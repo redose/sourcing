@@ -1,6 +1,6 @@
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
-import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, Link2, Pause, Play, Repeat, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
+import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, Link2, Search, Pause, Play, Repeat, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
 
@@ -758,7 +758,7 @@ const CSS = `
 .rd-story { font-family: ${SERIF}; font-size: 19px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; transition: color .6s; }
 .rd-story.focus { color: rgba(255,255,255,.42); }
 .rd-side > * { min-width: 0; }
-.rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }
+.rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 110px); overflow-y: auto; scrollbar-width: none; }
 .rd-bar { position: sticky; top: 8px; z-index: 10; border-radius: 20px; border: 1px solid ${C.line}; background: rgba(62,50,124,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .rd-range { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 999px; background: rgba(255,255,255,.18); outline: none; }
 .rd-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; cursor: pointer; }
@@ -1897,16 +1897,7 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 	const co = new Map(rows(coQ).map((r) => [S(r.s), N(r.n)]));
 	// Match the name, or any common or street name; exact name matches come first, and the card says which name hit.
 	const needle = filter.trim().toLowerCase();
-	const matchOf = (r: Record<string, unknown>) => {
-		if (!needle) return { rank: 0, via: '' };
-		const name = S(r.s).toLowerCase();
-		if (name === needle || short(S(r.s)).toLowerCase() === needle) return { rank: 3, via: '' };
-		const names = S(r.alias).split('|').filter(Boolean);
-		if (names.includes(needle)) return { rank: 2, via: needle };
-		if (name.includes(needle) || short(S(r.s)).toLowerCase().includes(needle)) return { rank: 1.5, via: '' };
-		const partial = names.find((a) => a.includes(needle));
-		return partial ? { rank: 1, via: partial } : { rank: -1, via: '' };
-	};
+	const matchOf = (r: Record<string, unknown>) => matchSubstance(r, needle);
 	const list = rows(q)
 		.map((r) => ({ ...r, hit: matchOf(r) }))
 		.filter((r) => r.hit.rank >= 0)
@@ -2527,6 +2518,177 @@ function SubstanceNumbers({ name }: { name: string }) {
 				</div>
 			</div>
 		</section>
+	);
+}
+
+// How well a substance row (name + "|"-separated common and street names) matches a search: exact name first,
+// then an exact other name, then partial name, then partial other name. `via` is the other name that matched.
+const matchSubstance = (r: Record<string, unknown>, needle: string) => {
+	if (!needle) return { rank: 0, via: '' };
+	const name = S(r.s).toLowerCase();
+	const shown = short(S(r.s)).toLowerCase();
+	if (name === needle || shown === needle) return { rank: 3, via: '' };
+	const names = S(r.alias).split('|').filter(Boolean);
+	if (names.includes(needle)) return { rank: 2, via: needle };
+	if (name.includes(needle) || shown.includes(needle)) return { rank: 1.5, via: '' };
+	const partial = names.find((a) => a.includes(needle));
+	return partial ? { rank: 1, via: partial } : { rank: -1, via: '' };
+};
+
+// Full-text search over the stories: closely read ones first. A bare number is a report ID.
+const reportSearchSQL = (q: string) => {
+	const id = /^\d{2,7}$/.test(q);
+	const term = esc(q.toLowerCase());
+	return `
+SELECT r.id,
+  array_to_string(list_distinct(r.substances), ' · ') AS subs,
+  (SELECT canonical_substance FROM ${DB}."report_doses" d WHERE d.report_id = r.id AND canonical_substance IS NOT NULL LIMIT 1) AS first_sub,
+  r.experience_year AS yr,
+  ${id ? "''" : `substring(r.body, greatest(1, position('${term}' IN lower(r.body)) - 60), 170)`} AS snip,
+  x.report_id IS NOT NULL AS close
+FROM ${DB}."experience_reports" r
+LEFT JOIN ${DB}."llm_extractions" x ON x.report_id = r.id
+WHERE ${id ? `r.id = 'erowid-${q}'` : `lower(r.body) LIKE '%${term.replace(/[%_]/g, ' ')}%'`}
+ORDER BY close DESC, r.id DESC
+LIMIT 6`;
+};
+
+// Wrap each occurrence of the search words in a soft highlight.
+const highlight = (text: string, needle: string) => {
+	if (!needle) return text;
+	const parts = text.split(new RegExp(`(${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig'));
+	return parts.map((p, i) => (i % 2 ? <mark key={i} style={{ background: 'rgba(255,224,130,.3)', color: '#fff', borderRadius: 3, padding: '0 1px' }}>{p}</mark> : p));
+};
+
+// The search in the header: substances (with their common and street names), effects, and the text of every story.
+// ⌘K or "/" to focus, arrows to move, Enter to open, Esc to close.
+function GlobalSearch({ subs, onSubstance, onEffect, onReport }: { subs: Record<string, unknown>[]; onSubstance: (s: string) => void; onEffect: (e: string) => void; onReport: (id: string, sub: string) => void }) {
+	const [q, setQ] = useState('');
+	const [dq, setDq] = useState('');
+	const [open, setOpen] = useState(false);
+	const [sel, setSel] = useState(0);
+	const input = useRef<HTMLInputElement | null>(null);
+	const box = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		const timer = setTimeout(() => setDq(q.trim()), 280);
+		return () => clearTimeout(timer);
+	}, [q]);
+	useEffect(() => {
+		const key = (e: KeyboardEvent) => {
+			const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+			if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing)) {
+				e.preventDefault();
+				input.current?.focus();
+				setOpen(true);
+			}
+		};
+		const away = (e: PointerEvent) => box.current && !box.current.contains(e.target as Node) && setOpen(false);
+		window.addEventListener('keydown', key);
+		window.addEventListener('pointerdown', away);
+		return () => {
+			window.removeEventListener('keydown', key);
+			window.removeEventListener('pointerdown', away);
+		};
+	}, []);
+	const effectsQ = useSQLQuery(effectsBrowseSQL, { enabled: open });
+	const repQ = useSQLQuery(reportSearchSQL(dq), { enabled: open && (dq.length >= 3 || /^\d{2,7}$/.test(dq)) });
+	const needle = q.trim().toLowerCase();
+	type Item = { kind: 'sub' | 'eff' | 'rep'; key: string; title: string; sub?: string; via?: string; snip?: string; id?: string; first?: string; n?: number };
+	const subHits: Item[] = needle
+		? subs
+				.map((r) => ({ r, m: matchSubstance(r, needle) }))
+				.filter((x) => x.m.rank >= 0)
+				.sort((a, b) => b.m.rank - a.m.rank || N(b.r.n) - N(a.r.n))
+				.slice(0, 5)
+				.map(({ r, m }) => ({ kind: 'sub', key: `s${S(r.s)}`, title: S(r.s), via: m.via, n: N(r.n) }))
+		: [];
+	const effHits: Item[] = needle.length >= 2 ? rows(effectsQ).filter((r) => S(r.name).toLowerCase().includes(needle)).slice(0, 5).map((r) => ({ kind: 'eff', key: `e${S(r.name)}`, title: S(r.name), n: N(r.n) })) : [];
+	const repHits: Item[] = dq && dq.toLowerCase() === needle ? rows(repQ).map((r) => ({ kind: 'rep', key: `r${S(r.id)}`, id: S(r.id), first: S(r.first_sub), title: S(r.subs) || 'Report', sub: r.yr != null ? String(N(r.yr)) : '', snip: S(r.snip).replace(/\s+/g, ' ').trim() })) : [];
+	const items = [...subHits, ...effHits, ...repHits];
+	useEffect(() => setSel(0), [needle]);
+	const go = (it?: Item) => {
+		if (!it) return;
+		setOpen(false);
+		setQ('');
+		input.current?.blur();
+		if (it.kind === 'sub') onSubstance(it.title);
+		else if (it.kind === 'eff') onEffect(it.title);
+		else onReport(it.id!, it.first || '');
+	};
+	const searching = open && needle && dq.toLowerCase() !== needle;
+	const group = (label: string, list: Item[], offset: number) =>
+		list.length > 0 && (
+			<div className="py-1.5">
+				<div className="rd-label px-3 pb-1">{label}</div>
+				{list.map((it, i) => (
+					<button
+						key={it.key}
+						onMouseEnter={() => setSel(offset + i)}
+						onClick={() => go(it)}
+						className="block w-full rounded-xl px-3 py-2 text-left"
+						style={{ background: sel === offset + i ? 'rgba(255,255,255,.1)' : 'transparent' }}
+					>
+						<div className="flex items-center gap-2 text-sm">
+							{it.kind === 'sub' && <SubstanceIcon name={it.title} />}
+							<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+								{it.kind === 'sub' ? short(it.title) : it.title}
+							</span>
+							{it.via && <span className="text-xs italic" style={{ color: C.mint, whiteSpace: 'nowrap' }}>“{it.via}”</span>}
+							<span className="ml-auto text-xs tabular-nums" style={{ color: C.faint, whiteSpace: 'nowrap' }}>
+								{it.kind === 'rep' ? `#${it.id!.replace('erowid-', '')}${it.sub ? ` · ${it.sub}` : ''}` : `${it.n} reports`}
+							</span>
+						</div>
+						{it.snip && (
+							<div className="mt-1 text-xs" style={{ color: C.soft, fontFamily: SERIF, fontSize: 13.5, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+								…{highlight(it.snip, needle)}…
+							</div>
+						)}
+					</button>
+				))}
+			</div>
+		);
+	return (
+		<div ref={box} className="relative" style={{ zIndex: 30 }}>
+			<label className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ background: 'rgba(255,255,255,.08)', border: `1px solid ${open ? 'rgba(255,255,255,.35)' : C.line}`, transition: 'border-color .2s' }}>
+				<Search size={14} color={C.faint} />
+				<input
+					ref={input}
+					value={q}
+					onChange={(e) => {
+						setQ(e.target.value);
+						setOpen(true);
+					}}
+					onFocus={() => setOpen(true)}
+					onKeyDown={(e) => {
+						if (e.key === 'ArrowDown') {
+							e.preventDefault();
+							setSel((i) => Math.min(items.length - 1, i + 1));
+						} else if (e.key === 'ArrowUp') {
+							e.preventDefault();
+							setSel((i) => Math.max(0, i - 1));
+						} else if (e.key === 'Enter') go(items[sel]);
+						else if (e.key === 'Escape') {
+							setOpen(false);
+							input.current?.blur();
+						}
+					}}
+					placeholder="Search"
+					aria-label="Search substances, effects and stories"
+					className="bg-transparent text-sm outline-none"
+					style={{ width: 'min(200px, 38vw)', color: C.text }}
+				/>
+				<kbd className="rd-hide-sm text-xs" style={{ color: C.faint, fontFamily: SANS }}>⌘K</kbd>
+			</label>
+			{open && needle && (
+				<div className="rd-fade absolute right-0 mt-2 overflow-y-auto rounded-2xl p-1.5" style={{ width: 'min(460px, 92vw)', maxHeight: '70vh', background: C.panel, border: `1px solid ${C.line}`, boxShadow: '0 20px 50px rgba(10,4,40,.5)' }}>
+					{group('Substances', subHits, 0)}
+					{group('Effects', effHits, subHits.length)}
+					{group('Stories', repHits, subHits.length + effHits.length)}
+					{(searching || repQ.isLoading) && <div className="px-3 py-2 text-xs" style={{ color: C.faint }}>Searching stories…</div>}
+					{!items.length && !searching && !repQ.isLoading && <div className="px-3 py-3 text-sm" style={{ color: C.faint }}>Nothing found for “{q.trim()}”.</div>}
+				</div>
+			)}
+		</div>
 	);
 }
 
@@ -4288,7 +4450,7 @@ export default function ReportTimelapse() {
 		<OpenCtx.Provider value={{ open: setOpenItem, effectInfo, classOf: (n: string) => classMap.get(n) }}>
 			<main className="rd" style={{ minHeight: '100vh', background: BG, color: C.text }}>
 				<style>{CSS}</style>
-				<div className="px-4 py-6 sm:px-8 sm:py-8" style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate' }}>
+				<div className="px-4 py-6 sm:px-8 sm:py-8" style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 110 }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '90px 140px' }} />
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
@@ -4303,6 +4465,20 @@ export default function ReportTimelapse() {
 						>
 							<img src={LOGO} alt="re:dose" style={{ height: 34, width: 'auto', display: 'block' }} />
 						</button>
+						<div className="flex flex-wrap items-center gap-3">
+						<GlobalSearch
+							subs={rows(pickQ)}
+							onSubstance={goSubstance}
+							onEffect={(e) => setOpenItem({ kind: 'effect', name: e })}
+							onReport={(id, s) => {
+								setView('reports');
+								if (s) setSub(s);
+								setWithSub(undefined as unknown as null);
+								setAtLink(undefined as unknown as null);
+								setOpenItem(null);
+								setReportId(id);
+							}}
+						/>
 						<nav className="flex items-center gap-1">
 							{(['reports', 'substances', 'effects'] as const).map((v) => (
 								<button key={v} className="rd-nav" aria-current={view === v ? 'page' : undefined} onClick={() => setView(v)}>
@@ -4314,6 +4490,7 @@ export default function ReportTimelapse() {
 								<span className="rd-hide-sm">Community</span>
 							</a>
 						</nav>
+						</div>
 					</header>
 
 					{view === 'reports' && (sub || reportId) && (
