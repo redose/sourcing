@@ -2711,18 +2711,19 @@ function AboutPage() {
 	const r = rows(q)[0];
 	const n = (v: unknown) => (r ? N(v).toLocaleString() : '…');
 	const pct = r ? Math.round((100 * N(r.read_closely)) / Math.max(1, N(r.reports))) : 0;
+	// Reads like an article: serif body at a comfortable size and line length, clean sans headings.
 	const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-		<section className="mt-10">
-			<h2 className="text-xl font-semibold">{title}</h2>
-			<div className="mt-2 grid gap-3" style={{ color: C.soft, lineHeight: 1.7, fontSize: 16.5 }}>
+		<section className="mt-12">
+			<h2 style={{ fontFamily: SANS, fontSize: 22, fontWeight: 650, letterSpacing: '-0.015em', color: '#fff' }}>{title}</h2>
+			<div className="mt-3 grid gap-4" style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.7, color: 'rgba(255,255,255,.88)', maxWidth: 680 }}>
 				{children}
 			</div>
 		</section>
 	);
 	return (
 		<section className="rd-in max-w-3xl">
-			<h1 className="text-4xl font-semibold">How this works</h1>
-			<p className="mt-3" style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.5 }}>
+			<h1 style={{ fontFamily: SANS, fontSize: 44, fontWeight: 650, letterSpacing: '-0.025em', lineHeight: 1.1 }}>How this works</h1>
+			<p className="mt-4" style={{ fontFamily: SERIF, fontSize: 23, lineHeight: 1.55, color: 'rgba(255,255,255,.92)', maxWidth: 680 }}>
 				re:dose turns thousands of first-hand drug experience reports into something you can explore: how a substance usually plays out, what people felt, how mixes went, and the stories themselves. Here’s where it all comes from and how the conclusions are reached.
 			</p>
 			<div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
@@ -4170,6 +4171,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 										</span>
 									)}
 								</p>
+							<Sources className="mt-3" list={['sei', 'pw', ...(rows(pairsQ).length ? ['tripsit' as const] : [])]} />
 								{allEffects.length > 0 && (
 									<div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-5" style={{ borderColor: C.line }}>
 										<span className="rd-label mr-1">What happened</span>
@@ -4223,7 +4225,6 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 							<span key={i}>{renderPlain(s.text, s.from, `b${i}`)}</span>
 						),
 					)}
-					<Sources className="mt-10 border-t pt-5" list={[['erowid', `https://erowid.org/experiences/exp.php?ID=${id.replace('erowid-', '')}`], 'sei', 'pw', ...(rows(pairsQ).length ? ['tripsit' as const] : [])]} />
 				</article>
 
 				{/* Alongside the story: the moment, and the doses */}
@@ -4751,10 +4752,6 @@ export default function ReportTimelapse() {
 								How this works
 							</button>
 							<span className="text-xs" style={{ color: C.faint }}>Not medical advice.</span>
-							<a className="rd-btn inline-flex items-center gap-2" href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: 13, padding: '6px 12px' }}>
-								<DiscordIcon size={15} />
-								Join the community
-							</a>
 						</div>
 					</footer>
 				</div>
