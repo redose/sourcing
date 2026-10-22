@@ -2184,7 +2184,7 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 
 // The top of a substance's own page: what it is (and what people call it), how a dose usually plays out, what to
 // watch for, what people feel. Tolerance and what it's mixed with sit in their own cards below.
-function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
+function SubstanceOverview({ name }: { name: string }) {
 	const detailQ = useSQLQuery(substanceDetailSQL(name));
 	const timingQ = useSQLQuery(timingSQL([name]));
 	const membersQ = useSQLQuery(groupMembersSQL(name), { enabled: isGroup(name) });
@@ -2261,6 +2261,7 @@ function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: strin
 									</span>
 								</li>
 							)}
+							{L(r.cross_tol).length > 0 && <CrossTolLine name={name} />}
 							<li className="flex items-start gap-2.5">
 								<Calendar size={15} color={C.faint} style={{ flexShrink: 0, marginTop: 2 }} />
 								<span style={{ color: C.faint }}>
@@ -2280,16 +2281,6 @@ function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: strin
 						</div>
 					</div>
 				)}
-			</div>
-			<div className={`mt-6 grid gap-6 ${L(r.cross_tol).length > 0 ? 'lg:grid-cols-2' : ''}`}>
-				{L(r.cross_tol).length > 0 && (
-					<div className="rd-card content-start p-6">
-						<CrossTol name={name} />
-					</div>
-				)}
-				<div className="rd-card content-start p-6">
-					<CombosList name={name} onCombo={onCombo} />
-				</div>
 			</div>
 		</>
 	);
@@ -2355,6 +2346,22 @@ function Sources({ list, className = 'mt-6' }: { list: (keyof typeof SOURCES | [
 				);
 			})}
 		</div>
+	);
+}
+
+// One "At a glance" line: the most-reported substances that share tolerance with this one (all of them on hover).
+function CrossTolLine({ name }: { name: string }) {
+	const q = useSQLQuery(crossTolSQL(name));
+	const list = rows(q).map((r) => S(r.name));
+	if (!list.length) return null;
+	return (
+		<li className="flex items-start gap-2.5" title={`Recent use of any of these makes ${short(name)} feel weaker, and the other way round: ${list.join(', ')}`}>
+			<Repeat size={15} color={C.lav} style={{ flexShrink: 0, marginTop: 2 }} />
+			<span style={{ color: C.soft }}>
+				Shares tolerance with {list.slice(0, 3).map(short).join(', ')}
+				{list.length > 3 ? ` and ${list.length - 3} more` : ''}
+			</span>
+		</li>
 	);
 }
 
@@ -2848,6 +2855,8 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	const slice = clamp(Math.floor(cursor / w), 0, SLICES - 1);
 	const readout = series.map((s) => ({ ...s, v: interp(s.points, cursor) })).filter((r) => r.v != null).sort((a, b) => (b.v as number) - (a.v as number));
 	const shuffle = () => list.length && onOpen(S(list[Math.floor(Math.random() * list.length)].report_id));
+	const [tab, setTab] = useState<'stories' | 'unfold' | 'mixes'>('stories');
+	useEffect(() => setTab('stories'), [sub]);
 	// A dangerous or unsafe pair tints the whole page, so the risk is felt before anything is read.
 	const pairNote = withSub ? rows(pairQ)[0] : undefined;
 	const tolQ = useSQLQuery(tolPairsSQL(withSub ? [sub, withSub] : []), { enabled: !!withSub });
@@ -2869,8 +2878,24 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</span>
 				))}
 			</h1>
-			{!withSub && <SubstanceOverview name={sub} onCombo={onCombo} />}
-			<div className={`${withSub ? "mt-4" : "mt-12"} flex flex-wrap items-center gap-2`}>
+			{!withSub && <SubstanceOverview name={sub} />}
+			{!withSub && (
+				<div className="mt-12 flex flex-wrap items-center gap-1 border-b" style={{ borderColor: C.line }} role="tablist">
+					{(
+						[
+							['stories', 'Stories'],
+							['unfold', 'How it unfolds'],
+							['mixes', 'Often mixed with'],
+						] as const
+					).map(([k, label]) => (
+						<button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className="px-4 py-3 text-base font-semibold" style={{ color: tab === k ? '#fff' : C.faint, borderBottom: `2px solid ${tab === k ? C.mint : 'transparent'}`, marginBottom: -1, transition: 'color .2s, border-color .2s' }}>
+							{label}
+						</button>
+					))}
+				</div>
+			)}
+			{(withSub || tab !== 'mixes') && (
+			<div className={`${withSub ? "mt-4" : "mt-5"} flex flex-wrap items-center gap-2`}>
 				{[false, true].map((v) => (
 					<button key={String(v)} className="rd-nav" aria-current={only === v ? 'page' : undefined} onClick={() => setOnly(v)} style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }}>
 						{v ? (withSub ? 'Only these two' : `Only ${short(sub)}`) : withSub ? 'Any reports with both' : 'Any reports with it'}
@@ -2878,6 +2903,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				))}
 				<span className="text-xs" style={{ color: C.faint }}>{only ? 'Nothing else taken' : 'May include other substances'}</span>
 			</div>
+			)}
 			<Sources className="mt-4" list={['erowid', 'sei', 'pw', ...(withSub ? ['tripsit' as const] : [])]} />
 			{withSub && (
 				<div className="rd-card rd-in mt-6 p-5" style={risk >= 1 ? { background: RISK[risk].bg, borderColor: risk >= 2 ? RISK[risk].c : `${RISK[risk].c}88`, padding: risk >= 2 ? 28 : undefined } : undefined}>
@@ -2933,7 +2959,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</span>
 				</p>
 			)}
-			{curveQ.isLoading || kq.isLoading ? (
+			{(withSub || tab === 'unfold') && (curveQ.isLoading || kq.isLoading ? (
 				<div className="rd-card mt-6 animate-pulse" style={{ height: 320 }} />
 			) : withSub ? (
 				<>
@@ -2973,8 +2999,10 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						</div>
 					</div>
 				</section>
-			) : null}
+			) : null)}
 
+			{(withSub || tab === 'stories') && (
+				<>
 			<div className="mt-10 flex flex-wrap items-end justify-between gap-3">
 				<div>
 					<h2 className="text-2xl font-semibold">{withSub ? 'Stories with both' : 'Stories'}</h2>
@@ -3000,6 +3028,13 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 							</div>
 						</button>
 					))}
+				</div>
+			)}
+				</>
+			)}
+			{!withSub && tab === 'mixes' && (
+				<div className="rd-card rd-in mt-6 p-6">
+					<CombosList name={sub} onCombo={onCombo} />
 				</div>
 			)}
 			<Err q={q} />
