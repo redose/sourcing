@@ -2329,9 +2329,9 @@ function SubstanceOverview({ name }: { name: string }) {
 				</p>
 			)}
 			<StreetNames name={name} known={[name, ...aka]} />
-			<div className="rd-card rd-in mt-6 p-6 sm:p-7">
+			<div className="rd-in mt-6">
 				{warning && (
-					<div className="mb-6 flex items-start gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
+					<div className="mb-8 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
 						<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
 						<span>{warning}</span>
 					</div>
@@ -2344,7 +2344,7 @@ function SubstanceOverview({ name }: { name: string }) {
 					</div>
 				</div>
 				{L(r.effects).length > 0 && (
-					<div className="mt-7 border-t pt-5" style={{ borderColor: C.line }}>
+					<div className="mt-8 border-t pt-6" style={{ borderColor: C.line }}>
 						<div className="rd-label mb-3">What people mostly feel</div>
 						{feel}
 					</div>
