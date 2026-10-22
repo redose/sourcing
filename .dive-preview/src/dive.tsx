@@ -1570,7 +1570,7 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 									<div>
 										<span className="rd-label mr-2">Tolerance</span>
 										builds {S(r.tolerance_full).replace(/^with\s+/i, '')}
-										{S(r.tolerance_zero) ? `, back to baseline ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ')}` : ''}
+										{S(r.tolerance_zero) ? `, back to baseline ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ').replace(/^(?=\d)/, 'after ')}` : ''}
 									</div>
 								)}
 								{S(r.addiction) && (
@@ -1740,13 +1740,12 @@ function CombosList({ name, onCombo }: { name: string; onCombo: (a: string, b: s
 							<button
 								key={other}
 								onClick={() => onCombo(name, other)}
-								className="rd-hover grid items-center gap-3 rounded-xl px-2 py-2.5 text-left"
-								style={{ gridTemplateColumns: 'minmax(0, 1.2fr) auto minmax(0, 1.6fr) 16px', borderTop: `1px solid ${C.line}` }}
+								className="rd-hover grid items-center rounded-xl px-2 py-3 text-left"
+								style={{ gridTemplateColumns: 'minmax(0, 1fr) auto 16px', columnGap: 12, rowGap: 6, borderTop: `1px solid ${C.line}` }}
 							>
 								<span className="flex items-center gap-2 font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={other}>
 									<ClassIcon cls={classOf(other)} size={16} color={C.coral} />
 									{short(other)}
-									<span className="text-xs font-normal" style={{ color: C.faint }}>{N(r.n)} together</span>
 								</span>
 								<span className="text-xs font-semibold" style={{ color: sev?.c ?? C.faint, whiteSpace: 'nowrap' }}>
 									{sev ? (
@@ -1759,8 +1758,11 @@ function CombosList({ name, onCombo }: { name: string; onCombo: (a: string, b: s
 										'no note'
 									)}
 								</span>
-								<OutcomeBar pos={r.pos} neg={r.neg} n={N(r.n_llm)} />
-								<ChevronRight size={14} color={C.faint} />
+								<ChevronRight size={14} color={C.faint} style={{ gridRow: '1 / 3', gridColumn: 3 }} />
+								<span className="flex flex-wrap items-center gap-x-3 gap-y-1" style={{ gridColumn: '1 / 3' }}>
+									<span className="text-xs" style={{ color: C.faint, whiteSpace: 'nowrap' }}>{N(r.n)} reports together</span>
+									<OutcomeBar pos={r.pos} neg={r.neg} n={N(r.n_llm)} />
+								</span>
 							</button>
 						);
 					})}
@@ -2059,47 +2061,109 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 	return { desc, warning, aka, timing: t };
 }
 
-// The top of a substance's own page: what it is, how it usually goes, what to watch for, what it's mixed with.
+// How one dose usually plays out, as a shape: nothing → first effects → strongest → fading. The three moments are
+// marked on the curve and spelled out underneath, so the numbers read as a timeline rather than three stats.
+function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
+	const span = end * 1.12;
+	const x = (v: number) => (100 * v) / span;
+	const pts: [number, number][] = [
+		[0, 0],
+		[on, 0.18],
+		[pk, 1],
+		[pk + (end - pk) * 0.3, 0.8],
+		[end, 0.22],
+		[span, 0],
+	];
+	const H = 76;
+	const path = pts.map(([v, y], i) => `${i ? 'L' : 'M'}${x(v) * 10},${H - y * (H - 8)}`).join(' ');
+	const marks = [
+		{ v: on, label: 'Kicks in', color: C.lav },
+		{ v: pk, label: 'Strongest', color: C.cyan },
+		{ v: end, label: 'Mostly gone', color: C.faint },
+	];
+	return (
+		<div>
+			<div className="relative" style={{ height: H }}>
+				<svg viewBox={`0 0 1000 ${H}`} preserveAspectRatio="none" width="100%" height={H} style={{ display: 'block', overflow: 'visible' }} aria-hidden>
+					<defs>
+						<linearGradient id="phase-fill" x1="0" x2="0" y1="0" y2="1">
+							<stop offset="0%" stopColor={C.cyan} stopOpacity="0.35" />
+							<stop offset="100%" stopColor={C.cyan} stopOpacity="0.02" />
+						</linearGradient>
+					</defs>
+					<path d={`${path} L1000,${H} L0,${H} Z`} fill="url(#phase-fill)" />
+					<path d={path} fill="none" stroke={C.cyan} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+					<line x1="0" x2="1000" y1={H} y2={H} stroke="rgba(255,255,255,.2)" vectorEffect="non-scaling-stroke" />
+					{marks.map((m) => (
+						<line key={m.label} x1={x(m.v) * 10} x2={x(m.v) * 10} y1="0" y2={H} stroke={m.color} strokeDasharray="3 4" strokeOpacity="0.7" vectorEffect="non-scaling-stroke" />
+					))}
+				</svg>
+				{marks.map((m) => (
+					<span key={m.label} className="absolute rounded-full" style={{ left: `${x(m.v)}%`, bottom: -5, width: 10, height: 10, marginLeft: -5, background: m.color, boxShadow: `0 0 0 3px ${C.deep}` }} />
+				))}
+			</div>
+			<div className="mt-1 flex justify-between text-xs" style={{ color: C.faint }}>
+				<span>Dose</span>
+				<span>{fmtDur(span)}</span>
+			</div>
+			<div className="mt-5 grid grid-cols-3 gap-4">
+				{marks.map((m) => (
+					<div key={m.label}>
+						<div className="flex items-center gap-2">
+							<span className="rd-dot" style={{ width: 9, height: 9, background: m.color }} />
+							<span className="rd-label" style={{ color: C.soft }}>{m.label}</span>
+						</div>
+						<div className="mt-1 text-3xl font-light" style={{ letterSpacing: '-0.02em' }}>
+							{m.label === 'Mostly gone' ? 'by ' : '~'}
+							{fmtDur(m.v)}
+						</div>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+// The top of a substance's own page: what it is (and what people call it), how a dose usually plays out, what to
+// watch for, what people feel. Tolerance and what it's mixed with sit in their own cards below.
 function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
 	const detailQ = useSQLQuery(substanceDetailSQL(name));
 	const timingQ = useSQLQuery(timingSQL([name]));
 	const r = rows(detailQ)[0];
-	if (detailQ.isLoading || timingQ.isLoading) return <div className="rd-card mt-6 animate-pulse" style={{ height: 260 }} />;
+	if (detailQ.isLoading || timingQ.isLoading) return <div className="rd-card mt-6 animate-pulse" style={{ height: 360 }} />;
 	if (!r) return null;
 	const { desc, warning, aka, timing: t } = describeSubstance(name, r, rows(timingQ));
+	const hasTol = S(r.tolerance_full) || S(r.addiction) || L(r.cross_tol).length > 0;
 	return (
-		<div className="rd-in mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-			<div className="grid content-start gap-5">
-				{aka.length > 0 && (
-					<div className="text-sm" style={{ color: C.soft }}>
-						<span className="rd-label mr-2">Also known as</span>
-						{aka.join(', ')}
-					</div>
-				)}
-				{desc && <p style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.55 }}>{desc}</p>}
+		<>
+			{aka.length > 0 && (
+				<p className="mt-3 text-lg" style={{ color: C.soft }}>
+					Also called{' '}
+					{aka.map((a, i) => (
+						<span key={a}>
+							{i > 0 && <span style={{ color: C.faint }}>{i === aka.length - 1 ? ' or ' : ', '}</span>}
+							<span style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{a}</span>
+						</span>
+					))}
+				</p>
+			)}
+			<div className="rd-card rd-in mt-6 grid gap-8 p-6 sm:p-9">
+				{desc && <p style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.5, maxWidth: 820 }}>{desc}</p>}
 				{t && (
-					<div className="flex flex-wrap gap-10">
-						{[
-							['First effects', N(t.on_m)],
-							['Strongest', N(t.pk_m)],
-							['Last effects', N(t.end_m)],
-						].map(([l, v]) => (
-							<div key={l as string}>
-								<div className="text-3xl font-light" style={{ letterSpacing: '-0.02em' }}>{fmtDur(v as number)}</div>
-								<div className="rd-label mt-1">{l}</div>
-							</div>
-						))}
+					<div>
+						<div className="rd-label mb-3">How a dose usually plays out</div>
+						<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} />
 					</div>
 				)}
 				{warning && (
-					<div className="flex items-start gap-2 rounded-2xl p-4 text-sm" style={{ background: 'rgba(255,163,182,.12)', border: '1px solid rgba(255,163,182,.4)', color: C.text, lineHeight: 1.5 }}>
-						<AlertTriangle size={16} color={C.coral} style={{ flexShrink: 0, marginTop: 2 }} />
+					<div className="flex items-start gap-3 rounded-2xl p-4" style={{ background: 'rgba(255,163,182,.12)', border: '1px solid rgba(255,163,182,.4)', color: C.text, lineHeight: 1.5 }}>
+						<AlertTriangle size={18} color={C.coral} style={{ flexShrink: 0, marginTop: 2 }} />
 						<span>{warning}</span>
 					</div>
 				)}
 				{L(r.effects).length > 0 && (
 					<div>
-						<div className="rd-label mb-2">Most reported effects</div>
+						<div className="rd-label mb-3">What people mostly feel</div>
 						<div className="flex flex-wrap gap-2">
 							{L(r.effects).map((e) => (
 								<EffectTag key={e} name={e} />
@@ -2107,29 +2171,30 @@ function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: strin
 						</div>
 					</div>
 				)}
-				{(S(r.tolerance_full) || S(r.addiction)) && (
-					<div className="grid gap-2 text-sm" style={{ color: C.soft }}>
+			</div>
+			<div className={`mt-6 grid gap-6 ${hasTol ? 'lg:grid-cols-2' : ''}`}>
+				{hasTol && (
+					<div className="rd-card grid content-start gap-4 p-6">
+						<span className="rd-label">Tolerance and habit</span>
 						{S(r.tolerance_full) && (
-							<div>
-								<span className="rd-label mr-2">Tolerance</span>
-								builds {S(r.tolerance_full).replace(/^with\s+/i, '')}
-								{S(r.tolerance_zero) ? `, back to baseline ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ')}` : ''}
-							</div>
+							<p style={{ color: C.soft, lineHeight: 1.5 }}>
+								Tolerance builds {S(r.tolerance_full).replace(/^with\s+/i, '')}
+								{S(r.tolerance_zero) ? `, and is back to baseline ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ').replace(/^(?=\d)/, 'after ')}` : ''}.
+							</p>
 						)}
 						{S(r.addiction) && (
-							<div>
-								<span className="rd-label mr-2">Habit-forming</span>
-								{S(r.addiction)}
-							</div>
+							<p style={{ color: C.soft, lineHeight: 1.5 }}>
+								<span style={{ color: '#fff' }}>{S(r.addiction)[0].toUpperCase() + S(r.addiction).slice(1)}</span>.
+							</p>
 						)}
+						{L(r.cross_tol).length > 0 && <CrossTol name={name} />}
 					</div>
 				)}
-				{L(r.cross_tol).length > 0 && <CrossTol name={name} />}
+				<div className="rd-card content-start p-6">
+					<CombosList name={name} onCombo={onCombo} />
+				</div>
 			</div>
-			<div className="rd-card content-start p-5">
-				<CombosList name={name} onCombo={onCombo} />
-			</div>
-		</div>
+		</>
 	);
 }
 
@@ -2674,7 +2739,8 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</span>
 				))}
 			</h1>
-			<div className="mt-4 flex flex-wrap items-center gap-2">
+			{!withSub && <SubstanceOverview name={sub} onCombo={onCombo} />}
+			<div className={`${withSub ? "mt-4" : "mt-12"} flex flex-wrap items-center gap-2`}>
 				{[false, true].map((v) => (
 					<button key={String(v)} className="rd-nav" aria-current={only === v ? 'page' : undefined} onClick={() => setOnly(v)} style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }}>
 						{v ? (withSub ? 'Only these two' : `Only ${short(sub)}`) : withSub ? 'Any reports with both' : 'Any reports with it'}
@@ -2728,7 +2794,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</span>
 				</p>
 			)}
-			{!withSub && <SubstanceOverview name={sub} onCombo={onCombo} />}
 			{curveQ.isLoading || kq.isLoading ? (
 				<div className="rd-card mt-6 animate-pulse" style={{ height: 320 }} />
 			) : withSub ? (
