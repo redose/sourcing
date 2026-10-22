@@ -3685,11 +3685,6 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 												title={fresh.has(e) ? `${e} starts here` : `${e}, continuing`}
 											>
 												<EffectTag name={e} />
-												{fresh.has(e) && (
-													<span className="absolute rounded-full px-1.5 font-bold uppercase" style={{ top: -7, right: -4, fontSize: 9, background: C.mint, color: C.deep, letterSpacing: '.06em', lineHeight: '14px' }}>
-														new
-													</span>
-												)}
 											</span>
 										))}
 									</div>
