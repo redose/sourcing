@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>re:dose log</title>
+<meta name="theme-color" content="#fbf9ff" />
+<style>
+	:root {
+		--coral: #ee4f74;
+		--cyan: #12a9b8;
+		--teal: #11998c;
+		--lav: #8b6cf0;
+		--lav-ink: #4b3a95;
+		--lav-soft: rgba(139, 108, 240, 0.12);
+		--amber: #e38b1f;
+		--bg: #fbf9ff;
+		--card: #ffffff;
+		--text: #2a2240;
+		--muted: #645d7d;
+		--line: #e7e0f5;
+		--shadow: 0 8px 28px rgba(139, 108, 240, 0.14);
+		--round: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Varela Round", system-ui, sans-serif;
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		font: 18px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+		color: var(--text);
+		background:
+			radial-gradient(700px 360px at 0% -10%, rgba(139, 108, 240, 0.2), transparent 70%),
+			radial-gradient(600px 320px at 100% 0%, rgba(90, 224, 228, 0.22), transparent 70%),
+			var(--bg);
+		background-attachment: fixed;
+		min-height: 100vh;
+	}
+	.wrap { max-width: 520px; margin: 0 auto; padding: 20px 16px 48px; }
+	h1, h2 { font-family: var(--round); margin: 0; }
+	button, input, select { font: inherit; color: inherit; }
+	button { cursor: pointer; }
+	a { color: var(--lav); font-weight: 600; }
+	[hidden] { display: none !important; }
+
+	.logo { font-size: 32px; line-height: 1.1; }
+	.logo .re { font-family: "Courier New", Courier, monospace; font-weight: 700; color: var(--coral); }
+	.logo .colon { color: var(--cyan); font-weight: 700; }
+	.logo .dose { font-family: var(--round); font-weight: 700; color: var(--coral); }
+	.logo .heart { color: var(--cyan); font-size: 24px; margin-left: 2px; }
+	.logo .sub { color: var(--lav); font-size: 21px; margin-left: 8px; font-weight: 600; font-family: var(--round); }
+
+	.big-btn {
+		width: 100%;
+		border: 0;
+		border-radius: 999px;
+		padding: 18px 20px;
+		font-family: var(--round);
+		font-size: 21px;
+		font-weight: 700;
+		color: #fff;
+		background: linear-gradient(135deg, var(--lav), #b06cf0 55%, var(--coral));
+		box-shadow: 0 10px 28px rgba(139, 108, 240, 0.35);
+	}
+	.big-btn:disabled { opacity: 0.4; box-shadow: none; }
+	.link-btn { border: 0; background: none; color: var(--lav); font-weight: 600; padding: 8px 0; font-size: 17px; }
+	.muted { color: var(--muted); }
+	.small { font-size: 16px; }
+
+	.card { background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 18px; box-shadow: var(--shadow); margin-top: 16px; }
+
+	/* Home */
+	.home-top { margin: 20px 0 6px; }
+	.empty { text-align: center; padding: 26px 12px; }
+	.empty .big { font-size: 40px; }
+
+	/* Dose card — bite-sized */
+	.dose-top { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 16px; }
+	.dose-name { font-family: var(--round); font-weight: 700; font-size: 22px; color: var(--text); }
+	.stage { font-family: var(--round); font-size: 26px; font-weight: 700; margin: 8px 0 2px; }
+	.stage.coming { color: #5b3fd0; }
+	.stage.peak { color: #0b7884; }
+	.stage.down { color: #c0345a; }
+	.stage.done, .stage.wait { color: var(--muted); }
+	.next { margin: 0; }
+	.track { position: relative; height: 12px; border-radius: 999px; background: #efeafa; margin: 18px 4px 4px; }
+	.track .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: linear-gradient(90deg, var(--lav), var(--cyan) 55%, var(--coral)); opacity: 0.85; }
+	.track .now { position: absolute; top: -8px; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: #fff; border: 3px solid var(--text); }
+	.track-ends { display: flex; justify-content: space-between; font-size: 14px; color: var(--muted); margin: 0 4px; }
+	.more-btn { border: 1.5px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 16px; margin-top: 14px; color: var(--lav-ink); font-weight: 600; }
+	.more { margin-top: 12px; }
+	.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+	.chip { border: 1.5px solid rgba(139, 108, 240, 0.35); background: var(--lav-soft); color: var(--lav-ink); border-radius: 999px; padding: 6px 12px; font-size: 16px; font-weight: 600; }
+	.chip[aria-pressed="true"] { background: var(--lav); color: #fff; border-color: var(--lav); }
+	.explain { margin-top: 10px; background: #f7f4ff; border-radius: 16px; padding: 12px 14px; font-size: 16px; }
+
+	.note { border-radius: 16px; padding: 12px 14px; margin-top: 12px; font-size: 17px; }
+	.note.danger { background: #fff0f3; border: 1.5px solid var(--coral); color: #a3203f; }
+	.note.warn { background: #fff6ea; border: 1.5px solid var(--amber); color: #8a4f08; }
+	.note.info { background: var(--lav-soft); border: 1.5px solid rgba(139, 108, 240, 0.3); color: var(--lav-ink); }
+
+	/* Wizard */
+	.wizard { position: fixed; inset: 0; background: var(--bg); overflow-y: auto; z-index: 10; }
+	.wizard .wrap { padding-top: 16px; }
+	.wiz-bar { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+	.dots { display: flex; gap: 6px; }
+	.dots span { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+	.dots span.on { background: var(--lav); }
+	.q { font-size: 28px; margin: 22px 0 6px; line-height: 1.2; }
+	.qhint { margin: 0 0 18px; }
+	.options { display: grid; gap: 10px; }
+	.opt { text-align: left; border: 1.5px solid var(--line); background: #fff; border-radius: 18px; padding: 15px 16px; font-size: 19px; font-weight: 600; }
+	.opt:hover, .opt:focus-visible { border-color: var(--lav); outline: none; box-shadow: 0 0 0 4px var(--lav-soft); }
+	.opt small { display: block; font-weight: 400; color: var(--muted); font-size: 15px; }
+	.input { width: 100%; border: 1.5px solid var(--line); border-radius: 18px; padding: 15px 16px; background: #fff; font-size: 20px; }
+	.input:focus { outline: none; border-color: var(--lav); box-shadow: 0 0 0 4px var(--lav-soft); }
+	.amount-row { display: grid; grid-template-columns: 1fr 112px; gap: 10px; }
+	.units { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+	.units button { border: 1.5px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 14px; font-size: 17px; }
+	.units button[aria-pressed="true"] { border-color: var(--lav); background: var(--lav-soft); color: var(--lav-ink); font-weight: 700; }
+	.wiz-foot { margin-top: 26px; display: grid; gap: 6px; }
+	.summary { font-size: 20px; font-family: var(--round); font-weight: 700; }
+
+	/* Footer bits */
+	.tip { margin-top: 28px; text-align: center; }
+	details { margin-top: 24px; }
+	summary { cursor: pointer; color: var(--lav); font-weight: 600; list-style: none; }
+	summary::-webkit-details-marker { display: none; }
+	.hist-day { margin-top: 14px; font-weight: 700; color: var(--muted); font-size: 15px; }
+	.hist { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 17px; }
+	.hist .t { width: 74px; color: var(--muted); font-size: 15px; flex-shrink: 0; }
+	.hist .w { flex: 1; }
+	.x { border: 0; background: none; color: var(--muted); font-size: 24px; line-height: 1; padding: 4px 8px; }
+	.tools { display: grid; gap: 8px; margin-top: 14px; }
+	.tools button { border: 1.5px solid var(--line); background: #fff; border-radius: 999px; padding: 10px 14px; font-size: 16px; color: var(--muted); }
+	.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+
+<!-- Home -->
+<main class="wrap" id="home">
+	<h1 class="logo"><span class="re">re</span><span class="colon">:</span><span class="dose">dose</span><span class="heart">♡</span><span class="sub">log</span></h1>
+	<p class="muted small" style="margin: 6px 0 0">Saved only on this phone.</p>
+
+	<div class="home-top"><button class="big-btn" id="start">＋ Log a dose</button></div>
+
+	<div id="now"></div>
+
+	<p class="tip muted small" id="tip"></p>
+
+	<details id="history">
+		<summary>Past doses</summary>
+		<div id="history-list"></div>
+	</details>
+
+	<details>
+		<summary>Backup &amp; settings</summary>
+		<div class="tools">
+			<button id="export">⬇ Save a backup file</button>
+			<button id="import">⬆ Restore from a backup</button>
+			<button id="clear">Delete everything</button>
+			<input type="file" id="import-file" accept="application/json" class="sr" />
+		</div>
+		<p class="muted small">
+			Timings and feelings come from real trip reports (Erowid). Dose ranges are from PsychonautWiki. It's what other
+			people went through — not medical advice. Questions?
+			<a href="https://discord.com/invite/WzWc5MQSnW" target="_blank" rel="noopener noreferrer">re:dose Discord ↗</a>
+		</p>
+	</details>
+</main>
+
+<!-- Step-by-step logging -->
+<section class="wizard" id="wizard" hidden aria-live="polite">
+	<div class="wrap">
+		<div class="wiz-bar">
+			<button class="link-btn" id="back">‹ Back</button>
+			<div class="dots" id="dots"></div>
+			<button class="link-btn" id="close">Cancel</button>
+		</div>
+		<div id="step"></div>
+	</div>
+</section>
+
+<script src="data.js"></script>
+<script>
+(() => {
+	'use strict';
+	const D = window.REDOSE_DATA;
+	const KEY = 'redose.log.v1';
+	const H = 3600e3;
+	const $ = (id) => document.getElementById(id);
+
+	// ── Reference data ───────────────────────────────────────────────
+	const byName = new Map(D.substances.map((s) => [s.name.toLowerCase(), s]));
+	const alias = new Map();
+	for (const s of D.substances) for (const a of s.aliases) if (!byName.has(a.toLowerCase())) alias.set(a.toLowerCase(), s);
+	const findSub = (text) => {
+		const k = String(text || '').trim().toLowerCase();
+		return byName.get(k) || alias.get(k) || null;
+	};
+	const nameOf = (text) => (findSub(text) || { name: String(text).trim() }).name;
+	const ROUTES = {
+		oral: '🍬 Swallowed',
+		smoked: '💨 Smoked or vaped',
+		insufflated: '👃 Snorted',
+		sublingual: '👅 Under the tongue',
+		injected: '💉 Injected',
+		other: '✳️ Something else',
+	};
+	const ROUTE_ALIAS = { inhaled: 'smoked', vaporized: 'smoked', intravenous: 'injected', intramuscular: 'injected', buccal: 'sublingual', rectal: 'other', transdermal: 'other' };
+	const normRoute = (r) => ROUTE_ALIAS[r] || r;
+	const routeWord = (r) => (ROUTES[r] || r).replace(/^\S+\s/, '').toLowerCase();
+
+	const timingFor = (sub, route) => (sub && ((sub.timingByRoute && sub.timingByRoute[normRoute(route)]) || sub.timing)) || null;
+	const refFor = (sub, route) => {
+		if (!sub || !sub.routes.length) return null;
+		return sub.routes.find((r) => normRoute(r.route) === normRoute(route)) || (sub.routes.length === 1 ? sub.routes[0] : null);
+	};
+	const pairSev = (a, b) => {
+		if (!a || !b || a === b) return 0;
+		return D.pairs[a < b ? `${a}|${b}` : `${b}|${a}`] || 0;
+	};
+
+	// ── Storage ─────────────────────────────────────────────────────
+	let log = [];
+	try {
+		const v = JSON.parse(localStorage.getItem(KEY) || '[]');
+		if (Array.isArray(v)) log = v;
+	} catch {}
+	const save = () => {
+		try {
+			localStorage.setItem(KEY, JSON.stringify(log));
+		} catch {
+			alert("Couldn't save — your browser may be blocking storage (private mode?).");
+		}
+	};
+
+	// ── Words & times ───────────────────────────────────────────────
+	const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+	const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+	const dur = (h) => {
+		const m = Math.round(h * 60);
+		if (m < 1) return 'under a minute';
+		if (m < 60) return `${m} min`;
+		const hh = Math.floor(m / 60), mm = m % 60;
+		return mm ? `${hh} h ${mm} min` : `${hh} h`;
+	};
+	const ago = (ms) => ((Date.now() - ms) / H < 1 / 60 ? 'just now' : `${dur((Date.now() - ms) / H)} ago`);
+	const dayLabel = (ms) => {
+		const d = new Date(ms).toDateString(), t = new Date();
+		if (d === t.toDateString()) return 'Today';
+		t.setDate(t.getDate() - 1);
+		if (d === t.toDateString()) return 'Yesterday';
+		return new Date(ms).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
+	};
+	const amountText = (e) => (e.amount ? `${e.amount} ${e.unit}` : '');
+
+	const bandOf = (ref, amount, unit) => {
+		if (!ref || !amount || !ref.unit) return null;
+		const f = ({ mg: { mg: 1, g: 1000, 'µg': 0.001 }, 'µg': { 'µg': 1, mg: 1000, g: 1e6 }, g: { g: 1, mg: 0.001, 'µg': 1e-6 } }[ref.unit] || {})[unit];
+		if (!f) return null;
+		const v = amount * f;
+		if (ref.threshold != null && v < ref.threshold) return 'below the usual threshold';
+		if (ref.common[0] != null && v < ref.common[0]) return 'a light dose';
+		if (ref.common[1] != null && v <= ref.common[1]) return 'a common dose';
+		if (ref.heavy != null && v >= ref.heavy) return 'a heavy dose';
+		return 'a strong dose';
+	};
+
+	// ── Active doses ────────────────────────────────────────────────
+	const windowH = (e) => {
+		const t = timingFor(findSub(e.sub), e.route);
+		return t ? Math.max(t.end[2] || 0, t.end[0] || 0) * 1.25 : 12;
+	};
+	const active = () => log.filter((e) => (Date.now() - e.t) / H < windowH(e)).sort((a, b) => b.t - a.t);
+
+	const stageOf = (t, h) => {
+		if (!t) return ['wait', 'Logged ✓'];
+		const [on] = t.onset, [pk, , pkHi] = t.peak, [end, , endHi] = t.end;
+		if (h < on) return ['coming', '🌱 Not much yet'];
+		if (h < pk) return ['coming', '🌤️ Coming up'];
+		if (h <= Math.max(pkHi || pk, pk)) return ['peak', '🌊 Around the peak'];
+		if (h < Math.max(endHi || end, end)) return ['down', '🌅 Winding down'];
+		return ['done', '🌙 Mostly done'];
+	};
+	const nextLine = (t, e, h) => {
+		if (!t) return 'Not enough stories yet to say how long it lasts.';
+		const [on] = t.onset, [pk] = t.peak, [end] = t.end;
+		if (h < on) return `Usually kicks in around <b>${clock(e.t + on * H)}</b>.`;
+		if (h < pk) return `Usually strongest around <b>${clock(e.t + pk * H)}</b>.`;
+		if (h < end) return `Usually done around <b>${clock(e.t + end * H)}</b>.`;
+		return 'Rest up and drink some water ♡';
+	};
+	const phaseAt = (sub, h) => {
+		if (!sub || !sub.phases) return null;
+		const b = D.phaseHours;
+		let i = 0;
+		while (i + 1 < b.length && h >= b[i + 1]) i++;
+		return sub.phases[i];
+	};
+
+	const ui = { open: null, effect: null }; // which card's "more" is open, and which feeling is explained
+	const mixNotes = (names) => {
+		const out = [];
+		for (let i = 0; i < names.length; i++)
+			for (let j = i + 1; j < names.length; j++) {
+				const s = pairSev(names[i], names[j]);
+				if (s >= 2) out.push([names[i], names[j], s]);
+			}
+		return out
+			.sort((a, b) => b[2] - a[2])
+			.map(([a, b, s]) => `<div class="note ${s === 3 ? 'danger' : 'warn'}">⚠️ <b>${esc(a)} + ${esc(b)}</b> is a ${s === 3 ? 'dangerous' : 'risky'} mix.</div>`)
+			.join('');
+	};
+
+	const card = (e) => {
+		const sub = findSub(e.sub);
+		const t = timingFor(sub, e.route);
+		const h = (Date.now() - e.t) / H;
+		const [cls, stage] = stageOf(t, h);
+		let html = `<article class="card" data-id="${e.id}">
+			<div class="dose-top"><span class="dose-name">${esc(nameOf(e.sub))}</span><span>${esc(ago(e.t))}</span></div>
+			<div class="stage ${cls}">${stage}</div>
+			<p class="next">${nextLine(t, e, h)}</p>`;
+		if (t) {
+			const max = Math.max(t.end[0], h) * 1.05;
+			const pct = (x) => `${Math.min(100, (100 * x) / max).toFixed(1)}%`;
+			html += `<div class="track" aria-hidden="true"><div class="fill" style="width:${pct(t.end[0])}"></div><div class="now" style="left:${pct(h)}"></div></div>
+				<div class="track-ends"><span>${esc(clock(e.t))}</span><span>${esc(clock(e.t + t.end[0] * H))}</span></div>`;
+		}
+		const ph = phaseAt(sub, h);
+		const isOpen = ui.open === e.id;
+		if (ph || t) html += `<button class="more-btn" data-more="${e.id}">${isOpen ? 'Show less' : 'What might I feel? ›'}</button>`;
+		if (isOpen) {
+			html += `<div class="more">`;
+			if (ph) {
+				html += `<div class="muted small">Around now, people often mention:</div><div class="chips">${ph.top
+					.map((x) => `<button class="chip" data-effect="${esc(x.e)}" aria-pressed="${ui.effect === x.e}">${esc(x.e)}</button>`)
+					.join('')}</div>`;
+				const info = ui.effect && D.effects[ui.effect];
+				if (info && ph.top.some((x) => x.e === ui.effect))
+					html += `<div class="explain">${esc(info.blurb)} <a href="${esc(info.url)}" target="_blank" rel="noopener noreferrer">More ↗</a></div>`;
+			} else html += `<div class="muted small">Not enough stories about this point in time yet.</div>`;
+			if (t) html += `<p class="muted small" style="margin:12px 0 0">Based on ${t.n} people's stories.</p>`;
+			html += `</div>`;
+		}
+		return html + `</article>`;
+	};
+
+	const TIPS = [
+		'🐢 Start low, go slow — give it time before taking more.',
+		'🔀 Check a mix before you mix.',
+		"🧑‍🤝‍🧑 Have someone you trust around, and don't use alone.",
+		'🧪 Test what you’ve got if you can.',
+		'💧 Sip water, eat something, rest after.',
+	];
+
+	const renderHome = () => {
+		const act = active();
+		$('now').innerHTML =
+			mixNotes([...new Set(act.map((e) => nameOf(e.sub)))]) +
+			(act.length ? act.map(card).join('') : `<div class="card empty"><div class="big">🌙</div>Nothing active right now.</div>`);
+		$('tip').textContent = TIPS[Math.floor(Date.now() / 6e4) % TIPS.length];
+
+		const past = [...log].sort((a, b) => b.t - a.t);
+		$('history').querySelector('summary').textContent = `Past doses (${past.length}) ›`;
+		let html = '', last = '';
+		for (const e of past) {
+			const d = dayLabel(e.t);
+			if (d !== last) html += `<div class="hist-day">${esc(d)}</div>`;
+			last = d;
+			html += `<div class="hist"><span class="t">${esc(clock(e.t))}</span><span class="w"><b>${esc(nameOf(e.sub))}</b> ${esc(
+				[amountText(e), routeWord(e.route)].filter(Boolean).join(' · '),
+			)}</span><button class="x" data-del="${e.id}" aria-label="Delete">×</button></div>`;
+		}
+		$('history-list').innerHTML = html || `<p class="muted small">Nothing yet.</p>`;
+	};
+
+	// ── Step-by-step logging ────────────────────────────────────────
+	let draft, stepIdx;
+	const STEPS = ['what', 'how', 'much', 'when', 'check'];
+
+	const recentNames = () => [...new Set([...log].sort((a, b) => b.t - a.t).map((e) => nameOf(e.sub)))].slice(0, 4);
+	const POPULAR = ['Cannabis', 'Alcohol', 'Psilocybin mushrooms', 'LSD', 'MDMA', 'Ketamine'];
+
+	const steps = {
+		what() {
+			const quick = [...new Set([...recentNames(), ...POPULAR])].slice(0, 6);
+			return `<h2 class="q">What did you take?</h2>
+				<p class="qhint muted">Nicknames are fine.</p>
+				<input class="input" id="w-sub" list="sub-list" autocomplete="off" placeholder="e.g. weed, acid, molly" value="${esc(draft.sub || '')}" />
+				<datalist id="sub-list">${D.substances
+					.flatMap((s) => [s.name, ...s.aliases.filter((a) => a.length > 2)])
+					.map((n) => `<option value="${esc(n)}"></option>`)
+					.join('')}</datalist>
+				<div class="options" style="margin-top:14px">${quick
+					.map((n) => `<button class="opt" data-pick="${esc(n)}">${esc(n)}</button>`)
+					.join('')}</div>
+				<div class="wiz-foot"><button class="big-btn" id="w-next" ${draft.sub ? '' : 'disabled'}>Next</button></div>`;
+		},
+		how() {
+			const sub = findSub(draft.sub);
+			const known = sub ? [...new Set(sub.routes.map((r) => normRoute(r.route)).filter((r) => ROUTES[r]))] : [];
+			const order = [...known, ...Object.keys(ROUTES).filter((k) => !known.includes(k))];
+			return `<h2 class="q">How did you take it?</h2>
+				<p class="qhint muted">${esc(nameOf(draft.sub))}</p>
+				<div class="options">${order.map((k) => `<button class="opt" data-route="${k}">${ROUTES[k]}</button>`).join('')}</div>`;
+		},
+		much() {
+			const ref = refFor(findSub(draft.sub), draft.route);
+			if (!draft.unit) draft.unit = (ref && ref.unit) || 'mg';
+			const units = [...new Set([draft.unit, 'mg', 'µg', 'g', 'ml', 'tab', 'pill', 'drink'])];
+			const band = bandOf(ref, draft.amount, draft.unit);
+			const refLine = ref && ref.common[0] != null ? `Common dose: ${ref.common[0]}–${ref.common[1]} ${esc(ref.unit)}.` : '';
+			return `<h2 class="q">How much?</h2>
+				<p class="qhint muted">${refLine || 'Skip it if you\'re not sure.'}</p>
+				<input class="input" id="w-amount" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount" value="${draft.amount || ''}" />
+				<div class="units">${units.map((u) => `<button data-unit="${esc(u)}" aria-pressed="${u === draft.unit}">${esc(u)}</button>`).join('')}</div>
+				<p class="small" id="w-band" style="margin:14px 0 0">${band ? `That's <b>${band}</b>.` : ''}</p>
+				<div class="wiz-foot"><button class="big-btn" id="w-next">${draft.amount ? 'Next' : 'Skip'}</button></div>`;
+		},
+		when() {
+			const opts = [[0, 'Just now'], [15, '15 min ago'], [30, '30 min ago'], [60, '1 hour ago'], [120, '2 hours ago']];
+			return `<h2 class="q">When?</h2>
+				<p class="qhint muted">&nbsp;</p>
+				<div class="options">${opts.map(([m, l]) => `<button class="opt" data-ago="${m}">${l}</button>`).join('')}
+				<button class="opt" data-ago="pick">🕒 Pick a time</button></div>
+				<input class="input" id="w-time" type="datetime-local" style="margin-top:12px" hidden />
+				<div class="wiz-foot" id="w-time-next" hidden><button class="big-btn" id="w-next">Next</button></div>`;
+		},
+		check() {
+			const name = nameOf(draft.sub);
+			const act = active().filter((e) => e.id !== draft.id);
+			const notes = [];
+			for (const n of new Set(act.map((e) => nameOf(e.sub)))) {
+				const s = pairSev(name, n);
+				if (s >= 2) notes.push(`<div class="note ${s === 3 ? 'danger' : 'warn'}">⚠️ <b>${esc(name)} + ${esc(n)}</b> is a ${s === 3 ? 'dangerous' : 'risky'} mix.</div>`);
+			}
+			const same = act.filter((e) => nameOf(e.sub) === name).sort((a, b) => b.t - a.t)[0];
+			if (same) {
+				const t = timingFor(findSub(same.sub), same.route);
+				const h = Math.max(0, (draft.t - same.t) / H);
+				notes.push(
+					`<div class="note warn">🐢 You took ${esc(name)} ${esc(dur(h))} before this.${
+						t && h < t.peak[0] ? ' It may not have peaked yet — waiting is the safer bet.' : ' More stacks on what’s there — go gently.'
+					}</div>`,
+				);
+			}
+			return `<h2 class="q">Look right?</h2>
+				<div class="card" style="margin-top:12px">
+					<div class="summary">${esc(name)}</div>
+					<div class="muted">${esc([amountText(draft), routeWord(draft.route)].filter(Boolean).join(' · '))}</div>
+					<div class="muted">${esc(dayLabel(draft.t))}, ${esc(clock(draft.t))}</div>
+				</div>
+				${notes.join('')}
+				<div class="wiz-foot"><button class="big-btn" id="w-save">Save ✓</button></div>`;
+		},
+	};
+
+	const showStep = (i) => {
+		stepIdx = i;
+		$('dots').innerHTML = STEPS.map((_, k) => `<span class="${k <= i ? 'on' : ''}"></span>`).join('');
+		$('back').style.visibility = i ? 'visible' : 'hidden';
+		$('step').innerHTML = steps[STEPS[i]]();
+		const focus = $('step').querySelector('input:not([hidden])');
+		if (focus && STEPS[i] !== 'when') focus.focus();
+		window.scrollTo(0, 0);
+	};
+	const startLog = (prefill) => {
+		draft = { ...(prefill || {}) };
+		$('wizard').hidden = false;
+		$('home').setAttribute('aria-hidden', 'true');
+		showStep(prefill && prefill.sub ? 1 : 0);
+	};
+	const closeLog = () => {
+		$('wizard').hidden = true;
+		$('home').removeAttribute('aria-hidden');
+		renderHome();
+	};
+
+	$('start').addEventListener('click', () => startLog());
+	$('close').addEventListener('click', closeLog);
+	$('back').addEventListener('click', () => stepIdx > 0 && showStep(stepIdx - 1));
+
+	$('step').addEventListener('input', (ev) => {
+		if (ev.target.id === 'w-sub') {
+			draft.sub = ev.target.value.trim();
+			$('w-next').disabled = !draft.sub;
+		}
+		if (ev.target.id === 'w-amount') {
+			const v = parseFloat(ev.target.value);
+			draft.amount = Number.isFinite(v) && v > 0 ? v : null;
+			const band = bandOf(refFor(findSub(draft.sub), draft.route), draft.amount, draft.unit);
+			$('w-band').innerHTML = band ? `That's <b>${band}</b>.` : '';
+			$('w-next').textContent = draft.amount ? 'Next' : 'Skip';
+		}
+		if (ev.target.id === 'w-time') draft.t = ev.target.value ? new Date(ev.target.value).getTime() : Date.now();
+	});
+	$('step').addEventListener('keydown', (ev) => {
+		if (ev.key === 'Enter' && $('w-next') && !$('w-next').disabled) $('w-next').click();
+	});
+	$('step').addEventListener('click', (ev) => {
+		const b = ev.target.closest('button');
+		if (!b) return;
+		if (b.dataset.pick) {
+			draft.sub = b.dataset.pick;
+			return showStep(1);
+		}
+		if (b.id === 'w-next') {
+			if (STEPS[stepIdx] === 'what') {
+				const sub = findSub(draft.sub);
+				if (sub) draft.sub = sub.name;
+			}
+			return showStep(stepIdx + 1);
+		}
+		if (b.dataset.route) {
+			if (draft.route !== b.dataset.route) draft.unit = null;
+			draft.route = b.dataset.route;
+			return showStep(2);
+		}
+		if (b.dataset.unit) {
+			draft.unit = b.dataset.unit;
+			return showStep(2);
+		}
+		if (b.dataset.ago === 'pick') {
+			const local = new Date(Date.now() - new Date().getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
+			$('w-time').value = local;
+			$('w-time').hidden = false;
+			$('w-time-next').hidden = false;
+			draft.t = Date.now();
+			return $('w-time').focus();
+		}
+		if (b.dataset.ago != null) {
+			draft.t = Date.now() - Number(b.dataset.ago) * 60e3;
+			return showStep(4);
+		}
+		if (b.id === 'w-save') {
+			log.push({
+				id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+				sub: draft.sub,
+				route: draft.route || 'other',
+				amount: draft.amount || null,
+				unit: draft.unit || null,
+				t: draft.t || Date.now(),
+				note: null,
+			});
+			save();
+			closeLog();
+		}
+	});
+
+	// ── Home actions ────────────────────────────────────────────────
+	$('home').addEventListener('click', (ev) => {
+		const more = ev.target.closest('[data-more]');
+		if (more) {
+			ui.open = ui.open === more.dataset.more ? null : more.dataset.more;
+			ui.effect = null;
+			return renderHome();
+		}
+		const chip = ev.target.closest('[data-effect]');
+		if (chip) {
+			ui.effect = ui.effect === chip.dataset.effect ? null : chip.dataset.effect;
+			return renderHome();
+		}
+		const del = ev.target.closest('[data-del]');
+		if (del && confirm('Delete this dose?')) {
+			log = log.filter((x) => x.id !== del.dataset.del);
+			save();
+			renderHome();
+		}
+	});
+	$('export').addEventListener('click', () => {
+		const blob = new Blob([JSON.stringify({ version: 1, doses: log }, null, 2)], { type: 'application/json' });
+		const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `redose-log-${new Date().toISOString().slice(0, 10)}.json` });
+		a.click();
+		URL.revokeObjectURL(a.href);
+	});
+	$('import').addEventListener('click', () => $('import-file').click());
+	$('import-file').addEventListener('change', async (ev) => {
+		const file = ev.target.files[0];
+		if (!file) return;
+		try {
+			const parsed = JSON.parse(await file.text());
+			const doses = Array.isArray(parsed) ? parsed : parsed.doses;
+			if (!Array.isArray(doses)) throw new Error();
+			const ids = new Set(log.map((e) => e.id));
+			const fresh = doses.filter((e) => e && e.id && e.sub && Number.isFinite(e.t) && !ids.has(e.id));
+			log.push(...fresh);
+			save();
+			renderHome();
+			alert(`Restored ${fresh.length} dose${fresh.length === 1 ? '' : 's'}.`);
+		} catch {
+			alert("That file doesn't look like a re:dose backup.");
+		}
+		ev.target.value = '';
+	});
+	$('clear').addEventListener('click', () => {
+		if (log.length && confirm('Delete your whole log from this phone? Save a backup first if you want one.')) {
+			log = [];
+			save();
+			renderHome();
+		}
+	});
+
+	renderHome();
+	setInterval(() => $('wizard').hidden && renderHome(), 30e3);
+})();
+</script>
+</body>
+</html>
