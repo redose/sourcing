@@ -1,6 +1,6 @@
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
-import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, Globe, Link2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
+import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, Globe, Link2, Pause, Play, Repeat, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
 
@@ -648,6 +648,41 @@ SELECT s.name, s.summary, s.url, coalesce(s.psychoactive_class, []) AS cls, coal
   (SELECT list(effect_name ORDER BY n DESC, effect_name) FROM eff) AS effects
 FROM (SELECT '${esc(name)}' AS q) q
 LEFT JOIN ${DB}."substances" s ON s.name = q.q`;
+
+// Cross-tolerance: the substances table lists it as loose keywords ("psychedelics", "dopamine", "GABA|gabaergic"…).
+// Group them into families; two substances share tolerance when their families overlap.
+const tolCTE = `tol AS (
+  SELECT name, list_distinct(list_filter(list_transform(coalesce(cross_tolerances, []), x -> CASE
+      WHEN regexp_matches(lower(x), 'psychedelic|hallucinogen') THEN 'psychedelics'
+      WHEN regexp_matches(lower(x), 'dopamin|stimulant') THEN 'stimulants'
+      WHEN regexp_matches(lower(x), 'opioid') THEN 'opioids'
+      WHEN regexp_matches(lower(x), 'dissociative') THEN 'dissociatives'
+      WHEN regexp_matches(lower(x), 'benzo|thien|gaba|depressant') THEN 'benzos and other GABA drugs'
+      WHEN regexp_matches(lower(x), 'cannabinoid') THEN 'cannabinoids'
+      WHEN regexp_matches(lower(x), 'seroton|entactogen') THEN 'serotonergic drugs'
+    END), f -> f IS NOT NULL)) AS fam
+  FROM ${DB}."substances"
+)`;
+// The most-reported substances that share tolerance with this one.
+const crossTolSQL = (name: string) => `
+WITH ${tolCTE},
+me AS (SELECT fam FROM tol WHERE name = '${esc(name)}'),
+n AS (SELECT canonical_substance AS name, count(DISTINCT report_id) AS n FROM ${DB}."report_doses" WHERE canonical_substance IS NOT NULL GROUP BY 1)
+SELECT t.name, list_intersect(t.fam, me.fam) AS shared, coalesce(n.n, 0) AS n
+FROM tol t CROSS JOIN me LEFT JOIN n ON n.name = t.name
+WHERE t.name <> '${esc(name)}' AND len(list_intersect(t.fam, me.fam)) > 0
+ORDER BY n DESC, t.name LIMIT 10`;
+// Which of these substances share tolerance with each other.
+const tolPairsSQL = (subs: string[]) => {
+	const list = subs.map((x) => `'${esc(x)}'`).join(', ') || "''";
+	return `
+WITH ${tolCTE}
+SELECT a.name AS a, b.name AS b, list_intersect(a.fam, b.fam) AS shared
+FROM tol a JOIN tol b ON a.name < b.name
+WHERE a.name IN (${list}) AND b.name IN (${list}) AND len(list_intersect(a.fam, b.fam)) > 0`;
+};
+const sharesTol = (pairs: Record<string, unknown>[], x: string, y: string) =>
+	pairs.find((p) => (S(p.a) === x && S(p.b) === y) || (S(p.a) === y && S(p.b) === x));
 
 // ── Look & feel ───────────────────────────────────────────────────
 
@@ -1554,12 +1589,7 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 										{S(r.addiction)}
 									</div>
 								)}
-								{L(r.cross_tol).length > 0 && (
-									<div>
-										<span className="rd-label mr-2">Cross-tolerance</span>
-										{L(r.cross_tol).slice(0, 4).join(', ')}
-									</div>
-								)}
+								{L(r.cross_tol).length > 0 && <CrossTol name={item.name} />}
 							</div>
 						)}
 						<div className="text-sm" style={{ color: C.faint }}>
@@ -2070,6 +2100,27 @@ function Sources({ list, className = 'mt-6' }: { list: (keyof typeof SOURCES | [
 	);
 }
 
+// Substances that share tolerance with this one: recent use of any of them makes it feel weaker, and back.
+function CrossTol({ name }: { name: string }) {
+	const q = useSQLQuery(crossTolSQL(name));
+	const list = rows(q);
+	if (!list.length) return null;
+	const fams = [...new Set(list.flatMap((r) => L(r.shared)))];
+	return (
+		<div className="mt-2">
+			<span className="rd-label">Shares tolerance with</span>
+			<p className="mt-1" style={{ color: C.soft }}>
+				Same tolerance family ({fams.join(', ')}). If you've had any of these lately, {short(name)} will likely feel weaker, and the other way round.
+			</p>
+			<div className="mt-2 flex flex-wrap gap-2">
+				{list.slice(0, 8).map((r) => (
+					<SubstanceTag key={S(r.name)} name={S(r.name)} />
+				))}
+			</div>
+		</div>
+	);
+}
+
 // What's known about the pairs active right now, one at a time: worst first, cycling every few seconds
 // (paused while pointed at or focused), with dots to step through. Each shows the actual note, not a count.
 function MixNotes({ items, pwPage }: { items: Record<string, unknown>[]; pwPage: (p: Record<string, unknown>) => string }) {
@@ -2512,6 +2563,8 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 	const shuffle = () => list.length && onOpen(S(list[Math.floor(Math.random() * list.length)].report_id));
 	// A dangerous or unsafe pair tints the whole page, so the risk is felt before anything is read.
 	const pairNote = withSub ? rows(pairQ)[0] : undefined;
+	const tolQ = useSQLQuery(tolPairsSQL(withSub ? [sub, withSub] : []), { enabled: !!withSub });
+	const tolShared = withSub ? rows(tolQ)[0] : undefined;
 	const risk = pairNote ? N(pairNote.sev) : 0;
 
 	return (
@@ -2573,6 +2626,14 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 						);
 					})()}
 				</div>
+			)}
+			{tolShared && (
+				<p className="rd-in mt-3 flex items-start gap-2 text-sm" style={{ color: C.soft }}>
+					<Repeat size={15} color={C.lav} style={{ flexShrink: 0, marginTop: 2 }} />
+					<span>
+						<b style={{ color: C.lav, fontWeight: 600 }}>They share tolerance</b> ({L(tolShared.shared).join(', ')}). If you've had one lately, the other will likely feel weaker, which can tempt people into taking more.
+					</span>
+				</p>
 			)}
 			{!withSub && k && N(k.n_llm) >= 5 && (
 				<div className="mt-5 flex flex-wrap gap-10">
@@ -2681,6 +2742,8 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const byTime = useMemo(() => [...marks].sort((a, b) => a.t - b.t || a.start - b.start), [marks]);
 	const doses = rows(dosesQ).map((d) => ({ sub: S(d.sub), amount: S(d.amount), route: S(d.route), t: d.t == null ? 0 : N(d.t), assumed: d.t == null }));
 	const expected = useMemo(() => expectedCurves(doses, rows(timingQ)), [dosesQ.data, timingQ.data]);
+	const doseSubs = [...new Set(doses.map((d) => d.sub))];
+	const tolQ = useSQLQuery(tolPairsSQL(doseSubs), { enabled: doseSubs.length > 1 });
 	// Effects that show up for the first time at each moment: where each one "became a thing".
 	const newEffects = useMemo(() => {
 		const seen = new Set<string>();
@@ -3230,9 +3293,11 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 							<div className="mt-2 text-sm" style={{ color: C.faint }}>No doses recorded.</div>
 						) : (
 							<ol ref={takenRef} className="mt-2 grid gap-0.5" style={{ maxHeight: 230, overflowY: 'auto', scrollbarWidth: 'none' }}>
-								{[...doses].sort((p, q) => p.t - q.t).map((d, i) => {
+								{[...doses].sort((p, q) => p.t - q.t).map((d, i, all) => {
 									const taken = d.t <= t + 1e-9;
 									const latest = taken && i === takenSoFar.length - 1;
+									// Taken a while after something it shares tolerance with: it may land softer.
+									const earlier = d.assumed ? undefined : all.find((e) => !e.assumed && e.sub !== d.sub && e.t < d.t - 0.25 && sharesTol(rows(tolQ), e.sub, d.sub));
 									return (
 										<li
 											key={i}
@@ -3264,6 +3329,12 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 											<span className="tabular-nums" style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'right' }} title={d.amount}>
 												{/\d/.test(d.amount) ? d.amount : ''}
 											</span>
+											{earlier && (
+												<span className="flex items-center gap-1.5 text-xs" style={{ gridColumn: '3 / -1', color: C.lav }} title={`${d.sub} and ${earlier.sub} share tolerance (${L(sharesTol(rows(tolQ), earlier.sub, d.sub)?.shared).join(', ')})`}>
+													<Repeat size={12} style={{ flexShrink: 0 }} />
+													Shares tolerance with {short(earlier.sub)}, may feel weaker
+												</span>
+											)}
 										</li>
 									);
 								})}
