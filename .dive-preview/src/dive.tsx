@@ -737,9 +737,6 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-newfx { 0% { box-shadow: 0 0 0 0 rgba(166,242,228,.55); } 70% { box-shadow: 0 0 0 10px rgba(166,242,228,0); } 100% { box-shadow: 0 0 0 0 rgba(166,242,228,0); } }
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
-@keyframes rd-toast { 0% { opacity: 0; transform: translateY(-26px) scale(.9); } 12% { opacity: 1; transform: translateY(0) scale(1.06); } 20% { transform: scale(1); } 72% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-34px); } }
-.rd-toast { animation: rd-toast 2.6s ease-out both; }
-@media (prefers-reduced-motion: reduce) { .rd-toast { animation: rd-fade .3s ease-out both; } }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
 .rd-new { border-color: rgba(217,207,255,.7) !important; animation: rd-new 1.6s ease-out both; }
@@ -758,7 +755,7 @@ const CSS = `
 .rd-range::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff; cursor: pointer; }
 @media (max-width: 960px) {
   .rd-tl { grid-template-columns: 1fr; }
-  .rd-story { font-size: 18px; padding-bottom: 52vh; }
+  .rd-story { font-size: 18px; }
   .rd-side { position: static; max-height: none; }
   .rd-hide-sm { display: none !important; }
 }
@@ -874,10 +871,10 @@ const RISK: Record<number, { c: string; t: string; word: string; bg: string; ban
 	2: { c: '#ffb072', t: 'Unsafe combination', word: 'Unsafe', bg: 'rgba(255,170,100,.13)', banner: 'rgba(112,60,30,.78)' },
 	1: { c: '#ffe27a', t: 'Use caution', word: 'Caution', bg: 'rgba(255,226,122,.08)', banner: 'rgba(96,80,36,.8)' },
 };
-function RiskPill({ sev, small }: { sev: number; small?: boolean }) {
+function RiskPill({ sev, small, solid: forceSolid }: { sev: number; small?: boolean; solid?: boolean }) {
 	const r = RISK[sev];
 	if (!r) return null;
-	const solid = sev >= 2;
+	const solid = forceSolid || sev >= 2;
 	return (
 		<span
 			className="inline-flex items-center gap-1 rounded-full font-bold uppercase"
@@ -2414,26 +2411,29 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 	const sev = N(p.sev);
 	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
 	const reason = p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
+	// Spunion's speech bubble is a cartoon one: warm white, his own thick black outline, a hard shadow in the risk colour.
+	const ink = '#1d1440';
+	const inkSoft = '#4a3f78';
 
 	const row = (
 		<div className="flex items-center gap-3">
-			<button key={idx} className="rd-fade flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setFull(!full)} title={full ? 'Show less' : 'Read the whole note'}>
-				<RiskPill sev={sev} small={docked} />
-				<b className="font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap', fontSize: docked ? 13 : undefined }}>
+			<button key={idx} className={`rd-fade flex min-w-0 flex-1 items-center text-left ${docked ? 'flex-wrap gap-x-2 gap-y-1' : 'gap-3'}`} onClick={() => setFull(!full)} title={full ? 'Show less' : 'Read the whole note'}>
+				<RiskPill sev={sev} small={docked} solid={!docked} />
+				<b className="font-semibold" style={{ color: docked ? '#fff' : ink, whiteSpace: 'nowrap', fontSize: docked ? 13 : undefined }}>
 					{short(S(p.a))} + {short(S(p.b))}
 				</b>
 				{p.now && (
-					<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ border: '1px solid rgba(255,255,255,.6)', color: '#fff', whiteSpace: 'nowrap' }}>
+					<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ border: `1.5px solid ${docked ? 'rgba(255,255,255,.6)' : ink}`, color: docked ? '#fff' : ink, whiteSpace: 'nowrap' }}>
 						mixing now
 					</span>
 				)}
 				{!full && !docked && (
-					<span className="min-w-0 text-sm" style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+					<span className="min-w-0 text-sm" style={{ color: inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
 						{reason}
 					</span>
 				)}
 			</button>
-			{items.length > 1 && (
+			{items.length > 1 && !docked && (
 				<div className="flex items-center gap-1.5" style={{ flexShrink: 0 }}>
 					{items.map((q, i) => (
 						<button
@@ -2446,14 +2446,14 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 					))}
 				</div>
 			)}
-			<button onClick={() => setFull(!full)} aria-label={full ? 'Show less' : 'Read the whole note'} style={{ color: C.soft, flexShrink: 0 }}>
+			<button onClick={() => setFull(!full)} aria-label={full ? 'Show less' : 'Read the whole note'} style={{ color: docked ? C.soft : ink, flexShrink: 0 }}>
 				{full ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
 			</button>
 		</div>
 	);
 	const note = full && (
 		<div className="rd-fade mt-2 flex flex-wrap items-end justify-between gap-3">
-			<p style={{ fontFamily: SERIF, fontSize: docked ? 16 : 17, lineHeight: 1.5, color: C.text, maxWidth: 820 }}>
+			<p style={{ fontFamily: SERIF, fontSize: docked ? 16 : 17, lineHeight: 1.5, color: docked ? C.text : ink, maxWidth: 820 }}>
 				{reason}
 				{!p.note && (
 					<>
@@ -2483,10 +2483,15 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 			<style>{SPUNION_CSS}</style>
 			<div className="rd-in flex items-end gap-3" style={{ width: 'min(640px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
 				<div
+					key={`b${idx}`}
+					className="sp-bubble-pop"
 					aria-live="polite"
-					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 8, padding: '10px 14px', borderRadius: '20px 20px 6px 20px', border: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, background: look.bg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 14px 40px rgba(10,4,40,.45)', transition: 'background .4s, border-color .4s' }}
+					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 14, padding: '11px 16px', borderRadius: 24, border: '3px solid #0d0820', background: '#fffaf1', color: ink, boxShadow: `6px 6px 0 ${look.fg}` }}
 				>
-					<span aria-hidden style={{ position: 'absolute', right: -7, bottom: 10, width: 13, height: 13, background: look.bg, borderRight: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, borderBottom: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, transform: 'rotate(-45deg)', borderRadius: '0 0 3px 0' }} />
+					<svg aria-hidden width="30" height="26" viewBox="0 0 30 26" style={{ position: 'absolute', right: -25, bottom: 6, overflow: 'visible' }}>
+						<path d="M0 2 C10 6 18 12 27 22 C18 21 9 18 0 16 Z" fill="#fffaf1" stroke="#0d0820" strokeWidth="3" strokeLinejoin="round" />
+						<path d="M-2.5 4.5 L-2.5 13.5" stroke="#fffaf1" strokeWidth="5" />
+					</svg>
 					{row}
 					{note}
 				</div>
@@ -3228,28 +3233,6 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 		if (playing && dosesTaken > lastDoses.current) holdUntil.current = Math.max(holdUntil.current, Date.now() + 1800 / Math.sqrt(speed));
 		lastDoses.current = dosesTaken;
 	}, [dosesTaken, playing]);
-	// A little game-style pop when the timeline reaches a dose ("+40mg Amphetamine"), whether playing, scrolling or
-	// jumping ahead. Not on first load, not when going backwards; at most three at once.
-	const [toasts, setToasts] = useState<{ id: number; d: Dose }[]>([]);
-	const toastId = useRef(0);
-	const toastFrom = useRef<number | null>(null);
-	const toastReady = useRef(0); // a shared link's jump to its moment on load shouldn't pop anything
-	useEffect(() => {
-		toastFrom.current = null;
-		toastReady.current = Date.now() + 1200;
-		setToasts([]);
-	}, [id]);
-	useEffect(() => {
-		const taken = [...doses].sort((a, b) => a.t - b.t).filter((d) => d.t <= t + 1e-9);
-		const before = toastFrom.current;
-		toastFrom.current = taken.length;
-		if (before == null || taken.length <= before || Date.now() < toastReady.current) return;
-		const fresh = taken.slice(before).slice(-3).map((d) => ({ id: ++toastId.current, d }));
-		setToasts((ts) => [...ts, ...fresh].slice(-3));
-		const ids = new Set(fresh.map((f) => f.id));
-		setTimeout(() => setToasts((ts) => ts.filter((x) => !ids.has(x.id))), 2600);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [dosesTaken, dosesQ.data]);
 	// The turning point we're in; a longer beat when playback reaches a new one.
 	const msIdx = milestones.reduce((k, m, i) => (m.t <= t + 1e-9 ? i : k), -1);
 	const phase = msIdx >= 0 ? milestones[msIdx] : null;
@@ -3531,23 +3514,6 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 
 	return (
 		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: (wide ? 0 : dockOpen ? 340 : 120) + (bannerItems.length ? (wide ? 100 : 60) : 0) }}>
-			{toasts.length > 0 && (
-				<div aria-live="polite" style={{ position: 'fixed', top: 84, left: 0, right: 0, zIndex: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, pointerEvents: 'none' }}>
-					{toasts.map(({ id: k, d }) => {
-						const amount = /\d/.test(d.amount) ? (d.amount.length > 22 ? d.amount.slice(0, 21) + '…' : d.amount) : '';
-						return (
-							<div key={k} className="rd-toast flex items-center gap-2.5 rounded-full px-4 py-2" style={{ background: 'rgba(30,22,74,.88)', border: '1px solid rgba(255,255,255,.22)', boxShadow: '0 12px 30px rgba(10,4,40,.45), 0 0 24px rgba(166,242,228,.18)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
-								<ClassIcon cls={classOf(d.sub)} size={18} color={C.coral} />
-								<span className="text-lg font-bold tabular-nums" style={{ color: C.mint, letterSpacing: '-0.01em' }}>
-									+{amount || ' dose'}
-								</span>
-								<span className="text-lg font-semibold" style={{ whiteSpace: 'nowrap' }}>{short(d.sub)}</span>
-								{d.route && <RouteIcon route={d.route} size={16} color={C.soft} />}
-							</div>
-						);
-					})}
-				</div>
-			)}
 			<header>
 				{(() => {
 					const taken = [...new Set([...doses].sort((a, b) => a.t - b.t).map((d) => d.sub))];
@@ -3834,6 +3800,8 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 const SPUNION_CSS = `
 @keyframes sp-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
 @keyframes sp-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
+@keyframes sp-bubble-pop { 0% { opacity: 0; transform: scale(.82) translateY(8px); } 60% { opacity: 1; transform: scale(1.03); } 100% { transform: scale(1); } }
+.sp-bubble-pop { animation: sp-bubble-pop .42s cubic-bezier(.2,.9,.3,1.3) both; transform-origin: 95% 100%; }
 @keyframes sp-hop { 0% { transform: translateY(0) scale(1, 1); } 30% { transform: translateY(2px) scale(1.08, .9); } 60% { transform: translateY(-12px) scale(.94, 1.06); } 100% { transform: translateY(0) scale(1, 1); } }
 .sp-wrap { position: fixed; right: 18px; bottom: 18px; z-index: 35; display: flex; align-items: flex-end; gap: 10px; pointer-events: none; }
 .sp-wrap > * { pointer-events: auto; }
@@ -3848,7 +3816,7 @@ const SPUNION_CSS = `
   box-shadow: 0 12px 34px rgba(10,4,40,.35); font-size: 14px; line-height: 1.45; color: #fff; }
 .sp-bubble b { color: #8ff4c8; }
 @media (max-width: 960px) { .sp-wrap.lift { bottom: 104px; } .sp-me { width: 54px; height: 54px; } }
-@media (prefers-reduced-motion: reduce) { .sp-body, .sp-eye, .sp-me.hop .sp-body { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .sp-body, .sp-eye, .sp-me.hop .sp-body, .sp-bubble-pop { animation: none !important; } }
 `;
 
 function SpunionSvg({ worried }: { worried?: boolean }) {
