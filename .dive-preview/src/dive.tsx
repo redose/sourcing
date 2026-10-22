@@ -737,6 +737,9 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-newfx { 0% { box-shadow: 0 0 0 0 rgba(166,242,228,.55); } 70% { box-shadow: 0 0 0 10px rgba(166,242,228,0); } 100% { box-shadow: 0 0 0 0 rgba(166,242,228,0); } }
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
+@keyframes rd-toast { 0% { opacity: 0; transform: translateY(-26px) scale(.9); } 12% { opacity: 1; transform: translateY(0) scale(1.06); } 20% { transform: scale(1); } 72% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-34px); } }
+.rd-toast { animation: rd-toast 2.6s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .rd-toast { animation: rd-fade .3s ease-out both; } }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
 .rd-new { border-color: rgba(217,207,255,.7) !important; animation: rd-new 1.6s ease-out both; }
@@ -3190,6 +3193,28 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 		if (playing && dosesTaken > lastDoses.current) holdUntil.current = Math.max(holdUntil.current, Date.now() + 1800 / Math.sqrt(speed));
 		lastDoses.current = dosesTaken;
 	}, [dosesTaken, playing]);
+	// A little game-style pop when the timeline reaches a dose ("+40mg Amphetamine"), whether playing, scrolling or
+	// jumping ahead. Not on first load, not when going backwards; at most three at once.
+	const [toasts, setToasts] = useState<{ id: number; d: Dose }[]>([]);
+	const toastId = useRef(0);
+	const toastFrom = useRef<number | null>(null);
+	const toastReady = useRef(0); // a shared link's jump to its moment on load shouldn't pop anything
+	useEffect(() => {
+		toastFrom.current = null;
+		toastReady.current = Date.now() + 1200;
+		setToasts([]);
+	}, [id]);
+	useEffect(() => {
+		const taken = [...doses].sort((a, b) => a.t - b.t).filter((d) => d.t <= t + 1e-9);
+		const before = toastFrom.current;
+		toastFrom.current = taken.length;
+		if (before == null || taken.length <= before || Date.now() < toastReady.current) return;
+		const fresh = taken.slice(before).slice(-3).map((d) => ({ id: ++toastId.current, d }));
+		setToasts((ts) => [...ts, ...fresh].slice(-3));
+		const ids = new Set(fresh.map((f) => f.id));
+		setTimeout(() => setToasts((ts) => ts.filter((x) => !ids.has(x.id))), 2600);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [dosesTaken, dosesQ.data]);
 	// The turning point we're in; a longer beat when playback reaches a new one.
 	const msIdx = milestones.reduce((k, m, i) => (m.t <= t + 1e-9 ? i : k), -1);
 	const phase = msIdx >= 0 ? milestones[msIdx] : null;
@@ -3471,6 +3496,23 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 
 	return (
 		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: (wide ? 0 : dockOpen ? 340 : 120) + (bannerItems.length ? (wide ? 100 : 60) : 0) }}>
+			{toasts.length > 0 && (
+				<div aria-live="polite" style={{ position: 'fixed', top: 84, left: 0, right: 0, zIndex: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, pointerEvents: 'none' }}>
+					{toasts.map(({ id: k, d }) => {
+						const amount = /\d/.test(d.amount) ? (d.amount.length > 22 ? d.amount.slice(0, 21) + '…' : d.amount) : '';
+						return (
+							<div key={k} className="rd-toast flex items-center gap-2.5 rounded-full px-4 py-2" style={{ background: 'rgba(30,22,74,.88)', border: '1px solid rgba(255,255,255,.22)', boxShadow: '0 12px 30px rgba(10,4,40,.45), 0 0 24px rgba(166,242,228,.18)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}>
+								<ClassIcon cls={classOf(d.sub)} size={18} color={C.coral} />
+								<span className="text-lg font-bold tabular-nums" style={{ color: C.mint, letterSpacing: '-0.01em' }}>
+									+{amount || ' dose'}
+								</span>
+								<span className="text-lg font-semibold" style={{ whiteSpace: 'nowrap' }}>{short(d.sub)}</span>
+								{d.route && <RouteIcon route={d.route} size={16} color={C.soft} />}
+							</div>
+						);
+					})}
+				</div>
+			)}
 			<header>
 				{(() => {
 					const taken = [...new Set([...doses].sort((a, b) => a.t - b.t).map((d) => d.sub))];
