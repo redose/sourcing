@@ -796,8 +796,8 @@ const CSS = `
 .rd-ts:hover { background: rgba(10,6,30,.55); border-color: rgba(255,255,255,.32); }
 .rd-ts b { color: #fff; font-weight: 700; }
 .rd-ts img { display: block; border-radius: 999px; }
-.rd-thanks { display: inline-flex; align-items: center; gap: 7px; color: ${C.text}; font-weight: 600; white-space: nowrap; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.18); padding-bottom: 1px; transition: border-color .2s; }
-.rd-thanks:hover { border-color: rgba(255,255,255,.6); }
+.rd-thanks { display: inline-flex; align-items: center; gap: 6px; color: ${C.soft}; font-size: 12.5px; font-weight: 500; white-space: nowrap; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .2s, color .2s; }
+.rd-thanks:hover { color: #fff; border-color: rgba(255,255,255,.5); }
 .rd-thanks img { display: block; border-radius: 4px; }
 .rd-logo { display: inline-flex; padding: 4px; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid ${C.line}; transition: background .2s, border-color .2s; }
 .rd-logo:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.3); }
@@ -4259,11 +4259,11 @@ export default function ReportTimelapse() {
 
 					<footer className="mt-16 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-t pt-6 text-sm" style={{ borderColor: C.line, color: C.soft }}>
 						{(
-							<div className="flex flex-wrap items-center gap-3">
-								<span>With thanks to</span>
+							<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+								<span className="text-xs" style={{ color: C.faint }}>With thanks to</span>
 								{(Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map((k) => (
 									<a key={k} className="rd-thanks" href={SOURCES[k].href} target="_blank" rel="noopener noreferrer" title={SOURCES[k].gives}>
-										<img src={SOURCES[k].logo} alt="" width={18} height={18} />
+										<img src={SOURCES[k].logo} alt="" width={15} height={15} />
 										{SOURCES[k].name}
 									</a>
 								))}
