@@ -8,8 +8,8 @@ function ConnectionGate({ children }: { children: React.ReactNode }) {
 	if (isConnecting)
 		return (
 			<div className="flex items-center justify-center h-screen gap-2" style={{ color: '#aba3c7' }}>
-				<img src={LOADING_PILL} alt="" width={64} height={64} style={{ opacity: 0.55 }} />
-				Connecting to MotherDuck…
+				<img src={LOADING_PILL} alt="" width={180} height={180} style={{ opacity: 0.16 }} />
+				<span style={{ position: 'absolute', marginTop: 220, fontSize: 13 }}>Connecting to MotherDuck…</span>
 			</div>
 		);
 	if (error)
