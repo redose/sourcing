@@ -1779,12 +1779,12 @@ function OutcomeBar({ pos, neg, n }: { pos: unknown; neg: unknown; n: number }) 
 }
 
 // What people most often took it with, whether the mix carries a warning, and how it went.
-function CombosList({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
+function CombosList({ name, onCombo, bare }: { name: string; onCombo: (a: string, b: string) => void; bare?: boolean }) {
 	const { classOf } = useContext(OpenCtx);
 	const combosQ = useSQLQuery(focusCombosSQL(name));
 	return (
 		<>
-			<span className="rd-label">Most often combined with</span>
+			{!bare && <span className="rd-label">Most often combined with</span>}
 			{combosQ.isLoading ? (
 				<div className="mt-3 animate-pulse" style={{ height: 180 }} />
 			) : rows(combosQ).length === 0 ? (
@@ -2112,7 +2112,7 @@ function GroupBadge() {
 
 // A plain description built from the structured fields and the reports. PsychonautWiki "summaries" are mostly
 // page furniture ("Summary sheet: …", "Not to be confused with …"); what's left of them is usually a safety note.
-function describeSubstance(name: string, r: Record<string, unknown>, timing: Record<string, unknown>[]) {
+function describeSubstance(name: string, r: Record<string, unknown>, timing: Record<string, unknown>[], allNames = false) {
 	const t = timing.find((x) => S(x.sub) === name && S(x.route) === '*');
 	const cls = L(r.cls).map((c) => c.toLowerCase().replace(/s$/, ''));
 	const chem = L(r.chem).filter((c) => !/^substituted /i.test(c) || L(r.chem).length === 1);
@@ -2134,7 +2134,7 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 			: tox
 				? `${tox[0].toUpperCase()}${tox.slice(1)}.`
 				: '';
-	const aka = L(r.aka).filter((a) => a.toLowerCase() !== name.toLowerCase()).slice(0, 6);
+	const aka = L(r.aka).filter((a) => a.toLowerCase() !== name.toLowerCase()).slice(0, allNames ? 999 : 6);
 	return { desc, kindLine, warning, aka, timing: group ? undefined : t, group };
 }
 
@@ -2210,7 +2210,7 @@ function SubstanceOverview({ name }: { name: string }) {
 	const r = rows(detailQ)[0];
 	if (detailQ.isLoading || timingQ.isLoading) return <div className="rd-card mt-6 animate-pulse" style={{ height: 360 }} />;
 	if (!r) return null;
-	const { kindLine, warning, aka, timing: t, group } = describeSubstance(name, r, rows(timingQ));
+	const { kindLine, warning, aka, timing: t, group } = describeSubstance(name, r, rows(timingQ), true);
 	const members = rows(membersQ).map((m) => S(m.name)).filter((m) => m.toLowerCase() !== name.toLowerCase());
 	const about = (
 		<div className="max-w-3xl">
@@ -2289,6 +2289,7 @@ function SubstanceOverview({ name }: { name: string }) {
 					))}
 				</p>
 			)}
+			<StreetNames name={name} known={[name, ...aka]} />
 			{warning && (
 				<div className="rd-in mt-5 flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: 'rgba(255,110,130,.13)', border: '1px solid rgba(255,125,142,.45)', lineHeight: 1.5, maxWidth: 900 }}>
 					<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -2311,6 +2312,182 @@ function SubstanceOverview({ name }: { name: string }) {
 				)}
 			</div>
 		</>
+	);
+}
+
+// Street names from the DEA's slang list, NoSlang and Dope Lookup. Entries that name something around the drug
+// (a pipe, a dealer crew, a price) rather than the drug itself are left out; names for mixes are kept apart.
+const streetNamesSQL = (name: string) => `
+SELECT street_name AS term, coalesce(is_combo, false) AS combo, len(sources) AS n_src
+FROM ${DB}."street_names"
+WHERE substance = '${esc(name)}'
+  AND NOT regexp_matches(lower(coalesce(description, '')), 'pipe|crew|sham|seller|dealer|user|vial|paraphernalia|equipment|house|amount|price|person|police|addict|buy|sell|smok|inject|money')
+ORDER BY combo, n_src DESC, term`;
+
+// The numbers behind a substance page: how people took it, how it went, who wrote, and when.
+const substanceStatsSQL = (name: string) => `
+WITH ids AS (SELECT DISTINCT report_id FROM ${DB}."report_doses" WHERE canonical_substance = '${esc(name)}'),
+r AS (SELECT e.* FROM ${DB}."experience_reports" e JOIN ids ON ids.report_id = e.id),
+rt AS (
+  SELECT CASE lower(route) WHEN 'inhaled' THEN 'smoked' WHEN 'vaporized' THEN 'smoked' WHEN 'iv' THEN 'injected' WHEN 'im' THEN 'injected'
+      WHEN 'intravenous' THEN 'injected' WHEN 'snorted' THEN 'insufflated' ELSE lower(route) END AS k,
+    count(DISTINCT report_id) AS n
+  FROM ${DB}."report_doses" WHERE canonical_substance = '${esc(name)}' AND route IS NOT NULL
+  GROUP BY 1 ORDER BY n DESC LIMIT 4
+),
+yr AS (SELECT TRY_CAST(experience_year AS INTEGER) AS y, count(*) AS n FROM r WHERE TRY_CAST(experience_year AS INTEGER) BETWEEN 1960 AND 2030 GROUP BY 1),
+x AS (SELECT x.overall_sentiment AS s, x.would_repeat AS rep FROM ${DB}."llm_extractions" x JOIN ids USING (report_id))
+SELECT
+  (SELECT count(*) FROM ids) AS n,
+  (SELECT list(k ORDER BY n DESC) FROM rt) AS route_k,
+  (SELECT list(n ORDER BY n DESC) FROM rt) AS route_n,
+  (SELECT count(DISTINCT report_id) FROM ${DB}."report_doses" WHERE canonical_substance = '${esc(name)}' AND route IS NOT NULL) AS route_total,
+  (SELECT list(y ORDER BY y) FROM yr) AS years,
+  (SELECT list(n ORDER BY y) FROM yr) AS year_n,
+  (SELECT count(*) FILTER (WHERE gender = 'Male') FROM r) AS men,
+  (SELECT count(*) FILTER (WHERE gender = 'Female') FROM r) AS women,
+  (SELECT median(TRY_CAST(age AS DOUBLE)) FROM r) AS age,
+  (SELECT count(*) FROM x) AS n_x,
+  (SELECT avg((s = 'positive')::INT) FROM x) AS pos,
+  (SELECT avg((s = 'negative')::INT) FROM x) AS neg,
+  (SELECT avg(rep::INT) FROM x WHERE rep IS NOT NULL) AS rep`;
+
+function StreetNames({ name, known }: { name: string; known: string[] }) {
+	const q = useSQLQuery(streetNamesSQL(name));
+	const [open, setOpen] = useState(false);
+	const seen = new Set(known.map((k) => k.toLowerCase()));
+	const all = rows(q).filter((r) => !seen.has(S(r.term).toLowerCase()));
+	const names = all.filter((r) => !r.combo).map((r) => S(r.term));
+	const mixes = all.filter((r) => r.combo).map((r) => S(r.term));
+	if (!names.length && !mixes.length) return null;
+	return (
+		<div className="mt-2">
+			<button className="text-sm font-semibold" style={{ color: C.soft, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.3)', textUnderlineOffset: 4 }} onClick={() => setOpen(!open)}>
+				{open ? 'Hide street names' : `+${names.length + mixes.length} street names`}
+			</button>
+			{open && (
+				<div className="rd-fade mt-3 max-w-4xl">
+					<p className="text-sm" style={{ color: C.soft, lineHeight: 1.9 }}>
+						{names.map((t, i) => (
+							<span key={t} style={{ whiteSpace: 'nowrap' }}>
+								{i > 0 && <span style={{ color: C.faint }}> · </span>}
+								{t}
+							</span>
+						))}
+					</p>
+					{mixes.length > 0 && (
+						<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.7 }}>
+							<span className="rd-label mr-2">For mixes</span>
+							{mixes.join(' · ')}
+						</p>
+					)}
+					<p className="mt-2 text-xs" style={{ color: C.faint }}>
+						From the DEA's slang list, NoSlang and Dope Lookup. Street names change fast and vary from place to place.
+					</p>
+				</div>
+			)}
+		</div>
+	);
+}
+
+// "By the numbers": four small tiles summarising every report that mentions the substance.
+function SubstanceNumbers({ name }: { name: string }) {
+	const q = useSQLQuery(substanceStatsSQL(name));
+	const r = rows(q)[0];
+	if (q.isLoading) return <div className="rd-card mt-6 animate-pulse" style={{ height: 180 }} />;
+	if (!r || !N(r.n)) return null;
+	const routeK = L(r.route_k), routeN = (Array.isArray(r.route_n) ? r.route_n : []).map(N);
+	const routeTotal = Math.max(1, N(r.route_total));
+	const years = (Array.isArray(r.years) ? r.years : []).map(N), yearN = (Array.isArray(r.year_n) ? r.year_n : []).map(N);
+	const yMax = Math.max(1, ...yearN);
+	const peak = years[yearN.indexOf(yMax)];
+	const men = N(r.men), women = N(r.women), people = men + women;
+	const tile = 'rd-card p-5 grid content-start gap-3';
+	return (
+		<section className="mt-12">
+			<h2 className="text-2xl font-semibold">By the numbers</h2>
+			<p className="mt-1 text-sm" style={{ color: C.faint }}>Across all {N(r.n).toLocaleString()} reports that mention it.</p>
+			<div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+				<div className={tile}>
+					<span className="rd-label">How it went</span>
+					{N(r.n_x) >= 3 ? (
+						<>
+							<div className="flex overflow-hidden rounded-full" style={{ height: 8, background: 'rgba(255,255,255,.1)' }}>
+								<span style={{ width: `${100 * N(r.pos)}%`, background: C.mint }} />
+								<span style={{ flex: 1 }} />
+								<span style={{ width: `${100 * N(r.neg)}%`, background: C.coral }} />
+							</div>
+							<div className="flex justify-between text-sm">
+								<span style={{ color: C.mint }}>{Math.round(100 * N(r.pos))}% good</span>
+								<span style={{ color: C.coral }}>{Math.round(100 * N(r.neg))}% rough</span>
+							</div>
+							{r.rep != null && <div className="text-sm" style={{ color: C.soft }}>{Math.round(100 * N(r.rep))}% would do it again</div>}
+							<div className="text-xs" style={{ color: C.faint }}>From {N(r.n_x)} closely read reports</div>
+						</>
+					) : (
+						<div className="text-sm" style={{ color: C.faint }}>Too few closely read reports yet.</div>
+					)}
+				</div>
+				<div className={tile}>
+					<span className="rd-label">How people took it</span>
+					{routeK.length ? (
+						<div className="grid gap-2">
+							{routeK.map((k, i) => (
+								<div key={k} className="grid items-center gap-2 text-sm" style={{ gridTemplateColumns: '18px minmax(0,1fr) 38px' }}>
+									<RouteIcon route={k} size={15} color={C.soft} />
+									<span className="flex items-center gap-2" style={{ minWidth: 0 }}>
+										<span style={{ whiteSpace: 'nowrap' }}>{k[0].toUpperCase() + k.slice(1)}</span>
+										<span className="flex-1 rounded-full" style={{ height: 5, background: 'rgba(255,255,255,.1)', minWidth: 20 }}>
+											<span className="block h-full rounded-full" style={{ width: `${(100 * routeN[i]) / routeTotal}%`, background: C.lav }} />
+										</span>
+									</span>
+									<span className="text-right tabular-nums" style={{ color: C.faint }}>{Math.round((100 * routeN[i]) / routeTotal)}%</span>
+								</div>
+							))}
+						</div>
+					) : (
+						<div className="text-sm" style={{ color: C.faint }}>Not recorded.</div>
+					)}
+				</div>
+				<div className={tile}>
+					<span className="rd-label">Who wrote</span>
+					{people >= 5 ? (
+						<>
+							<div className="text-2xl font-light">{r.age != null ? `${Math.round(N(r.age))}` : '—'}<span className="ml-1.5 text-sm" style={{ color: C.faint }}>median age</span></div>
+							<div className="flex overflow-hidden rounded-full" style={{ height: 8 }}>
+								<span style={{ width: `${(100 * men) / people}%`, background: C.lav }} />
+								<span style={{ flex: 1, background: C.coral }} />
+							</div>
+							<div className="flex justify-between text-sm">
+								<span style={{ color: C.lav }}>{Math.round((100 * men) / people)}% men</span>
+								<span style={{ color: C.coral }}>{Math.round((100 * women) / people)}% women</span>
+							</div>
+						</>
+					) : (
+						<div className="text-sm" style={{ color: C.faint }}>Not enough to say.</div>
+					)}
+				</div>
+				<div className={tile}>
+					<span className="rd-label">When</span>
+					{years.length >= 2 ? (
+						<>
+							<div className="flex items-end gap-px" style={{ height: 56 }} aria-label="Reports by year of the experience">
+								{years.map((y, i) => (
+									<span key={y} title={`${y}: ${yearN[i]} report${yearN[i] === 1 ? '' : 's'}`} className="flex-1 rounded-t-sm" style={{ height: `${Math.max(4, (100 * yearN[i]) / yMax)}%`, background: y === peak ? C.mint : 'rgba(217,207,255,.55)' }} />
+								))}
+							</div>
+							<div className="flex justify-between text-xs tabular-nums" style={{ color: C.faint }}>
+								<span>{years[0]}</span>
+								<span>{years[years.length - 1]}</span>
+							</div>
+							<div className="text-sm" style={{ color: C.soft }}>Most reports from around {peak}</div>
+						</>
+					) : (
+						<div className="text-sm" style={{ color: C.faint }}>Not enough to say.</div>
+					)}
+				</div>
+			</div>
+		</section>
 	);
 }
 
@@ -2867,8 +3044,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	const slice = clamp(Math.floor(cursor / w), 0, SLICES - 1);
 	const readout = series.map((s) => ({ ...s, v: interp(s.points, cursor) })).filter((r) => r.v != null).sort((a, b) => (b.v as number) - (a.v as number));
 	const shuffle = () => list.length && onOpen(S(list[Math.floor(Math.random() * list.length)].report_id));
-	const [tab, setTab] = useState<'stories' | 'unfold' | 'mixes'>('stories');
-	useEffect(() => setTab('stories'), [sub]);
 	// A dangerous or unsafe pair tints the whole page, so the risk is felt before anything is read.
 	const pairNote = withSub ? rows(pairQ)[0] : undefined;
 	const tolQ = useSQLQuery(tolPairsSQL(withSub ? [sub, withSub] : []), { enabled: !!withSub });
@@ -2891,23 +3066,17 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				))}
 			</h1>
 			{!withSub && <SubstanceOverview name={sub} />}
+			{!withSub && <SubstanceNumbers name={sub} />}
 			{!withSub && (
-				<div className="mt-12 flex flex-wrap items-center gap-1 border-b" style={{ borderColor: C.line }} role="tablist">
-					{(
-						[
-							['stories', 'Stories'],
-							['unfold', 'How it unfolds'],
-							['mixes', 'Often mixed with'],
-						] as const
-					).map(([k, label]) => (
-						<button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className="px-4 py-3 text-base font-semibold" style={{ color: tab === k ? '#fff' : C.faint, borderBottom: `2px solid ${tab === k ? C.mint : 'transparent'}`, marginBottom: -1, transition: 'color .2s, border-color .2s' }}>
-							{label}
-						</button>
-					))}
-				</div>
+				<section className="mt-12">
+					<h2 className="text-2xl font-semibold">Often mixed with</h2>
+					<p className="mt-1 text-sm" style={{ color: C.faint }}>Tap a mix to see how it tends to go together.</p>
+					<div className="rd-card mt-5 p-5">
+						<CombosList name={sub} onCombo={onCombo} bare />
+					</div>
+				</section>
 			)}
-			{(withSub || tab !== 'mixes') && (
-			<div className={`${withSub ? "mt-4" : "mt-5"} flex flex-wrap items-center gap-2`}>
+			<div className={`${withSub ? "mt-4" : "mt-12"} flex flex-wrap items-center gap-2`}>
 				{[false, true].map((v) => (
 					<button key={String(v)} className="rd-nav" aria-current={only === v ? 'page' : undefined} onClick={() => setOnly(v)} style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }}>
 						{v ? (withSub ? 'Only these two' : `Only ${short(sub)}`) : withSub ? 'Any reports with both' : 'Any reports with it'}
@@ -2915,7 +3084,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				))}
 				<span className="text-xs" style={{ color: C.faint }}>{only ? 'Nothing else taken' : 'May include other substances'}</span>
 			</div>
-			)}
 			<Sources className="mt-4" list={['erowid', 'sei', 'pw', ...(withSub ? ['tripsit' as const] : [])]} />
 			{withSub &&
 				(pairQ.isLoading ? (
@@ -2952,7 +3120,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</span>
 				</p>
 			)}
-			{(withSub || tab === 'unfold') && (curveQ.isLoading || kq.isLoading ? (
+			{(curveQ.isLoading || kq.isLoading ? (
 				<div className="rd-card mt-6 animate-pulse" style={{ height: 320 }} />
 			) : withSub ? (
 				<>
@@ -2994,7 +3162,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				</section>
 			) : null)}
 
-			{(withSub || tab === 'stories') && (
+			{(
 				<>
 			<div className="mt-10 flex flex-wrap items-end justify-between gap-3">
 				<div>
@@ -3024,11 +3192,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				</div>
 			)}
 				</>
-			)}
-			{!withSub && tab === 'mixes' && (
-				<div className="rd-card rd-in mt-6 p-6">
-					<CombosList name={sub} onCombo={onCombo} />
-				</div>
 			)}
 			<Err q={q} />
 		</section>
