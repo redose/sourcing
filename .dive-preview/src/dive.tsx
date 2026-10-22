@@ -750,6 +750,9 @@ const CSS = `
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
 @keyframes rd-watermark { 0%, 100% { opacity: .22; } 50% { opacity: .35; } }
 .rd-watermark { opacity: .28; animation: rd-watermark 2.8s ease-in-out infinite; pointer-events: none; }
+@keyframes rd-bounce { 0%, 100% { transform: translateY(0) scale(1.08, .9); } 18% { transform: translateY(-4px) scale(.96, 1.05); } 50% { transform: translateY(-34px) scale(.98, 1.02); } 82% { transform: translateY(-4px) scale(.98, 1.03); } }
+.rd-bounce { display: block; opacity: .3; animation: rd-bounce 1.1s cubic-bezier(.45,0,.55,1) infinite; transform-origin: 50% 100%; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .rd-bounce { animation: none; } }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
 .rd-new { border-color: rgba(217,207,255,.7) !important; animation: rd-new 1.6s ease-out both; }
@@ -2746,12 +2749,14 @@ function TripSitBadge() {
 // (at the same time or later, or one marked quiet) just holds its space until its content arrives.
 let pillOwner: object | null = null;
 let pillPage = ''; // the page that has already had its pill
+let pillKind: 'pill' | 'spunion' = 'pill'; // each page gets one or the other, at random
 let currentPage = ''; // set by the main view on every render
 function Loading({ height = 200, className = '', quiet }: { height?: number; className?: string; quiet?: boolean }) {
 	const me = useRef<object>({});
 	if (!quiet && pillOwner == null && pillPage !== currentPage) {
 		pillOwner = me.current;
 		pillPage = currentPage;
+		pillKind = Math.random() < 0.5 ? 'pill' : 'spunion';
 	}
 	useEffect(
 		() => () => {
@@ -2762,7 +2767,13 @@ function Loading({ height = 200, className = '', quiet }: { height?: number; cla
 	if (pillOwner !== me.current) return <div className={className} style={{ height }} aria-busy="true" />;
 	return (
 		<div className={`flex items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
-			<img src={LOADING_PILL} alt="" className="rd-watermark" width={Math.min(72, Math.round(height * 0.5))} height={Math.min(72, Math.round(height * 0.5))} />
+			{pillKind === 'spunion' ? (
+				<span className="rd-bounce" style={{ width: Math.min(96, Math.round(height * 0.45)), height: Math.min(96, Math.round(height * 0.45)) }}>
+					<SpunionGhost />
+				</span>
+			) : (
+				<img src={LOADING_PILL} alt="" className="rd-watermark" width={Math.min(120, Math.round(height * 0.6))} height={Math.min(120, Math.round(height * 0.6))} />
+			)}
 		</div>
 	);
 }
@@ -4030,6 +4041,24 @@ const SPUNION_CSS = `
 @media (max-width: 960px) { .sp-wrap.lift { bottom: 104px; } .sp-me { width: 54px; height: 54px; } }
 @media (prefers-reduced-motion: reduce) { .sp-body, .sp-eye, .sp-me.hop .sp-body { animation: none !important; } }
 `;
+
+// Spunion as a white watermark for loading: his body in white with the eyes cut out, rings kept.
+function SpunionGhost() {
+	return (
+		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden style={{ display: 'block', overflow: 'visible' }}>
+			<defs>
+				<mask id="sp-ghost-eyes">
+					<rect width="500" height="500" fill="#fff" />
+					<circle cx="185" cy="300" r="86" fill="#000" />
+					<circle cx="357" cy="268" r="64" fill="#000" />
+				</mask>
+			</defs>
+			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" mask="url(#sp-ghost-eyes)" />
+			<circle cx="185" cy="300" r="70" fill="none" stroke="#fff" strokeWidth="6" />
+			<circle cx="357" cy="268" r="49" fill="none" stroke="#fff" strokeWidth="6" />
+		</svg>
+	);
+}
 
 function SpunionSvg() {
 	return (
