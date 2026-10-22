@@ -2198,20 +2198,6 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 // The top of a substance's own page: what it is (and what people call it), how a dose usually plays out, what to
 // watch for, what people feel. Tolerance and what it's mixed with sit in their own cards below.
 function SubstanceOverview({ name }: { name: string }) {
-	// The overview is a small slideshow: it moves on by itself every few seconds until you point at it or pick a slide.
-	const [slide, setSlide] = useState(0);
-	const [hold, setHold] = useState(false);
-	const [manual, setManual] = useState(false);
-	const slideCount = useRef(1);
-	useEffect(() => {
-		setSlide(0);
-		setManual(false);
-	}, [name]);
-	useEffect(() => {
-		if (hold || manual) return;
-		const timer = setTimeout(() => setSlide((i) => (i + 1) % Math.max(1, slideCount.current)), 9000);
-		return () => clearTimeout(timer);
-	}, [slide, hold, manual]);
 	const detailQ = useSQLQuery(substanceDetailSQL(name));
 	const timingQ = useSQLQuery(timingSQL([name]));
 	const membersQ = useSQLQuery(groupMembersSQL(name), { enabled: isGroup(name) });
@@ -2284,9 +2270,6 @@ function SubstanceOverview({ name }: { name: string }) {
 			))}
 		</div>
 	);
-	const slides = ([['What it is', about], ['At a glance', glance], ['What people feel', L(r.effects).length ? feel : null]] as [string, JSX.Element | null][]).filter((x) => x[1]);
-	slideCount.current = slides.length;
-	const slideAt = Math.min(slide, slides.length - 1);
 	return (
 		<>
 			{aka.length > 0 && (
@@ -2306,28 +2289,20 @@ function SubstanceOverview({ name }: { name: string }) {
 					<span>{warning}</span>
 				</div>
 			)}
-			<div className="rd-card rd-in mt-5 p-6 sm:p-7" onMouseEnter={() => setHold(true)} onMouseLeave={() => setHold(false)}>
-				<div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2" role="tablist">
-					{slides.map(([label], i) => (
-						<button
-							key={label}
-							role="tab"
-							aria-selected={i === slideAt}
-							onClick={() => {
-								setSlide(i);
-								setManual(true);
-							}}
-							className="flex items-center gap-2 text-sm font-semibold"
-							style={{ color: i === slideAt ? '#fff' : C.faint, transition: 'color .2s' }}
-						>
-							<span className="rounded-full" style={{ width: i === slideAt ? 22 : 8, height: 8, background: i === slideAt ? C.mint : 'rgba(255,255,255,.25)', transition: 'width .3s, background .3s' }} />
-							{label}
-						</button>
-					))}
+			<div className="rd-card rd-in mt-5 p-6 sm:p-7">
+				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+					<div className="min-w-0">{about}</div>
+					<div className="min-w-0">
+						<div className="rd-label mb-3">At a glance</div>
+						{glance}
+					</div>
 				</div>
-				<div key={slideAt} className="rd-fade" style={{ minHeight: 170 }}>
-					{slides[slideAt]?.[1]}
-				</div>
+				{L(r.effects).length > 0 && (
+					<div className="mt-7 border-t pt-5" style={{ borderColor: C.line }}>
+						<div className="rd-label mb-3">What people mostly feel</div>
+						{feel}
+					</div>
+				)}
 			</div>
 		</>
 	);
