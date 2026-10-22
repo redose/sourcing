@@ -686,7 +686,7 @@ const CSS = `
 .rd-tl { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 56px; align-items: start; }
 .rd-story { font-family: ${SERIF}; font-size: 21px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; }
 .rd-side > * { min-width: 0; }
-.rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 120px); overflow-y: auto; scrollbar-width: none; }
+.rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }
 .rd-bar { position: sticky; top: 8px; z-index: 10; border-radius: 20px; border: 1px solid ${C.line}; background: rgba(62,50,124,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .rd-range { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 999px; background: rgba(255,255,255,.18); outline: none; }
 .rd-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; cursor: pointer; }
@@ -716,9 +716,6 @@ const CSS = `
 .rd-mark.past { background: rgba(217,207,255,.18); color: #fff; }
 .rd-mark.future { color: rgba(255,255,255,.6); box-shadow: inset 0 -1px 0 rgba(255,255,255,.35); }
 .rd-mark.active { background: rgba(143,244,247,.22); color: #fff; animation: rd-mark 2.6s ease-in-out infinite; }
-.rd-src { display: inline-flex; align-items: center; gap: 6px; color: ${C.text}; font-weight: 600; white-space: nowrap; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.2); transition: border-color .2s; }
-.rd-src:hover { border-color: rgba(255,255,255,.6); }
-.rd-src img { display: block; border-radius: 4px; }
 .rd-ts { display: inline-flex; align-items: center; padding: 3px; border-radius: 999px; background: rgba(10,6,30,.35); border: 1px solid rgba(255,255,255,.14);
   font-family: ${SANS}; font-size: 12px; white-space: nowrap; vertical-align: middle; }
 .rd-ts a { display: inline-flex; align-items: center; gap: 7px; height: 22px; padding: 0 9px; border-radius: 999px; color: ${C.soft}; text-decoration: none; transition: background .2s, color .2s; }
@@ -2026,15 +2023,18 @@ const SOURCES = {
 	pw: { name: 'PsychonautWiki', href: 'https://psychonautwiki.org', logo: PW_ICON, gives: 'substance details, timing and tolerance' },
 	tripsit: { name: 'TripSit', href: 'https://tripsit.me', logo: TRIPSIT_ICON, gives: 'the drug combinations chart behind every mixing warning' },
 };
-function SourceLink({ src, href, children }: { src: keyof typeof SOURCES; href?: string; children?: React.ReactNode }) {
-	const s = SOURCES[src];
-	return (
-		<a className="rd-src" href={href || s.href} target="_blank" rel="noopener noreferrer" title={`${s.name}: ${s.gives}`}>
-			<img src={s.logo} alt="" width={16} height={16} />
-			{children ?? s.name}
-			<span style={{ color: C.faint }}>↗</span>
-		</a>
-	);
+// Two-column layout (story + side column) from 961px up; matches the .rd-tl breakpoint.
+function useWide() {
+	const q = '(min-width: 961px)';
+	const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(q).matches);
+	useEffect(() => {
+		const m = window.matchMedia?.(q);
+		if (!m) return;
+		const on = () => setWide(m.matches);
+		m.addEventListener('change', on);
+		return () => m.removeEventListener('change', on);
+	}, []);
+	return !!wide;
 }
 
 // Ctrl/⌘+F jumps to the page's own search box instead of the browser's find bar.
@@ -2066,6 +2066,82 @@ function Sources({ list, className = 'mt-6' }: { list: (keyof typeof SOURCES | [
 					</a>
 				);
 			})}
+		</div>
+	);
+}
+
+// What's known about the pairs active right now, one at a time: worst first, cycling every few seconds
+// (paused while pointed at or focused), with dots to step through. Each shows the actual note, not a count.
+function MixNotes({ items, pwPage }: { items: Record<string, unknown>[]; pwPage: (p: Record<string, unknown>) => string }) {
+	const [idx, setIdx] = useState(0);
+	const [paused, setPaused] = useState(false);
+	const key = items.map((p) => `${S(p.a)}|${S(p.b)}`).join(',');
+	useEffect(() => setIdx(0), [key]);
+	useEffect(() => {
+		if (items.length < 2 || paused) return;
+		const timer = setInterval(() => setIdx((i) => (i + 1) % items.length), 7000);
+		return () => clearInterval(timer);
+	}, [items.length, paused, key]);
+	const p = items[Math.min(idx, items.length - 1)];
+	if (!p) return null;
+	const sev = p.sev == null ? 0 : N(p.sev);
+	const look =
+		sev === 3 ? { fg: C.coral, bg: 'rgba(255,140,165,.14)', t: 'dangerous together' }
+		: sev === 2 ? { fg: C.amber, bg: 'rgba(255,200,130,.11)', t: 'unsafe together' }
+		: sev === 1 ? { fg: C.lav, bg: 'rgba(217,207,255,.08)', t: 'use caution' }
+		: { fg: C.mint, bg: 'rgba(166,242,228,.07)', t: S(p.status).toLowerCase() || 'low risk' };
+	return (
+		<div
+			className="mt-3 rounded-2xl p-4"
+			style={{ background: look.bg, border: `1px solid ${look.fg}55`, transition: 'background .4s, border-color .4s' }}
+			onMouseEnter={() => setPaused(true)}
+			onMouseLeave={() => setPaused(false)}
+			onFocus={() => setPaused(true)}
+			onBlur={() => setPaused(false)}
+			aria-live="polite"
+		>
+			<div key={idx} className="rd-fade">
+				<div className="flex items-center gap-2 font-semibold" style={{ color: look.fg }}>
+					{sev > 0 ? <AlertTriangle size={15} style={{ flexShrink: 0 }} /> : <Check size={15} style={{ flexShrink: 0 }} />}
+					<span>
+						{short(S(p.a))} + {short(S(p.b))}: {look.t}
+					</span>
+				</div>
+				{p.note ? (
+					<p className="mt-2" style={{ fontFamily: SERIF, fontSize: 16, lineHeight: 1.5, color: C.text }}>{S(p.note)}</p>
+				) : sev > 0 ? (
+					<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
+						Flagged {sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on {S(p.via).toLowerCase()}), with no explanation on file.{' '}
+						<a href={pwPage(p)} target="_blank" rel="noopener noreferrer" style={{ color: C.text, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+							Read why ↗
+						</a>
+					</p>
+				) : null}
+			</div>
+			{items.length > 1 && (
+				<div className="mt-3 flex items-center gap-3">
+					<div className="flex items-center gap-1.5">
+						{items.map((q, i) => {
+							const c = q.sev == null ? C.mint : N(q.sev) === 3 ? C.coral : N(q.sev) === 2 ? C.amber : C.lav;
+							return (
+								<button
+									key={i}
+									onClick={() => setIdx(i)}
+									aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
+									title={`${short(S(q.a))} + ${short(S(q.b))}`}
+									style={{ width: i === idx ? 18 : 7, height: 7, borderRadius: 999, background: c, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
+								/>
+							);
+						})}
+					</div>
+					<span className="text-xs tabular-nums" style={{ color: C.faint }}>
+						{idx + 1} of {items.length}
+					</span>
+					<button className="ml-auto" onClick={() => setIdx((idx + 1) % items.length)} aria-label="Next note" style={{ color: C.soft }}>
+						<ChevronRight size={16} />
+					</button>
+				</div>
+			)}
 		</div>
 	);
 }
@@ -2674,6 +2750,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const [copied, setCopied] = useState(false);
 	const [dockOpen, setDockOpen] = useState(false);
 	const [allNames, setAllNames] = useState(false);
+	const wide = useWide();
 	const { effectInfo, open, classOf } = useContext(OpenCtx);
 	const takenRef = useRef<HTMLOListElement | null>(null);
 	const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -2873,38 +2950,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 											{!notes.length && <span style={{ color: C.faint }}> · no note on file, which isn't the same as safe</span>}
 										</span>
 									</div>
-									{flagged.map((p) => {
-										const sev = N(p.sev);
-										const look = sev === 3 ? { fg: C.coral, bg: 'rgba(255,140,165,.14)', t: 'dangerous together' } : sev === 2 ? { fg: C.amber, bg: 'rgba(255,200,130,.11)', t: 'unsafe together' } : { fg: C.lav, bg: 'rgba(217,207,255,.08)', t: 'use caution' };
-										return (
-											<div key={`${S(p.a)}|${S(p.b)}`} className="rd-in mt-3 rounded-2xl p-4" style={{ background: look.bg, border: `1px solid ${look.fg}55` }}>
-												<div className="flex items-center gap-2 font-semibold" style={{ color: look.fg }}>
-													<AlertTriangle size={15} style={{ flexShrink: 0 }} />
-													<span>
-														{short(S(p.a))} + {short(S(p.b))}: {look.t}
-													</span>
-												</div>
-												{p.note ? (
-													<p className="mt-2" style={{ fontFamily: SERIF, fontSize: 16, lineHeight: 1.5, color: C.text }}>{S(p.note)}</p>
-												) : (
-													<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
-														Flagged {sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on {S(p.via).toLowerCase()}), with no explanation on file.{' '}
-														<a href={pwPage(p)} target="_blank" rel="noopener noreferrer" style={{ color: C.text, textDecoration: 'underline', textUnderlineOffset: 3 }}>
-															Read why ↗
-														</a>
-													</p>
-												)}
-											</div>
-										);
-									})}
-									{low.map((p) => (
-										<p key={`${S(p.a)}|${S(p.b)}`} className="mt-3 text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
-											<b style={{ color: C.mint, fontWeight: 600 }}>
-												{short(S(p.a))} + {short(S(p.b))}: {S(p.status).toLowerCase()}.
-											</b>{' '}
-											{S(p.note)}
-										</p>
-									))}
+									{notes.length > 0 && <MixNotes items={[...flagged, ...low]} pwPage={pwPage} />}
 									{notes.some((p) => S(p.via) === 'TripSit') && (
 										<div className="mt-3">
 											<TripSitBadge />
@@ -2917,8 +2963,98 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const moodLine = moodPts.map((p) => ({ x: p.x, y: clamp(p.y * moodScale, -1, 1) }));
 	const moodNow = momentObs ? (MOMENT[S(momentObs.sentiment)] ?? MOMENT.neutral).y : clamp((interp(moodPts, t) ?? 0) * moodScale, -1, 1);
 
+	// The timeline: a card at the top of the side column on wide screens, a floating dock at the bottom on phones.
+	const timeline = (side: boolean) => (
+		<div
+			className={side ? 'rd-card p-4' : 'rd-dock'}
+			style={{ borderColor: `${moodColor(moodNow)}55`, boxShadow: side ? undefined : `0 10px 40px rgba(10,4,40,.35), 0 0 0 1px ${moodColor(moodNow)}22`, transition: 'border-color 1.2s ease' }}
+		>
+			<div className="flex items-center gap-3">
+				<button onClick={prevMark} className="rd-btn rd-hide-sm" aria-label="Previous mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
+					<SkipBack size={15} />
+				</button>
+				<button
+					onClick={() => {
+						if (t >= maxT) setT(0);
+						setPlaying(!playing);
+					}}
+					aria-label={playing ? 'Pause' : 'Play'}
+					className="flex items-center justify-center"
+					style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', color: C.deep, flexShrink: 0, boxShadow: playing ? `0 0 0 5px ${moodColor(moodNow)}33` : 'none', transition: 'box-shadow .4s' }}
+				>
+					{playing ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
+				</button>
+				<button onClick={nextMark} className="rd-btn rd-hide-sm" aria-label="Next mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
+					<SkipForward size={15} />
+				</button>
+				<div className="text-xl font-light tabular-nums" style={{ minWidth: 56, letterSpacing: '-0.02em' }}>{fmtT(t)}</div>
+				<div className="flex-1" style={{ minWidth: 0 }}>
+					{dockOpen || side ? (
+						<span className="block truncate text-sm font-semibold" style={{ color: phase ? '#fff' : C.faint }}>
+							{phase?.label ?? ''}
+						</span>
+					) : (
+						<MiniTimeline
+							xMax={maxT}
+							x={t}
+							onScrub={jump}
+							mood={moodLine}
+							drugs={expected.series}
+							ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))}
+							flags={milestones.map((m, i) => ({ x: m.t, label: m.label, on: i <= msIdx }))}
+						/>
+					)}
+				</div>
+				<select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="rd-btn" style={{ padding: '3px 6px', fontSize: 12, background: 'transparent' }} aria-label="Speed">
+					{[0.5, 1, 2, 4].map((v) => (
+						<option key={v} value={v} style={{ color: '#000' }}>
+							{v}×
+						</option>
+					))}
+				</select>
+				<button className="rd-btn" aria-label={dockOpen ? 'Hide details' : 'Show details'} title={dockOpen ? 'Hide details' : 'Show mood and drug lanes'} style={{ padding: 6, background: 'transparent' }} onClick={() => setDockOpen(!dockOpen)}>
+					{dockOpen === !side ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+				</button>
+			</div>
+			{side && !dockOpen && (
+				<div className="mt-3">
+					<MiniTimeline
+						xMax={maxT}
+						x={t}
+						onScrub={jump}
+						mood={moodLine}
+						drugs={expected.series}
+						ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))}
+						flags={milestones.map((m, i) => ({ x: m.t, label: m.label, on: i <= msIdx }))}
+					/>
+				</div>
+			)}
+			{dockOpen && (
+				<div className="rd-fade mt-3 border-t pt-3" style={{ borderColor: C.line, maxHeight: side ? 'none' : '38vh', overflowY: 'auto', scrollbarWidth: 'none' }}>
+					{lanes.length > 0 && (
+						<ScrubChart
+							id="rep"
+							lanes={lanes.map((l) => ({ ...l, height: l.diverging ? 56 : 34 }))}
+							xMax={maxT}
+							x={t}
+							onScrub={jump}
+							ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))}
+							xLabels={xLabels}
+							cursorLabel={fmtT(t)}
+						/>
+					)}
+					{coreEnd != null && (
+						<button className="rd-btn mt-2" style={{ padding: '3px 10px', fontSize: 12 }} onClick={() => setShowAll(!showAll)}>
+							{showAll ? 'Focus on the main part' : `Show all ${fmtT(fullT)}`}
+						</button>
+					)}
+				</div>
+			)}
+		</div>
+	);
+
 	return (
-		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: dockOpen ? 340 : 120 }}>
+		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: wide ? 0 : dockOpen ? 340 : 120 }}>
 			<header>
 				{(() => {
 					const taken = [...new Set([...doses].sort((a, b) => a.t - b.t).map((d) => d.sub))];
@@ -3005,7 +3141,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 			{[2, 3].map((r) => (
 				<div key={r} aria-hidden className="rd-tint" style={{ background: RISK_TINT[r], opacity: riskNow === r ? 1 : 0 }} />
 			))}
-			<div aria-hidden className="rd-fadebar" />
+			{!wide && <div aria-hidden className="rd-fadebar" />}
 
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
@@ -3041,6 +3177,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 
 				{/* Alongside the story: the moment, and the doses */}
 				<aside className="rd-side">
+					{wide && timeline(true)}
 					<div key={heroKey} className="rd-card rd-in p-5" style={{ borderColor: nowMood ? `${nowMood.color}55` : undefined }}>
 						<div className="flex flex-wrap items-center gap-3">
 							<span className="rd-label">
@@ -3137,77 +3274,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				</aside>
 			</div>
 
-			{/* Floating timeline dock */}
-			<div className="rd-dock" style={{ borderColor: `${moodColor(moodNow)}55`, boxShadow: `0 10px 40px rgba(10,4,40,.35), 0 0 0 1px ${moodColor(moodNow)}22` }}>
-				<div className="flex items-center gap-3">
-					<button onClick={prevMark} className="rd-btn rd-hide-sm" aria-label="Previous mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
-						<SkipBack size={15} />
-					</button>
-					<button
-						onClick={() => {
-							if (t >= maxT) setT(0);
-							setPlaying(!playing);
-						}}
-						aria-label={playing ? 'Pause' : 'Play'}
-						className="flex items-center justify-center"
-						style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', color: C.deep, flexShrink: 0, boxShadow: playing ? `0 0 0 5px ${moodColor(moodNow)}33` : 'none', transition: 'box-shadow .4s' }}
-					>
-						{playing ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
-					</button>
-					<button onClick={nextMark} className="rd-btn rd-hide-sm" aria-label="Next mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
-						<SkipForward size={15} />
-					</button>
-					<div className="text-xl font-light tabular-nums" style={{ minWidth: 56, letterSpacing: '-0.02em' }}>{fmtT(t)}</div>
-					<div className="flex-1" style={{ minWidth: 0 }}>
-						{dockOpen ? (
-							<span className="text-sm font-semibold" style={{ color: phase ? '#fff' : C.faint }}>
-								{phase?.label ?? ''}
-							</span>
-						) : (
-							<MiniTimeline
-								xMax={maxT}
-								x={t}
-								onScrub={jump}
-								mood={moodLine}
-								drugs={expected.series}
-								ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))}
-								flags={milestones.map((m, i) => ({ x: m.t, label: m.label, on: i <= msIdx }))}
-							/>
-						)}
-					</div>
-					<select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="rd-btn" style={{ padding: '3px 6px', fontSize: 12, background: 'transparent' }} aria-label="Speed">
-						{[0.5, 1, 2, 4].map((v) => (
-							<option key={v} value={v} style={{ color: '#000' }}>
-								{v}×
-							</option>
-						))}
-					</select>
-					<button className="rd-btn" aria-label={dockOpen ? 'Hide details' : 'Show details'} title={dockOpen ? 'Hide details' : 'Show mood and drug lanes'} style={{ padding: 6, background: 'transparent' }} onClick={() => setDockOpen(!dockOpen)}>
-						{dockOpen ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
-					</button>
-				</div>
-				{dockOpen && (
-					<div className="rd-fade mt-3 border-t pt-3" style={{ borderColor: C.line, maxHeight: '38vh', overflowY: 'auto', scrollbarWidth: 'none' }}>
-						{lanes.length > 0 && (
-							<ScrubChart
-								id="rep"
-								lanes={lanes.map((l) => ({ ...l, height: l.diverging ? 56 : 34 }))}
-								xMax={maxT}
-								x={t}
-								onScrub={jump}
-								ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))}
-								xLabels={xLabels}
-								cursorLabel={fmtT(t)}
-							/>
-						)}
-						{coreEnd != null && (
-							<button className="rd-btn mt-2" style={{ padding: '3px 10px', fontSize: 12 }} onClick={() => setShowAll(!showAll)}>
-								{showAll ? 'Focus on the main part' : `Show all ${fmtT(fullT)}`}
-							</button>
-						)}
-					</div>
-				)}
-			</div>
+			{!wide && timeline(false)}
 			<Err q={marksQ} />
 		</section>
 	);
@@ -3344,20 +3411,25 @@ export default function ReportTimelapse() {
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
 					{view === 'effects' && <EffectsBrowse q={effectsQ} />}
 
-					<footer className="mt-16 border-t pt-6 text-sm" style={{ borderColor: C.line, color: C.soft }}>
-						<a className="rd-btn mb-6 inline-flex items-center gap-2" href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-							<DiscordIcon size={16} />
-							Join the re:dose community
-						</a>
-						<div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-							<span>With thanks to</span>
-							{(Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map((k) => (
-								<SourceLink key={k} src={k} />
-							))}
+					<footer className="mt-16 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-t pt-6 text-sm" style={{ borderColor: C.line, color: C.soft }}>
+						{/* Report pages credit their sources under the story, so the footer stays short there. */}
+						{!onReport && (
+							<div className="flex flex-wrap items-center gap-3">
+								<span>With thanks to</span>
+								{(Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map((k) => (
+									<a key={k} className="rd-logo" href={SOURCES[k].href} target="_blank" rel="noopener noreferrer" title={`${SOURCES[k].name}: ${SOURCES[k].gives}`} aria-label={SOURCES[k].name}>
+										<img src={SOURCES[k].logo} alt="" width={18} height={18} />
+									</a>
+								))}
+							</div>
+						)}
+						<div className="flex flex-wrap items-center gap-4">
+							<span className="text-xs" style={{ color: C.faint }}>Not medical advice.</span>
+							<a className="rd-btn inline-flex items-center gap-2" href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: 13, padding: '6px 12px' }}>
+								<DiscordIcon size={15} />
+								Join the community
+							</a>
 						</div>
-						<p className="mt-3 text-xs" style={{ color: C.faint }}>
-							Stories from Erowid, effect descriptions from the Subjective Effect Index, substance details from PsychonautWiki, and mixing guidance from TripSit. Not medical advice.
-						</p>
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} />
