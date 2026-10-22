@@ -746,7 +746,7 @@ const CSS = `
 .rd-story { font-family: ${SERIF}; font-size: 19px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; transition: color .6s; }
 .rd-story.focus { color: rgba(255,255,255,.42); }
 .rd-side > * { min-width: 0; }
-.rd-side { position: sticky; top: 84px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 96px); overflow-y: auto; scrollbar-width: none; }
+.rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }
 .rd-bar { position: sticky; top: 8px; z-index: 10; border-radius: 20px; border: 1px solid ${C.line}; background: rgba(62,50,124,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .rd-range { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 999px; background: rgba(255,255,255,.18); outline: none; }
 .rd-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; cursor: pointer; }
@@ -866,9 +866,9 @@ const TONE_DOT: Record<string, string> = { negative: C.coral, positive: C.mint, 
 // How risk looks everywhere (pair pages, the report banner, combination lists): one colour, word and pill per
 // level. Dangerous (3) and unsafe (2) get solid pills and a page tint; caution (1) is an outline.
 const RISK: Record<number, { c: string; t: string; word: string; bg: string; banner: string }> = {
-	3: { c: C.coral, t: 'Dangerous combination', word: 'Dangerous', bg: 'rgba(255,140,165,.16)', banner: 'rgba(120,36,78,.74)' },
-	2: { c: C.amber, t: 'Unsafe combination', word: 'Unsafe', bg: 'rgba(255,200,130,.12)', banner: 'rgba(108,68,36,.68)' },
-	1: { c: C.lav, t: 'Use caution', word: 'Caution', bg: 'rgba(217,207,255,.07)', banner: 'rgba(70,56,140,.82)' },
+	3: { c: '#ff7d8e', t: 'Dangerous combination', word: 'Dangerous', bg: 'rgba(255,110,130,.16)', banner: 'rgba(124,30,58,.8)' },
+	2: { c: '#ffb072', t: 'Unsafe combination', word: 'Unsafe', bg: 'rgba(255,170,100,.13)', banner: 'rgba(112,60,30,.78)' },
+	1: { c: '#ffe27a', t: 'Use caution', word: 'Caution', bg: 'rgba(255,226,122,.08)', banner: 'rgba(96,80,36,.8)' },
 };
 function RiskPill({ sev, small }: { sev: number; small?: boolean }) {
 	const r = RISK[sev];
@@ -885,8 +885,8 @@ function RiskPill({ sev, small }: { sev: number; small?: boolean }) {
 	);
 }
 const RISK_TINT: Record<number, string> = {
-	3: 'radial-gradient(1300px 560px at 50% -10%, rgba(255,120,150,.34), transparent 70%), radial-gradient(900px 420px at 50% 110%, rgba(255,120,150,.18), transparent 70%)',
-	2: 'radial-gradient(1300px 560px at 50% -10%, rgba(255,190,120,.28), transparent 70%), radial-gradient(900px 420px at 50% 110%, rgba(255,190,120,.14), transparent 70%)',
+	3: 'radial-gradient(1300px 560px at 50% -10%, rgba(255,100,125,.34), transparent 70%), radial-gradient(900px 420px at 50% 110%, rgba(255,100,125,.18), transparent 70%)',
+	2: 'radial-gradient(1300px 560px at 50% -10%, rgba(255,160,90,.28), transparent 70%), radial-gradient(900px 420px at 50% 110%, rgba(255,160,90,.14), transparent 70%)',
 };
 const MOMENT: Record<string, { label: string; color: string; y: number }> = {
 	positive: { label: 'Good moment', color: C.mint, y: 1 },
@@ -949,6 +949,7 @@ function ScrubChart({
 	xLabels,
 	laneHeight = 56,
 	cursorLabel,
+	onHover,
 }: {
 	id: string;
 	lanes: Lane[];
@@ -960,9 +961,11 @@ function ScrubChart({
 	xLabels: { x: number; label: string }[];
 	laneHeight?: number;
 	cursorLabel?: string;
+	onHover?: (x: number | null) => void;
 }) {
 	const ref = useRef<HTMLDivElement | null>(null);
 	const dragging = useRef(false);
+	const [hx, setHx] = useState<number | null>(null);
 	const [w, setW] = useState(320);
 	useEffect(() => {
 		const el = ref.current;
@@ -998,7 +1001,18 @@ function ScrubChart({
 					(e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
 					scrubAt(e.clientX);
 				}}
-				onPointerMove={(e) => dragging.current && scrubAt(e.clientX)}
+				onPointerMove={(e) => {
+					if (dragging.current) return scrubAt(e.clientX);
+					if (e.pointerType !== 'mouse') return;
+					const r = ref.current!.getBoundingClientRect();
+					const v = clamp(((e.clientX - r.left - padX) / (w - 2 * padX)) * xMax, 0, xMax);
+					setHx(v);
+					onHover?.(v);
+				}}
+				onPointerLeave={() => {
+					setHx(null);
+					onHover?.(null);
+				}}
 				onPointerUp={() => (dragging.current = false)}
 				onPointerCancel={() => (dragging.current = false)}
 				role="slider"
@@ -1094,6 +1108,14 @@ function ScrubChart({
 							{l.label}
 						</text>
 					) : null,
+				)}
+				{hx != null && Math.abs(sx(hx) - cx) > 6 && (
+					<g pointerEvents="none">
+						<line x1={sx(hx)} x2={sx(hx)} y1={pillH ? 20 : 0} y2={plotBottom + 2} stroke="#fff" strokeOpacity="0.45" strokeDasharray="3 4" />
+						<text x={clamp(sx(hx), padX + 18, w - padX - 18)} y={pillH ? 14 : 10} textAnchor="middle" fontSize="11" fontWeight="600" fill={C.soft} style={{ fontVariantNumeric: 'tabular-nums' }}>
+							{fmtT(hx)}
+						</text>
+					</g>
 				)}
 				<line x1={cx} x2={cx} y1={pillH ? 20 : 0} y2={plotBottom + 2} stroke="#fff" strokeOpacity="0.95" strokeWidth="2" />
 				{cursorLabel && (
@@ -2358,7 +2380,7 @@ const pwInteractions = (p: Record<string, unknown>) => {
 
 // Risky pairs in this story, as a banner that stays at the top while reading: one pair at a time (worst and
 // "mixing now" first), cycling every few seconds unless pointed at, with the reason on one line. Tap to read it all.
-function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean })[] }) {
+function MixBanner({ items, bottom }: { items: (Record<string, unknown> & { now: boolean })[]; bottom: number }) {
 	const [idx, setIdx] = useState(0);
 	const [paused, setPaused] = useState(false);
 	const [full, setFull] = useState(false);
@@ -2375,14 +2397,19 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
 	const reason = p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
 	return (
+		<div style={{ position: 'fixed', left: 0, right: 0, bottom, zIndex: 32, display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none', transition: 'bottom .3s' }}>
+		<style>{SPUNION_CSS}</style>
 		<div
-			className="rd-in mt-6"
-			style={{ position: 'sticky', top: 10, zIndex: 20, borderRadius: 18, border: `1px solid ${look.fg}${sev >= 2 ? '88' : '66'}`, background: look.bg, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 10px 30px rgba(10,4,40,.3)', transition: 'background .4s, border-color .4s' }}
+			className="rd-in"
+			style={{ pointerEvents: 'auto', width: 'min(900px, 100%)', borderRadius: 22, border: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, background: look.bg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 14px 40px rgba(10,4,40,.45)', transition: 'background .4s, border-color .4s' }}
 			onMouseEnter={() => setPaused(true)}
 			onMouseLeave={() => setPaused(false)}
 			aria-live="polite"
 		>
-			<div className="flex items-center gap-3 px-4 py-2.5">
+			<div className="flex items-center gap-3 py-2.5 pl-2 pr-4">
+				<span aria-hidden style={{ width: 46, height: 46, flexShrink: 0, marginTop: -14, filter: 'drop-shadow(0 6px 10px rgba(10,4,40,.35))' }}>
+					<SpunionSvg />
+				</span>
 				<button key={idx} className="rd-fade flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setFull(!full)} title={full ? 'Show less' : 'Read the whole note'}>
 					<RiskPill sev={sev} />
 					<b className="font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>
@@ -2407,7 +2434,7 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 								onClick={() => setIdx(i)}
 								aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
 								title={`${short(S(q.a))} + ${short(S(q.b))}`}
-								style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 999, background: N(q.sev) === 3 ? C.coral : N(q.sev) === 2 ? C.amber : C.lav, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
+								style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
 							/>
 						))}
 					</div>
@@ -2432,6 +2459,7 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 					{S(p.via) === 'TripSit' && <TripSitBadge />}
 				</div>
 			)}
+		</div>
 		</div>
 	);
 }
@@ -3073,6 +3101,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const [copied, setCopied] = useState(false);
 	const [dockOpen, setDockOpen] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(min-width: 961px)').matches);
 	const [allNames, setAllNames] = useState(false);
+	const [hoverT, setHoverT] = useState<number | null>(null); // where the pointer is on the timeline chart
 	const wide = useWide();
 	const { effectInfo, open, classOf } = useContext(OpenCtx);
 	const takenRef = useRef<HTMLOListElement | null>(null);
@@ -3370,6 +3399,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 							ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))}
 							xLabels={xLabels}
 							cursorLabel={fmtT(t)}
+							onHover={setHoverT}
 						/>
 					)}
 					{coreEnd != null && (
@@ -3390,6 +3420,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 					<div className="mt-2 flex flex-wrap gap-1.5">
 						{[...doses].sort((p, q) => p.t - q.t).map((d, i, all) => {
 							const taken = d.t <= t + 1e-9;
+							const near = hoverT != null && !d.assumed && Math.abs(d.t - hoverT) <= Math.max(0.25, maxT / 40);
 							const earlier = d.assumed ? undefined : all.find((e) => !e.assumed && e.sub !== d.sub && e.t < d.t - 0.25 && sharesTol(rows(tolQ), e.sub, d.sub));
 							return (
 								<button
@@ -3397,7 +3428,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 									onClick={() => jump(d.t)}
 									className="rd-tag"
 									title={[d.assumed ? 'Time not given' : `Jump to ${fmtT(d.t)}`, d.sub, d.amount, earlier ? `Shares tolerance with ${short(earlier.sub)}, taken earlier` : ''].filter(Boolean).join(' · ')}
-									style={{ padding: '4px 10px', fontSize: 12, gap: 6, opacity: taken ? 1 : 0.42, transition: 'opacity .3s' }}
+									style={{ padding: '4px 10px', fontSize: 12, gap: 6, opacity: taken || near ? 1 : 0.42, background: near ? 'rgba(255,255,255,.22)' : undefined, borderColor: near ? '#fff' : undefined, transform: near ? 'translateY(-1px)' : 'none', transition: 'opacity .3s, background .2s, border-color .2s, transform .2s' }}
 								>
 									<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{d.assumed ? '—' : fmtT(d.t)}</span>
 									<ClassIcon cls={classOf(d.sub)} size={12} color={C.coral} />
@@ -3414,7 +3445,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	);
 
 	return (
-		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: wide ? 0 : dockOpen ? 340 : 120 }}>
+		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: (wide ? 0 : dockOpen ? 340 : 120) + (bannerItems.length ? 90 : 0) }}>
 			<header>
 				{(() => {
 					const taken = [...new Set([...doses].sort((a, b) => a.t - b.t).map((d) => d.sub))];
@@ -3524,7 +3555,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 			))}
 			{!wide && <div aria-hidden className="rd-fadebar" />}
 
-			{bannerItems.length > 0 && <MixBanner items={bannerItems} />}
+			{bannerItems.length > 0 && <MixBanner items={bannerItems} bottom={wide ? 16 : dockOpen ? 360 : 104} />}
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
 				<article ref={bodyRef} className={`rd-story ${active && playing ? 'focus' : ''}`}>
@@ -3558,7 +3589,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				</article>
 
 				{/* Alongside the story: the moment, and the doses */}
-				<aside className="rd-side" style={bannerItems.length ? undefined : { top: 12, maxHeight: 'calc(100vh - 24px)' }}>
+				<aside className="rd-side" style={bannerItems.length ? { maxHeight: 'calc(100vh - 110px)' } : undefined}>
 					{wide && timeline(true)}
 					<div key={heroKey} className="rd-in px-1 pb-2 pt-3">
 						<div className="flex flex-wrap items-center gap-3">
@@ -3854,7 +3885,7 @@ export default function ReportTimelapse() {
 		clearReport();
 		setOpenItem(null);
 	};
-	// Spunion only speaks up when it matters: a risky pair, a story with a risky mix, or a first hello.
+	// Spunion only speaks up when it matters: a risky pair or a first hello. On reports he delivers the mix banner.
 	const [greeted] = useState(() => {
 		try {
 			return window.localStorage.getItem('rd-spunion-hi') === '1';
@@ -3871,9 +3902,7 @@ export default function ReportTimelapse() {
 	}, []);
 	const spunionTips = (() => {
 		const pairSev = onSub && withSub ? N(rows(comboPairQ)[0]?.sev) : 0;
-		const storySev = onReport ? Math.max(0, ...rows(pairsQ).map((p) => N(p.sev))) : 0;
 		if (pairSev >= 2) return [`${short(sub!)} with ${short(withSub!)} is a risky mix. If you go ahead anyway: go low, go slow, and don’t do it alone.`, SPUNION_TIPS[1]];
-		if (storySev >= 2) return ['This story includes a risky mix. The banner up top says why, and lights up while it’s happening.', 'If you’re mixing anything yourself: go low, go slow, and don’t do it alone.'];
 		if (!greeted && !onSub && !onReport) return ['Hi, I’m Spunion! Tap a substance to see how it usually goes, or tap two to see how they mix.', ...SPUNION_TIPS];
 		return [];
 	})();
