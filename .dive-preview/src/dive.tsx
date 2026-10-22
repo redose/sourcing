@@ -2396,9 +2396,10 @@ function SubstanceNumbers({ name }: { name: string }) {
 	const r = rows(q)[0];
 	if (q.isLoading) return <div className="rd-card mt-6 animate-pulse" style={{ height: 180 }} />;
 	if (!r || !N(r.n)) return null;
-	const routeK = L(r.route_k), routeN = (Array.isArray(r.route_n) ? r.route_n : []).map(N);
+	// Lists arrive as plain arrays locally and as Arrow vectors from MotherDuck; L() reads both.
+	const routeK = L(r.route_k), routeN = L(r.route_n).map(Number);
 	const routeTotal = Math.max(1, N(r.route_total));
-	const years = (Array.isArray(r.years) ? r.years : []).map(N), yearN = (Array.isArray(r.year_n) ? r.year_n : []).map(N);
+	const years = L(r.years).map(Number), yearN = L(r.year_n).map(Number);
 	const yMax = Math.max(1, ...yearN);
 	const peak = years[yearN.indexOf(yMax)];
 	const men = N(r.men), women = N(r.women), people = men + women;
