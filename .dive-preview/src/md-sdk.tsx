@@ -270,7 +270,8 @@ function readRoute(): [string, unknown][] {
 	const [path, query = ''] = hash.split('?');
 	const parts = path.split('/').filter(Boolean);
 	const out: [string, unknown][] = [];
-	if (parts[0] === 'substances' || parts[0] === 'effects') out.push(['view', parts[0]]);
+	if (parts[0] === 'substances' || parts[0] === 'effects' || parts[0] === 'about') out.push(['view', parts[0]]);
+	else if (parts[0] === 'stories') out.push(['view', 'reports']);
 	else if (parts[0]) {
 		const [s1, s2] = parts[0].split('+').map(dec);
 		out.push(['substance', s1]);
@@ -296,6 +297,7 @@ function writeRoute(state: Map<string, unknown>) {
 	const open = state.get('open') as { kind: string; name: string } | undefined;
 	let path = '';
 	if (view && view !== 'reports') path = view;
+	else if (view === 'reports' && !sub && !report) path = 'stories';
 	else if (sub) path = enc(sub) + (withSub ? '+' + enc(withSub) : '') + (report ? '/' + report.replace(/^erowid-/, '') : '');
 	const q: string[] = [];
 	if (report && at) q.push('at=' + fmtAt(at));
