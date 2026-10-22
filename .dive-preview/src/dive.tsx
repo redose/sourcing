@@ -2413,144 +2413,93 @@ const pwInteractions = (p: Record<string, unknown>) => {
 
 // Risky pairs in this story, as a banner that stays at the top while reading: one pair at a time (worst and
 // "mixing now" first), cycling every few seconds unless pointed at, with the reason on one line. Tap to read it all.
-// Split a note into short phrases that fit on one line: sentences, and long sentences at commas or semicolons.
-const notePhrases = (text: string, max = 110) => {
-	const out: string[] = [];
-	for (const sentence of text.match(/[^.!?]+[.!?]*/g) ?? [text]) {
-		let cur = '';
-		for (const part of sentence.trim().split(/(?<=[,;:])\s+/)) {
-			if (cur && (cur + ' ' + part).length > max) {
-				out.push(cur);
-				cur = part;
-			} else cur = cur ? `${cur} ${part}` : part;
-		}
-		if (cur) out.push(cur);
-	}
-	return out.filter(Boolean);
-};
-
-function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now: boolean })[]; docked?: boolean }) {
-	const [idx, setIdx] = useState(0);
-	const [part, setPart] = useState(0);
-	const [paused, setPaused] = useState(false);
-	const key = items.map((p) => `${S(p.a)}|${S(p.b)}|${p.now ? 1 : 0}`).join(',');
-	const p = items[Math.min(idx, items.length - 1)];
-	const sev = p ? N(p.sev) : 0;
-	const reason = !p ? '' : p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
-	const phrases = useMemo(() => notePhrases(reason, docked ? 110 : 64), [reason, docked]);
-	useEffect(() => {
-		setIdx(0);
-		setPart(0);
-	}, [key]);
-	// Show each phrase long enough to read (~250 ms a word, at least 3.5 s), then the next; after the last phrase,
-	// move on to the next pair. Pointing at the bubble pauses it.
-	useEffect(() => {
-		if (paused || !phrases.length) return;
-		const words = (phrases[part] ?? '').split(/\s+/).length;
-		const timer = setTimeout(() => {
-			if (part < phrases.length - 1) setPart(part + 1);
-			else {
-				setPart(0);
-				if (items.length > 1) setIdx((i) => (i + 1) % items.length);
-			}
-		}, Math.max(3500, words * 250));
-		return () => clearTimeout(timer);
-	}, [part, phrases, paused, items.length]);
-	if (!p) return null;
-	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
-	const ink = '#fff';
-	const inkSoft = C.soft;
-	const last = part === phrases.length - 1;
-
-	const phrase = (
-		<span key={`${idx}-${part}`} className="rd-fade min-w-0" title={reason} style={{ fontFamily: SERIF, fontSize: docked ? 15 : 15.5, lineHeight: 1.35, color: inkSoft, ...(docked ? {} : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }) }}>
-			{phrases[part]}
-			{last && !p.note && (
-				<>
-					{' '}
-					<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ color: ink, textDecoration: 'underline', textUnderlineOffset: 3 }}>
-						why ↗
-					</a>
-				</>
-			)}
-		</span>
-	);
-	const head = (
-		<>
-			<RiskPill sev={sev} small />
-			<b className="font-semibold" style={{ color: ink, whiteSpace: 'nowrap', fontSize: 13.5 }}>
-				{short(S(p.a))} + {short(S(p.b))}
-			</b>
-			{p.now && (
-				<span className="rounded-full px-1.5 text-xs font-semibold" style={{ border: '1.5px solid rgba(255,255,255,.6)', color: ink, whiteSpace: 'nowrap', lineHeight: '16px' }}>
-					now
-				</span>
-			)}
-		</>
-	);
-	const body = docked ? (
-		<>
-			<div className="flex flex-wrap items-center gap-x-2 gap-y-1">{head}</div>
-			<div className="mt-1">{phrase}</div>
-		</>
-	) : (
-		<div className="flex items-center gap-2.5">
-			{head}
-			{phrase}
-			{phrases.length > 1 && (
-				<span style={{ fontSize: 10.5, color: inkSoft, opacity: 0.7, whiteSpace: 'nowrap' }}>
-					{part + 1}/{phrases.length}
-				</span>
-			)}
-			{items.length > 1 && (
-				<span className="flex items-center gap-1" style={{ flexShrink: 0 }}>
-					{items.map((q, i) => (
-						<button
-							key={i}
-							onClick={() => {
-								setIdx(i);
-								setPart(0);
-							}}
-							aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
-							title={`${short(S(q.a))} + ${short(S(q.b))}`}
-							style={{ width: i === idx ? 12 : 6, height: 6, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, opacity: i === idx ? 1 : 0.5, transition: 'width .3s, opacity .3s' }}
-						/>
-					))}
-				</span>
-			)}
-			{S(p.via) === 'TripSit' && (
-				<a href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" title="From TripSit's drug combinations chart" style={{ flexShrink: 0 }}>
-					<img src={TRIPSIT_ICON} alt="TripSit" width={16} height={16} style={{ borderRadius: 999, display: 'block' }} />
-				</a>
-			)}
+// The coloured risk card used on pair pages and on report pages: the pill, a headline, the actual note, and where
+// it comes from. Dangerous and unsafe get a stronger wash and an icon disc.
+function RiskCard({ p, heading, aside }: { p: Record<string, unknown>; heading?: React.ReactNode; aside?: React.ReactNode }) {
+	const sev = p.sev == null ? 0 : N(p.sev);
+	const look = RISK[sev];
+	if (!look) return null;
+	const loud = sev >= 2;
+	return (
+		<div className="rd-card rd-in p-5" style={{ background: look.bg, borderColor: loud ? look.c : `${look.c}88`, padding: loud ? 26 : undefined }}>
+			<div className="flex items-start gap-4">
+				{loud ? (
+					<span className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 999, background: `${look.c}26`, flexShrink: 0 }}>
+						<AlertTriangle size={22} color={look.c} />
+					</span>
+				) : (
+					<AlertTriangle size={20} color={look.c} style={{ flexShrink: 0, marginTop: 2 }} />
+				)}
+				<div className="min-w-0 flex-1">
+					<div className="flex flex-wrap items-center gap-3">
+						<RiskPill sev={sev} />
+						<span className={loud ? 'text-2xl font-semibold' : 'text-lg font-semibold'} style={{ color: look.c, letterSpacing: '-0.01em' }}>
+							{heading ?? (sev === 3 ? 'Avoid this combination' : sev === 2 ? 'Real risk of harm together' : 'Take care with this mix')}
+						</span>
+						{aside && <span className="ml-auto flex items-center gap-2">{aside}</span>}
+					</div>
+					{p.note ? (
+						<p className="mt-2" style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.text }}>{S(p.note)}</p>
+					) : (
+						<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
+							Flagged {sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on {S(p.via).toLowerCase()}), with no explanation on file.{' '}
+							<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ color: C.text, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+								Read why ↗
+							</a>
+						</p>
+					)}
+					{S(p.via) === 'TripSit' && (
+						<div className="mt-3">
+							<TripSitBadge />
+						</div>
+					)}
+				</div>
+			</div>
 		</div>
 	);
+}
 
-	// On phones it's the top row of the timeline dock, so nothing stacks on top of anything.
-	if (docked)
-		return (
-			<div className="mb-2 rounded-2xl px-3 py-2" style={{ background: look.bg, border: `1px solid ${look.fg}77` }} aria-live="polite" onClick={() => setPaused(!paused)}>
-				{body}
-			</div>
-		);
-
-	// Wide screens: Spunion in the bottom-right corner with it in his usual bubble (same glass as the dock and his tips).
+// Report pages: the risky pairs in the story, one card at a time (mixing-now and worst first), cycling with dots.
+function MixCards({ items }: { items: (Record<string, unknown> & { now: boolean })[] }) {
+	const [idx, setIdx] = useState(0);
+	const [paused, setPaused] = useState(false);
+	const key = items.map((p) => `${S(p.a)}|${S(p.b)}|${p.now ? 1 : 0}`).join(',');
+	useEffect(() => setIdx(0), [key]);
+	useEffect(() => {
+		if (items.length < 2 || paused) return;
+		const timer = setInterval(() => setIdx((i) => (i + 1) % items.length), 9000);
+		return () => clearInterval(timer);
+	}, [items.length, paused, key]);
+	const p = items[Math.min(idx, items.length - 1)];
+	if (!p) return null;
 	return (
-		<div className="sp-wrap" style={{ bottom: 16 }}>
-			<style>{SPUNION_CSS}</style>
-			<div
-				key={`b${idx}`}
-				className="sp-bubble rd-fade"
-				aria-live="polite"
-				onMouseEnter={() => setPaused(true)}
-				onMouseLeave={() => setPaused(false)}
-				style={{ width: 'min(560px, calc(100vw - 110px))', maxWidth: 'none', padding: '9px 14px 9px 10px', marginBottom: 22, borderColor: `${look.fg}88` }}
-			>
-				{body}
-			</div>
-			<span className="sp-me" aria-hidden style={{ cursor: 'default' }}>
-				<SpunionSvg />
-			</span>
+		<div className="mt-6" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} aria-live="polite">
+			<RiskCard
+				key={idx}
+				p={p}
+				heading={
+					<>
+						{short(S(p.a))} + {short(S(p.b))}
+						{p.now && (
+							<span className="ml-3 rounded-full px-2 py-0.5 align-middle text-xs font-semibold" style={{ border: '1px solid rgba(255,255,255,.6)', color: '#fff', letterSpacing: 0 }}>
+								mixing now
+							</span>
+						)}
+					</>
+				}
+				aside={
+					items.length > 1 &&
+					items.map((q, i) => (
+						<button
+							key={i}
+							onClick={() => setIdx(i)}
+							aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
+							title={`${short(S(q.a))} + ${short(S(q.b))}`}
+							style={{ width: i === idx ? 18 : 7, height: 7, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
+						/>
+					))
+				}
+			/>
 		</div>
 	);
 }
@@ -2962,52 +2911,33 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 			</div>
 			)}
 			<Sources className="mt-4" list={['erowid', 'sei', 'pw', ...(withSub ? ['tripsit' as const] : [])]} />
-			{withSub && (
-				<div className="rd-card rd-in mt-6 p-5" style={risk >= 1 ? { background: RISK[risk].bg, borderColor: risk >= 2 ? RISK[risk].c : `${RISK[risk].c}88`, padding: risk >= 2 ? 28 : undefined } : undefined}>
-					{(() => {
-						const p = pairNote;
-						const sev = risk;
-						const look = sev >= 1 ? RISK[sev] : p?.status ? { c: C.mint, t: S(p.status) } : null;
-						return pairQ.isLoading ? (
-							<span style={{ color: C.faint }}>Checking interaction notes…</span>
-						) : look ? (
-							<div className="flex items-start gap-4">
-								{sev >= 2 ? (
-									<span className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 999, background: `${look.c}26`, flexShrink: 0 }}>
-										<AlertTriangle size={22} color={look.c} />
-									</span>
-								) : (
-									<AlertTriangle size={20} color={look.c} style={{ flexShrink: 0, marginTop: 2 }} />
-								)}
+			{withSub &&
+				(pairQ.isLoading ? (
+					<div className="rd-card mt-6 p-5" style={{ color: C.faint }}>Checking interaction notes…</div>
+				) : risk >= 1 && pairNote ? (
+					<div className="mt-6">
+						<RiskCard p={pairNote} />
+					</div>
+				) : (
+					<div className="rd-card rd-in mt-6 p-5">
+						{pairNote?.status ? (
+							<div className="flex items-start gap-3">
+								<Check size={20} color={C.mint} style={{ flexShrink: 0, marginTop: 2 }} />
 								<div>
-									{sev >= 1 ? (
-										<div className="flex flex-wrap items-center gap-3">
-											<RiskPill sev={sev} />
-											<span className={sev >= 2 ? 'text-2xl font-semibold' : 'text-lg font-semibold'} style={{ color: look.c, letterSpacing: '-0.01em' }}>
-												{sev === 3 ? 'Avoid this combination' : sev === 2 ? 'Real risk of harm together' : 'Take care with this mix'}
-											</span>
+									<div className="text-lg font-semibold" style={{ color: C.mint }}>{S(pairNote.status)}</div>
+									{pairNote.note && <p className="mt-2" style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5 }}>{S(pairNote.note)}</p>}
+									{S(pairNote.via) === 'TripSit' && (
+										<div className="mt-3">
+											<TripSitBadge />
 										</div>
-									) : (
-										<div className="text-lg font-semibold" style={{ color: look.c }}>{look.t}</div>
 									)}
-									{p?.note && <p className="mt-2" style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.text }}>{S(p.note)}</p>}
-									<div className="mt-3 text-xs" style={{ color: C.faint }}>
-										{S(p?.via) === 'TripSit' ? (
-											<>
-												<TripSitBadge />
-											</>
-										) : (
-											`From interaction notes${p?.via ? ` (via ${S(p.via)})` : ''}.`
-										)}
-									</div>
 								</div>
 							</div>
 						) : (
-							<div className="text-sm" style={{ color: C.soft }}>No interaction note on file for this pair — that isn't the same as safe.</div>
-						);
-					})()}
-				</div>
-			)}
+							<div className="text-sm" style={{ color: C.soft }}>No interaction note on file for this pair, which isn't the same as safe.</div>
+						)}
+					</div>
+				))}
 			{tolShared && (
 				<p className="rd-in mt-3 flex items-start gap-2 text-sm" style={{ color: C.soft }}>
 					<Repeat size={15} color={C.lav} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -3446,7 +3376,6 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 			className={side ? 'px-1 pb-2' : 'rd-dock'}
 			style={side ? undefined : { borderColor: `${moodColor(moodNow)}55`, boxShadow: `0 10px 40px rgba(10,4,40,.35), 0 0 0 1px ${moodColor(moodNow)}22`, transition: 'border-color 1.2s ease' }}
 		>
-			{!side && bannerItems.length > 0 && <MixBanner items={bannerItems} docked />}
 			<div className="flex items-center gap-3">
 				<button onClick={prevMark} className="rd-btn rd-hide-sm" aria-label="Previous mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
 					<SkipBack size={15} />
@@ -3565,7 +3494,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	);
 
 	return (
-		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: (wide ? 0 : dockOpen ? 340 : 120) + (bannerItems.length ? (wide ? 100 : 60) : 0) }}>
+		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: wide ? 0 : dockOpen ? 340 : 120 }}>
 			<header>
 				{(() => {
 					const taken = [...new Set([...doses].sort((a, b) => a.t - b.t).map((d) => d.sub))];
@@ -3675,7 +3604,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 			))}
 			{!wide && <div aria-hidden className="rd-fadebar" />}
 
-			{wide && bannerItems.length > 0 && <MixBanner items={bannerItems} />}
+			{bannerItems.length > 0 && <MixCards items={bannerItems} />}
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
 				<article ref={bodyRef} className={`rd-story ${active && playing ? 'focus' : ''}`}>
@@ -3704,7 +3633,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				</article>
 
 				{/* Alongside the story: the moment, and the doses */}
-				<aside className="rd-side" style={bannerItems.length ? { maxHeight: 'calc(100vh - 110px)' } : undefined}>
+				<aside className="rd-side">
 					{wide && timeline(true)}
 					<div key={heroKey} className="rd-in px-1 pb-2 pt-3">
 						<div className="flex flex-wrap items-center gap-3">
@@ -4046,8 +3975,6 @@ export default function ReportTimelapse() {
 	];
 	// He opens his bubble by himself only when it matters; otherwise he waits to be tapped.
 	const spunionSpeaks = pairSev >= 2 || (!greeted && !onSub && !onReport);
-	const reportWarns = onReport && rows(pairsQ).some((p) => p.sev != null && N(p.sev) >= 1);
-	const wideMain = useWide();
 	const goCombo = (a: string, b: string) => {
 		setView('reports');
 		setSub(a);
@@ -4136,7 +4063,7 @@ export default function ReportTimelapse() {
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} />
-				{!openItem && !(reportWarns && wideMain) && <Spunion tips={spunionTips} lift={onReport} autoOpen={spunionSpeaks} />}
+				{!openItem && <Spunion tips={spunionTips} lift={onReport} autoOpen={spunionSpeaks} />}
 			</main>
 		</OpenCtx.Provider>
 	);
