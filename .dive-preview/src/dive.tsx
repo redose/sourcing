@@ -2647,10 +2647,20 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport }: { subs: Record<
 				))}
 			</div>
 		);
+	useEffect(() => {
+		if (open) setTimeout(() => input.current?.focus(), 0);
+	}, [open]);
 	return (
-		<div ref={box} className="relative" style={{ zIndex: 30 }}>
-			<label className="flex items-center gap-2 rounded-full px-3 py-1.5" style={{ background: 'rgba(255,255,255,.08)', border: `1px solid ${open ? 'rgba(255,255,255,.35)' : C.line}`, transition: 'border-color .2s' }}>
-				<Search size={14} color={C.faint} />
+		<>
+			<button className="rd-nav inline-flex items-center gap-2" onClick={() => setOpen(true)} aria-label="Search" title="Search (⌘K)">
+				<Search size={15} />
+				<span className="rd-hide-sm">Search</span>
+			</button>
+			{open && (
+				<div className="fixed inset-0 flex justify-center px-4" style={{ zIndex: 60, background: 'rgba(20,12,50,.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', paddingTop: '12vh' }}>
+		<div ref={box} className="rd-fade w-full" style={{ maxWidth: 620 }}>
+			<label className="flex items-center gap-3 rounded-2xl px-4 py-3.5" style={{ background: C.panel, border: '1px solid rgba(255,255,255,.25)', boxShadow: '0 20px 50px rgba(10,4,40,.5)' }}>
+				<Search size={18} color={C.soft} />
 				<input
 					ref={input}
 					value={q}
@@ -2658,7 +2668,6 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport }: { subs: Record<
 						setQ(e.target.value);
 						setOpen(true);
 					}}
-					onFocus={() => setOpen(true)}
 					onKeyDown={(e) => {
 						if (e.key === 'ArrowDown') {
 							e.preventDefault();
@@ -2672,15 +2681,17 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport }: { subs: Record<
 							input.current?.blur();
 						}
 					}}
-					placeholder="Search"
+					placeholder="Search substances, street names, effects or stories"
 					aria-label="Search substances, effects and stories"
-					className="bg-transparent text-sm outline-none"
-					style={{ width: 'min(200px, 38vw)', color: C.text }}
+					className="flex-1 bg-transparent text-lg outline-none"
+					style={{ color: C.text, minWidth: 0 }}
 				/>
-				<kbd className="rd-hide-sm text-xs" style={{ color: C.faint, fontFamily: SANS }}>⌘K</kbd>
+				<button onClick={() => setOpen(false)} aria-label="Close search" style={{ color: C.faint }}>
+					<X size={16} />
+				</button>
 			</label>
-			{open && needle && (
-				<div className="rd-fade absolute right-0 mt-2 overflow-y-auto rounded-2xl p-1.5" style={{ width: 'min(460px, 92vw)', maxHeight: '70vh', background: C.panel, border: `1px solid ${C.line}`, boxShadow: '0 20px 50px rgba(10,4,40,.5)' }}>
+			{needle && (
+				<div className="mt-2 overflow-y-auto rounded-2xl p-1.5" style={{ maxHeight: '62vh', background: C.panel, border: `1px solid ${C.line}`, boxShadow: '0 20px 50px rgba(10,4,40,.5)' }}>
 					{group('Substances', subHits, 0)}
 					{group('Effects', effHits, subHits.length)}
 					{group('Stories', repHits, subHits.length + effHits.length)}
@@ -2688,7 +2699,11 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport }: { subs: Record<
 					{!items.length && !searching && !repQ.isLoading && <div className="px-3 py-3 text-sm" style={{ color: C.faint }}>Nothing found for “{q.trim()}”.</div>}
 				</div>
 			)}
+			{!needle && <p className="mt-3 px-2 text-sm" style={{ color: 'rgba(255,255,255,.7)' }}>Try “molly”, “anxiety”, a phrase from a story, or a report number. Esc to close.</p>}
 		</div>
+				</div>
+			)}
+		</>
 	);
 }
 
@@ -3673,7 +3688,17 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				}
 			}
 		}
-		return best.text;
+		if (best.text) return best.text;
+		// No usable quote from a close reading: pick a vivid first-person sentence from the story itself, skipping the
+		// opening background and anything about doses or times.
+		const sentences = (body.replace(/\s+/g, ' ').match(/[^.!?]+[.!?]+/g) ?? []).map((x) => x.trim());
+		let pick = { text: '', score: -Infinity };
+		sentences.forEach((t, i) => {
+			if (t.length < 40 || t.length > 130 || i < 3 || /\d\s*(mg|ml|g|ug|µg|hits?|tabs?|pm|am)\b|t\s*\+|\d:\d/i.test(t)) return;
+			const score = (/\bI\b/.test(t) ? 1 : 0) + (/\b(felt|feel|feeling|saw|seemed|like|realized|laughed|cried|beautiful|terrified|scared|euphori)/i.test(t) ? 1.5 : 0) - Math.abs(t.length - 85) / 45 - i / Math.max(40, sentences.length);
+			if (score > pick.score) pick = { text: t, score };
+		});
+		return pick.text;
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [obsQ.data, reportQ.data]);
 	// Effects that show up for the first time at each moment: where each one "became a thing".
@@ -4098,21 +4123,24 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 					const overallWord = { positive: 'went well', negative: 'was rough', mixed: 'was mixed', neutral: 'was neutral' }[S(report.overall)];
 					return (
 						<>
-							<div className="rd-label mb-3">Experience report</div>
+							{/* Substances on a small line, the writer's own words as the title, then one line of facts. */}
 							<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-								<h1 className="flex flex-wrap items-center gap-x-4 gap-y-1 text-3xl font-semibold" style={{ letterSpacing: '-0.02em' }}>
-									{(allNames ? names : names.slice(0, 4)).map((n) => (
-										<button key={n} onClick={() => open({ kind: 'substance', name: n })} className="inline-flex items-center gap-2" style={{ whiteSpace: 'nowrap', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.25)', textDecorationThickness: 1, textUnderlineOffset: 6 }} title={`About ${n}`}>
-											<SubstanceIcon name={n} />
-											{short(n)}
-										</button>
+								<div className={`flex flex-wrap items-center gap-x-3 gap-y-1 font-semibold ${headline ? 'text-lg' : 'text-3xl'}`} style={{ letterSpacing: '-0.01em' }}>
+									{(allNames ? names : names.slice(0, 4)).map((n, i) => (
+										<span key={n} className="inline-flex items-center gap-3">
+											{i > 0 && <span style={{ color: C.faint, fontWeight: 300 }}>+</span>}
+											<button onClick={() => open({ kind: 'substance', name: n })} className="inline-flex items-center gap-2" style={{ whiteSpace: 'nowrap' }} title={`About ${n}`}>
+												<SubstanceIcon name={n} />
+												{short(n)}
+											</button>
+										</span>
 									))}
 									{names.length > 4 && (
-										<button className="rd-btn" style={{ fontSize: 14, padding: '5px 12px', alignSelf: 'center' }} onClick={() => setAllNames(!allNames)} title={allNames ? 'Show fewer' : names.slice(4).join(', ')}>
+										<button className="rd-btn" style={{ fontSize: 13, padding: '3px 10px' }} onClick={() => setAllNames(!allNames)} title={allNames ? 'Show fewer' : names.slice(4).join(', ')}>
 											{allNames ? 'Show fewer' : `+${names.length - 4} more`}
 										</button>
 									)}
-								</h1>
+								</div>
 								<div className="flex items-center gap-2">
 									<a
 										href={`https://erowid.org/experiences/exp.php?ID=${id.replace('erowid-', '')}`}
@@ -4143,36 +4171,35 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 								</div>
 							</div>
 							{headline && (
-								<p className="mt-4" style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 22, lineHeight: 1.4, color: C.soft, maxWidth: 820 }}>
+								<h1 className="mt-4" style={{ fontFamily: SERIF, fontSize: 34, lineHeight: 1.25, letterSpacing: '-0.01em', fontWeight: 500, maxWidth: 940, textWrap: 'balance' as never }}>
 									“{headline}”
-								</p>
+								</h1>
 							)}
-							<p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" style={{ color: C.faint }}>
+							<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" style={{ color: C.faint }}>
 									{report.yr != null && (
-										<span className="inline-flex items-center gap-1.5" title="Year of the experience">
-											<Calendar size={13} /> {N(report.yr)}
-										</span>
-									)}
-									{(S(report.gender) || report.age != null) && (
-										<span className="inline-flex items-center gap-1.5" title="Who wrote it">
-											<User size={13} /> {[S(report.gender), report.age != null ? String(N(report.age)) : ''].filter(Boolean).join(', ')}
-										</span>
-									)}
-									<span className="inline-flex items-center gap-1.5" title="How long the story covers">
-										<Clock size={13} /> {fmtDur(storyEnd)}
+									<span className="inline-flex items-center gap-1.5" title="Year of the experience">
+										<Calendar size={13} /> {N(report.yr)}
 									</span>
-									{overall && overallWord && (
-										<span className="inline-flex items-center gap-1.5" style={{ color: overall.color }} title="How it went overall">
-											<span className="rd-dot" style={{ background: overall.color }} /> {overallWord}
-										</span>
-									)}
-									{report.repeat != null && (
-										<span className="inline-flex items-center gap-1.5" title="Would they do it again?">
-											<RotateCcw size={13} /> {report.repeat ? 'would do it again' : 'wouldn' + "'" + 't do it again'}
-										</span>
-									)}
-								</p>
-							<Sources className="mt-3" list={['sei', 'pw', ...(rows(pairsQ).length ? ['tripsit' as const] : [])]} />
+								)}
+								{(S(report.gender) || report.age != null) && (
+									<span className="inline-flex items-center gap-1.5" title="Who wrote it">
+										<User size={13} /> {[S(report.gender), report.age != null ? String(N(report.age)) : ''].filter(Boolean).join(', ')}
+									</span>
+								)}
+								<span className="inline-flex items-center gap-1.5" title="How long the story covers">
+									<Clock size={13} /> {fmtDur(storyEnd)}
+								</span>
+								{overall && overallWord && (
+									<span className="inline-flex items-center gap-1.5" style={{ color: overall.color }} title="How it went overall">
+										<span className="rd-dot" style={{ background: overall.color }} /> {overallWord}
+									</span>
+								)}
+								{report.repeat != null && (
+									<span className="inline-flex items-center gap-1.5" title="Would they do it again?">
+										<RotateCcw size={13} /> {report.repeat ? 'would do it again' : 'wouldn' + "'" + 't do it again'}
+									</span>
+								)}
+							</div>
 								{bannerItems.length > 0 && <MixCards items={bannerItems} />}
 								{allEffects.length > 0 && (
 									<div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-5" style={{ borderColor: C.line }}>
@@ -4701,10 +4728,6 @@ export default function ReportTimelapse() {
 									{label}
 								</button>
 							))}
-							<a className="rd-nav inline-flex items-center gap-2" href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" title="Join the re:dose community on Discord" style={{ textDecoration: 'none' }}>
-								<DiscordIcon size={15} />
-								<span className="rd-hide-sm">Community</span>
-							</a>
 						</nav>
 						</div>
 					</header>
