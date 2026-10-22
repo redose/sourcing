@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
-import { AlertTriangle, Calendar, Check, ChevronRight, Clock, Link2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
+import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, Link2, Pause, Play, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
 
@@ -9,6 +9,9 @@ const LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAboAAABgCAYAAABrJbd4
 
 // Erowid's favicon (64 px ring logo, resized to 40 px), used on the source badge that links back to each report.
 const EROWID_ICON = 'data:image/png;base64,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';
+const TRIPSIT_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAIAAAADnC86AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAKKADAAQAAAABAAAAKAAAAAB65masAAACNUlEQVRYCe2XS8sBYRTH39xyS7GwULJBycZK+RJCseLb+DqWLiVSyILIgo0FyUJuWUjI5f3X1Gmy8cyZGZv3nYX+M/N/zm/O8Tznmfn5+T++VAGjVpxEImG1Wg+Hg2BAg6Dvoy2VSqXT6Y82jQ1ms7nf75fLZY3jfgwXi8Wu1+t0OrXZbB/NkkGbUmcyGYvF4na7nU6nIFgDm8vlQq6v12u73fr9fsGIGmScTCYjkQh4YD+fzy+BDQZDPp+XYI/H43a7CYLV2jCtTqcTcsWxWCxQdsGIaktdKBQcDocE2+12l8tFEKzK5vV6kaWULn5LpZJ4OFUZ53K5QCBAsMlkQlpHgV4xHA4pXYhsNqsjj0JjFWEaE/h4PIbDYbqrlzCZTOjMRIXo9Xq4qBeP4sbjcTRnObhYLNJdEcGcXKgzmjMBUPNms0mnegls+KPRSJ4uerXS7YGTcSgUeptH1WoV/UtRohxwNBq12+2EQZ1rtRqdCgoOOBgMyqPP53O8fsiviGgO+G3TrdfrWMQiMLmHA/Z4PBQCU4xRZwzngOULabVaoXXQc4gLDhhZEqDRaOCNh07FBQd8Pp8JgIVEWpHggPf7vcRYr9ftdlsRj8wcMHjSeLRJ0hRRUHDAy+VSil6pVOT/tyBSsnE2MnQMvMaiR3a7XUUwtWafz4eO0el0jEb+xyan1JvNZjabDQYDdGl2EpxS3+/3Vqs1Ho/ZVAxk1gpzCnswrSs1T6BsLLomPl6Ujfnr7l+xBhX6DBQxUAAAAABJRU5ErkJggg==';
+const SEI_ICON = 'data:image/png;base64,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';
+const PW_ICON = 'data:image/png;base64,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';
 
 const DB = '"sourcing"."main"';
 const N = (v: unknown): number => (v == null ? 0 : Number(v));
@@ -303,7 +306,7 @@ px AS (
     coalesce(sb.names, [lower(pr.b)]) || ${ALIAS_SQL('pr.b')} AS b_names, coalesce(sb.classes, []) AS b_cls
   FROM pr LEFT JOIN subs sa ON sa.name = pr.a LEFT JOIN subs sb ON sb.name = pr.b
 ),
-pairsev AS (
+oldsev AS (
   SELECT px.a, px.b,
     max(CASE i.severity WHEN 'dangerous' THEN 3 WHEN 'unsafe' THEN 2 WHEN 'uncertain' THEN 1 END) AS sev,
     string_agg(DISTINCT i.interacts_with, ', ') AS via
@@ -314,6 +317,25 @@ pairsev AS (
     OR (i.substance_id = px.b_id AND (list_contains(px.a_names, lower(i.interacts_with)) OR list_contains(px.a_names, rtrim(lower(i.interacts_with), 's'))
        OR list_contains(px.a_cls, lower(i.interacts_with)) OR list_contains(px.a_cls, rtrim(lower(i.interacts_with), 's'))))
   GROUP BY 1, 2
+),
+-- TripSit's combination chart (loaded by tripsit/load_tripsit.py) takes precedence when it covers the pair.
+tsev AS (
+  SELECT pr.a, pr.b, max(c.severity_rank) AS rank,
+    arg_max(c.status, c.severity_rank) AS status, arg_max(c.note, c.severity_rank) AS note
+  FROM pr
+  JOIN ${DB}."tripsit_group_members" ma ON ma.substance = pr.a
+  JOIN ${DB}."tripsit_group_members" mb ON mb.substance = pr.b
+  JOIN ${DB}."tripsit_combos" c
+    ON (c.group_a = ma.group_key AND c.group_b = mb.group_key) OR (c.group_a = mb.group_key AND c.group_b = ma.group_key)
+  WHERE ma.group_key <> mb.group_key
+  GROUP BY 1, 2
+),
+pairsev AS (
+  SELECT pr.a, pr.b,
+    CASE WHEN t.rank IS NOT NULL THEN nullif(t.rank, 0) ELSE o.sev END AS sev,
+    CASE WHEN t.rank IS NOT NULL THEN 'TripSit' ELSE o.via END AS via,
+    t.status, t.note
+  FROM pr LEFT JOIN tsev t USING (a, b) LEFT JOIN oldsev o USING (a, b)
 )`;
 
 const comboSQL = (sub: string) => `
@@ -519,11 +541,11 @@ const reportPairsSQL = (subs: string[]) => {
 	const list = `[${subs.map((x) => `'${esc(x)}'`).join(', ')}]`;
 	return `
 WITH ${pairSevCTEs(`SELECT a.x AS a, b.x AS b FROM unnest(${list}) AS a(x), unnest(${list}) AS b(x) WHERE a.x < b.x`)}
-SELECT a, b, sev, via FROM pairsev WHERE sev IS NOT NULL`;
+SELECT a, b, sev, via, status, note FROM pairsev WHERE sev IS NOT NULL OR status IS NOT NULL`;
 };
 
 const reportObsSQL = (id: string) => `
-SELECT o.obs_index, o.time_relative, o.description, o.sentiment,
+SELECT o.obs_index, o.time_relative, o.time_original, o.description, o.sentiment,
   TRY_CAST(regexp_extract(o.time_relative, '^T\\+~?(\\d+):(\\d{2})', 1) AS INTEGER)
     + TRY_CAST(regexp_extract(o.time_relative, '^T\\+~?(\\d+):(\\d{2})', 2) AS INTEGER) / 60.0 AS hrs,
   list(e.effect_name ORDER BY e.effect_name) FILTER (WHERE e.effect_name IS NOT NULL) AS effects
@@ -651,6 +673,9 @@ const BG = 'linear-gradient(170deg, #3a2e74 0%, #4f42a0 55%, #6152b4 100%)';
 const CSS = `
 @keyframes rd-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes rd-mark { 0%,100% { box-shadow: 0 0 0 1.5px rgba(143,244,247,.7); } 50% { box-shadow: 0 0 0 1.5px rgba(143,244,247,1), 0 0 18px 2px rgba(143,244,247,.35); } }
+/* Opacity-only entrance: a transform here would stop position: fixed children (the dock, the mood tint) from fixing to the viewport. */
+@keyframes rd-fade { from { opacity: 0; } to { opacity: 1; } }
+.rd-fade { animation: rd-fade .4s ease-out both; }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
 .rd-new { border-color: rgba(217,207,255,.7) !important; animation: rd-new 1.6s ease-out both; }
@@ -661,7 +686,7 @@ const CSS = `
 .rd-tl { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 56px; align-items: start; }
 .rd-story { font-family: ${SERIF}; font-size: 21px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; }
 .rd-side > * { min-width: 0; }
-.rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }
+.rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 120px); overflow-y: auto; scrollbar-width: none; }
 .rd-bar { position: sticky; top: 8px; z-index: 10; border-radius: 20px; border: 1px solid ${C.line}; background: rgba(62,50,124,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .rd-range { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 999px; background: rgba(255,255,255,.18); outline: none; }
 .rd-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; cursor: pointer; }
@@ -669,9 +694,14 @@ const CSS = `
 @media (max-width: 960px) {
   .rd-tl { grid-template-columns: 1fr; }
   .rd-story { font-size: 18px; padding-bottom: 52vh; }
-  .rd-side { position: fixed; left: 8px; right: 8px; bottom: 8px; top: auto; max-height: 38vh; overflow-y: auto; z-index: 20; border-radius: 22px; background: rgba(58,46,116,.97); box-shadow: 0 -10px 40px rgba(10,4,40,.4); }
-  .rd-story { padding-bottom: 42vh; }
+  .rd-side { position: static; max-height: none; }
+  .rd-hide-sm { display: none !important; }
 }
+.rd-tint { position: fixed; inset: 0; z-index: -1; pointer-events: none; transition: opacity 1.4s ease; }
+.rd-fadebar { position: fixed; left: 0; right: 0; bottom: 0; height: 150px; z-index: 25; pointer-events: none; background: linear-gradient(to top, rgba(82,68,166,.96) 0%, rgba(82,68,166,.75) 45%, rgba(82,68,166,0) 100%); }
+.rd-dock { position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; z-index: 30; width: min(960px, calc(100vw - 20px)); padding: 8px 12px 8px 10px;
+  border-radius: 26px; border: 1px solid ${C.line}; background: rgba(40,31,92,.82); backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  transition: border-color 1.2s ease, box-shadow 1.2s ease; }
 .rd-card { background: ${C.card}; border: 1px solid ${C.line}; border-radius: 20px; }
 .rd-label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: ${C.faint}; font-weight: 600; }
 .rd-in { animation: rd-in .4s ease-out both; }
@@ -686,6 +716,26 @@ const CSS = `
 .rd-mark.past { background: rgba(217,207,255,.18); color: #fff; }
 .rd-mark.future { color: rgba(255,255,255,.6); box-shadow: inset 0 -1px 0 rgba(255,255,255,.35); }
 .rd-mark.active { background: rgba(143,244,247,.22); color: #fff; animation: rd-mark 2.6s ease-in-out infinite; }
+.rd-src { display: inline-flex; align-items: center; gap: 6px; color: ${C.text}; font-weight: 600; white-space: nowrap; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,.2); transition: border-color .2s; }
+.rd-src:hover { border-color: rgba(255,255,255,.6); }
+.rd-src img { display: block; border-radius: 4px; }
+.rd-ts { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px 3px 3px; border-radius: 999px; background: rgba(10,6,30,.35); border: 1px solid rgba(255,255,255,.14);
+  color: ${C.soft}; font-family: ${SANS}; font-size: 12px; font-weight: 500; white-space: nowrap; text-decoration: none; transition: background .2s, border-color .2s, color .2s; }
+.rd-ts b { color: #fff; font-weight: 700; }
+.rd-ts img { display: block; border-radius: 999px; }
+.rd-ts:hover { background: rgba(10,6,30,.55); border-color: rgba(255,255,255,.32); color: #fff; }
+.rd-dose { display: grid; grid-template-columns: 40px 16px minmax(0,1fr) 16px minmax(0,auto); align-items: center; column-gap: 10px; }
+.rd-mark.stamp { margin-right: 2px; }
+.rd-eff { font-family: ${SANS}; font-size: 12px; font-weight: 600; color: #fff; border-radius: 999px; padding: 1px 8px; margin: 0 3px; white-space: nowrap; vertical-align: 1px; }
+.rd-ms { display: flex; align-items: center; gap: 14px; margin: 26px 0 14px; cursor: pointer; white-space: nowrap; line-height: 1; font-family: ${SANS}; transition: opacity .4s; }
+.rd-ms-line { flex: 1; height: 1px; background: rgba(255,255,255,.2); transition: background .4s; }
+.rd-ms-pill { display: inline-flex; align-items: baseline; gap: 10px; padding: 8px 16px; border-radius: 999px; border: 1px solid ${C.line};
+  font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: ${C.soft}; transition: background .4s, color .4s, box-shadow .4s; }
+.rd-ms-t { font-weight: 500; letter-spacing: 0; font-variant-numeric: tabular-nums; opacity: .75; }
+.rd-ms.future { opacity: .45; }
+.rd-ms.past .rd-ms-pill { color: #fff; background: rgba(255,255,255,.08); }
+.rd-ms.now .rd-ms-pill { color: ${C.deep}; background: #fff; border-color: #fff; box-shadow: 0 0 0 6px rgba(255,255,255,.12); }
+.rd-ms.now .rd-ms-line { background: rgba(255,255,255,.55); }
 .rd-btn { border-radius: 999px; border: 1px solid ${C.line}; padding: 8px 14px; font-size: 14px; font-weight: 600; color: #fff; background: rgba(255,255,255,.06); transition: background .2s; }
 .rd-btn:hover { background: rgba(255,255,255,.14); }
 .rd-btn[aria-pressed="true"] { background: #fff; color: ${C.deep}; }
@@ -720,6 +770,7 @@ const SHORT: Record<string, string> = {
 	'Serotonin-norepinephrine reuptake inhibitor': 'SNRI',
 	'Monoamine oxidase inhibitor': 'MAOI',
 	'Tetrahydrocannabinol': 'THC',
+	'Lisdexamfetamine': 'Vyvanse',
 	'5-Hydroxytryptophan': '5-HTP',
 	'2-Fluorodeschloroketamine': '2F-DCK',
 	'Deschloroketamine': 'DCK',
@@ -752,6 +803,15 @@ type EffectInfo = { blurb: string; url: string; neg?: number; pos?: number };
 const effectTone = (i?: { neg?: number; pos?: number }) =>
 	!i || i.neg == null ? 'neutral' : i.neg >= 0.55 ? 'negative' : (i.pos ?? 0) >= 0.6 ? 'positive' : 'neutral';
 const TONE_DOT: Record<string, string> = { negative: C.coral, positive: C.mint, neutral: C.lav };
+// How a risky pair looks: TripSit's Dangerous (3) and Unsafe (2), each with a card wash and a page tint.
+const RISK: Record<number, { c: string; t: string; bg: string }> = {
+	3: { c: C.coral, t: 'Dangerous combination', bg: 'rgba(255,140,165,.14)' },
+	2: { c: C.amber, t: 'Unsafe combination', bg: 'rgba(255,200,130,.11)' },
+};
+const RISK_TINT: Record<number, string> = {
+	3: 'radial-gradient(1300px 560px at 50% -10%, rgba(255,120,150,.34), transparent 70%), radial-gradient(900px 420px at 50% 110%, rgba(255,120,150,.18), transparent 70%)',
+	2: 'radial-gradient(1300px 560px at 50% -10%, rgba(255,190,120,.28), transparent 70%), radial-gradient(900px 420px at 50% 110%, rgba(255,190,120,.14), transparent 70%)',
+};
 const MOMENT: Record<string, { label: string; color: string; y: number }> = {
 	positive: { label: 'Good moment', color: C.mint, y: 1 },
 	mixed: { label: 'Mixed moment', color: C.amber, y: 0 },
@@ -974,6 +1034,7 @@ function ScrubChart({
 }
 
 type Mark = { t: number; method: string; raw: string; start: number; end: number; valence: number | null };
+type Milestone = { label: string; t: number; at: number };
 
 // Locate each time mark in the original text. Snippets were stored with whitespace collapsed, so search a
 // collapsed copy of the body and map positions back. Then re-time the marks in reading order so the story only
@@ -1072,6 +1133,62 @@ function locateMarks(body: string, marks: Record<string, unknown>[]): Mark[] {
 		prev = m.t;
 	}
 	return clean.filter((m) => m.t >= 0);
+}
+
+// A close reading quotes the story at each moment and gives its time. Find each quote in the text and pin the
+// mark there: on the time as written just before it when there is one, otherwise as a time stamp added in front
+// of the quote (an empty range). These times are more reliable than the automatic marks.
+function locateObs(body: string, obs: Record<string, unknown>[]): Mark[] {
+	const fold = (s: string) => s.toLowerCase().replace(/[‘’`�]/g, "'").replace(/[“”]/g, '"');
+	const fb = fold(body);
+	const norm: string[] = [];
+	const map: number[] = [];
+	let prevSpace = false;
+	for (let i = 0; i < fb.length; i++) {
+		const sp = /\s/.test(fb[i]);
+		if (sp && prevSpace) continue;
+		norm.push(sp ? ' ' : fb[i]);
+		prevSpace = sp;
+		map.push(i);
+	}
+	map.push(body.length);
+	const nb = norm.join('');
+	const frags = (s: string) =>
+		fold(s)
+			.split(/\s*(?:\.\.\.|…|"\s*[;,:-]?\s*")\s*/)
+			.map((f) => f.replace(/^[\s"'(]+|[\s"')]+$/g, '').replace(/\s+/g, ' '))
+			.filter((f) => f.split(' ').length >= 3);
+	const out: Mark[] = [];
+	let from = 0;
+	for (const o of [...obs].sort((a, b) => N(a.hrs) - N(b.hrs))) {
+		let at = -1;
+		search: for (const f of frags(S(o.description))) {
+			const ws = f.split(' ');
+			for (const n of [7, 5, 4, 3]) {
+				if (ws.length < n) continue;
+				const key = ws.slice(0, n).join(' ');
+				at = nb.indexOf(key, from);
+				if (at < 0) at = nb.indexOf(key);
+				if (at >= 0) break search;
+			}
+		}
+		if (at < 0) continue;
+		let s = at, e = at;
+		const orig = fold(S(o.time_original)).replace(/\s+/g, ' ').trim();
+		if (orig && orig.length <= 24 && /\d/.test(orig)) {
+			const k = nb.lastIndexOf(orig, at);
+			if (k >= 0 && at - k <= 300) [s, e] = [k, k + orig.length];
+		}
+		const start = map[s], end = e > s ? map[e - 1] + 1 : start;
+		out.push({ t: N(o.hrs), method: 'obs', raw: S(o.obs_index), start, end, valence: (MOMENT[S(o.sentiment)] ?? MOMENT.neutral).y });
+		from = at + 1;
+	}
+	const clean: Mark[] = [];
+	for (const m of out.sort((a, b) => a.start - b.start)) {
+		const last = clean[clean.length - 1];
+		if (!last || m.start >= last.end + (last.end === last.start ? 1 : 0)) clean.push(m);
+	}
+	return clean;
 }
 
 // Expected effect curve for one dose: nothing → first effects → peak → tapering off, using typical times from
@@ -1350,11 +1467,7 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 								</div>
 							</div>
 						)}
-						{S(r.url) && (
-							<a href={S(r.url)} target="_blank" rel="noopener noreferrer" style={{ color: C.cyan, fontWeight: 600 }}>
-								Read more on Effect Index ↗
-							</a>
-						)}
+						<Sources className="" list={[S(r.url) ? [/psychonautwiki/i.test(S(r.url)) ? 'pw' : 'sei', S(r.url)] : 'sei', 'erowid']} />
 					</div>
 				) : (
 					<div className="rd-in mt-5 grid gap-6">
@@ -1449,14 +1562,7 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 						)}
 						<div className="text-sm" style={{ color: C.faint }}>
 							{N(r.n_reports).toLocaleString()} reports · {N(r.n_read)} read closely
-							{S(r.url) && (
-								<>
-									{' · '}
-									<a href={S(r.url)} target="_blank" rel="noopener noreferrer" style={{ color: C.cyan }}>
-										PsychonautWiki ↗
-									</a>
-								</>
-							)}
+							<Sources className="mt-3" list={[S(r.url) ? ['pw', S(r.url)] : 'pw', 'erowid']} />
 						</div>
 						<button className="rd-btn" style={{ background: '#fff', color: C.deep, justifySelf: 'start' }} onClick={() => onReplay(item.name)}>
 							Replay its reports
@@ -1506,6 +1612,7 @@ function EffectsBrowse({ q }: { q: Q }) {
 			<p className="mt-2" style={{ color: C.soft }}>
 				Everything people described, grouped by type. Tap one to learn what it is.
 			</p>
+			<Sources className="mt-3" list={['sei', 'erowid']} />
 			<input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search effects" className="rd-card mt-6 w-full px-5 py-3 text-base" style={{ borderRadius: 999, color: C.text, outline: 'none' }} />
 			{q.isLoading ? (
 				<div className="rd-card mt-6 animate-pulse" style={{ height: 240 }} />
@@ -1557,7 +1664,7 @@ stats AS (
   FROM pairrep p LEFT JOIN ${DB}."llm_extractions" e USING (report_id) LEFT JOIN val USING (report_id)
   GROUP BY 1
 )
-SELECT co.s, co.n, stats.n_llm, stats.pos, stats.neg, stats.v, ps.sev
+SELECT co.s, co.n, stats.n_llm, stats.pos, stats.neg, stats.v, ps.sev, ps.status, ps.note
 FROM co LEFT JOIN stats USING (s) LEFT JOIN pairsev ps ON ps.b = co.s
 ORDER BY co.n DESC, co.s`;
 
@@ -1655,9 +1762,11 @@ function FocusPanel({ name, onPick, onCombo, onClose }: { name: string; onPick: 
 									</span>
 									<span className="text-xs font-semibold" style={{ color: sev?.c ?? C.faint, whiteSpace: 'nowrap' }}>
 										{sev ? (
-											<span className="inline-flex items-center gap-1">
+											<span className="inline-flex items-center gap-1" title={S(r.note)}>
 												<AlertTriangle size={12} /> {sev.w}
 											</span>
+										) : r.status ? (
+											<span style={{ color: C.mint }} title={S(r.note)}>low risk</span>
 										) : (
 											'no note'
 										)}
@@ -1670,7 +1779,10 @@ function FocusPanel({ name, onPick, onCombo, onClose }: { name: string; onPick: 
 					</div>
 				)}
 				<p className="mt-3 text-xs" style={{ color: C.faint }}>
-					Good / rough from closely read reports. Warnings from TripSit-style interaction notes — “no note” isn’t the same as safe.
+					Good / rough from closely read reports. “No note” isn’t the same as safe.
+					<span className="ml-2 inline-block align-middle">
+						<TripSitBadge />
+					</span>
 				</p>
 			</div>
 		</div>
@@ -1706,6 +1818,7 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 					'Tap one to see what it was combined with.'
 				)}
 			</p>
+			<Sources className="mt-3" list={['erowid', 'pw', 'tripsit']} />
 			<input
 				value={filter}
 				onClick={(e) => e.stopPropagation()}
@@ -1766,7 +1879,172 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 	);
 }
 
+// Slim timeline for the dock: the strip itself is coloured by mood, thin bands above show when each drug is
+// active, dots below are time marks. Drag or tap anywhere to scrub.
+const moodColor = (v: number) => (v > 0.15 ? C.mint : v < -0.15 ? C.coral : C.lav);
+function MiniTimeline({
+	xMax,
+	x,
+	onScrub,
+	mood,
+	drugs,
+	ticks,
+	flags = [],
+}: {
+	xMax: number;
+	x: number;
+	onScrub: (x: number) => void;
+	mood: Pt[];
+	drugs: Series[];
+	ticks: { x: number; on: boolean; active: boolean }[];
+	flags?: { x: number; label: string; on: boolean }[];
+}) {
+	const ref = useRef<HTMLDivElement | null>(null);
+	const dragging = useRef(false);
+	const [w, setW] = useState(300);
+	useEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		const ro = new ResizeObserver(([e]) => setW(Math.max(120, e.contentRect.width)));
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, []);
+	const pad = 9;
+	const sx = (v: number) => pad + (clamp(v, 0, xMax) / xMax) * (w - 2 * pad);
+	const scrubAt = (clientX: number) => {
+		const r = ref.current!.getBoundingClientRect();
+		onScrub(clamp(((clientX - r.left - pad) / (w - 2 * pad)) * xMax, 0, xMax));
+	};
+	const bands = drugs.slice(0, 4);
+	const bandH = 11, bandGap = 3;
+	const stripY = 4 + bands.length * (bandH + bandGap) + 4;
+	const H = stripY + 10 + 12 + (flags.length ? 13 : 0);
+	// Turning-point labels under the strip; skip any that would overlap the one before.
+	let flagRight = -Infinity;
+	const shownFlags = flags.filter((f) => {
+		const x0 = sx(f.x) - 2, x1 = x0 + f.label.length * 5.6 + 4;
+		if (x0 < flagRight + 6 || x1 > w) return false;
+		flagRight = x1;
+		return true;
+	});
+	const stops = mood.length ? mood : [{ x: 0, y: 0 }, { x: xMax, y: 0 }];
+	const knobV = interp(mood, x) ?? 0;
+	return (
+		<div ref={ref} style={{ width: '100%', minWidth: 0, userSelect: 'none' }}>
+			<svg
+				width={w}
+				height={H}
+				style={{ display: 'block', touchAction: 'pan-y', cursor: 'ew-resize', overflow: 'visible' }}
+				onPointerDown={(e) => {
+					e.preventDefault();
+					dragging.current = true;
+					(e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
+					scrubAt(e.clientX);
+				}}
+				onPointerMove={(e) => dragging.current && scrubAt(e.clientX)}
+				onPointerUp={() => (dragging.current = false)}
+				onPointerCancel={() => (dragging.current = false)}
+				role="slider"
+				aria-label="Time since first dose"
+				aria-valuemin={0}
+				aria-valuemax={xMax}
+				aria-valuenow={x}
+				tabIndex={0}
+				onKeyDown={(e) => {
+					if (e.key === 'ArrowRight') onScrub(clamp(x + xMax / 100, 0, xMax));
+					if (e.key === 'ArrowLeft') onScrub(clamp(x - xMax / 100, 0, xMax));
+				}}
+			>
+				<defs>
+					<linearGradient id="mini-mood" gradientUnits="userSpaceOnUse" x1={pad} x2={w - pad} y1="0" y2="0">
+						{stops.map((p, i) => (
+							<stop key={i} offset={`${(100 * clamp(p.x, 0, xMax)) / xMax}%`} stopColor={moodColor(p.y)} />
+						))}
+					</linearGradient>
+				</defs>
+				{bands.map((s, i) => {
+					const on = s.points.filter((p) => p.y > 0.15);
+					if (!on.length) return null;
+					const x0 = sx(on[0].x), bw = Math.max(6, sx(on[on.length - 1].x) - x0), y = 4 + i * (bandH + bandGap);
+					return (
+						<g key={s.key}>
+							<title>{short(s.label)} usually active here</title>
+							<rect x={x0} y={y} width={bw} height={bandH} rx={bandH / 2} fill={s.color} opacity={0.85} />
+							{bw > 46 && (
+								<text x={x0 + 6} y={y + 8.2} fontSize="8.5" fontWeight="700" fill={C.deep}>
+									{short(s.label)}
+								</text>
+							)}
+						</g>
+					);
+				})}
+				<rect x={pad} y={stripY} width={w - 2 * pad} height={10} rx={5} fill="rgba(255,255,255,.1)" />
+				<rect x={pad} y={stripY} width={Math.max(0, sx(x) - pad)} height={10} rx={5} fill="url(#mini-mood)" />
+				<rect x={sx(x)} y={stripY} width={Math.max(0, w - pad - sx(x))} height={10} rx={5} fill="url(#mini-mood)" opacity={0.28} />
+				{ticks.map((tk, i) => (
+					<circle key={i} cx={sx(tk.x)} cy={stripY + 17} r={tk.active ? 2.6 : 1.8} fill={tk.on ? '#fff' : 'rgba(255,255,255,.35)'} />
+				))}
+				{shownFlags.map((f) => (
+					<g key={f.label} opacity={f.on ? 1 : 0.45}>
+						<line x1={sx(f.x)} x2={sx(f.x)} y1={stripY + 10} y2={stripY + 22} stroke="#fff" strokeOpacity="0.5" />
+						<text x={sx(f.x) + 3} y={stripY + 31} fontSize="9.5" fontWeight="700" fill="#fff" style={{ letterSpacing: '.04em' }}>
+							{f.label}
+						</text>
+					</g>
+				))}
+				<line x1={sx(x)} x2={sx(x)} y1={2} y2={stripY} stroke="#fff" strokeOpacity="0.55" strokeWidth="1.5" />
+				<circle cx={sx(x)} cy={stripY + 5} r={8.5} fill="#fff" stroke={moodColor(knobV)} strokeWidth={3} />
+			</svg>
+		</div>
+	);
+}
+
 // ── Small pieces ──────────────────────────────────────────────────
+
+const TRIPSIT_COMBOS = 'https://wiki.tripsit.me/wiki/Drug_combinations';
+// The communities whose work this explorer stands on, credited with their own marks wherever we use it.
+const SOURCES = {
+	erowid: { name: 'Erowid', href: 'https://erowid.org', logo: EROWID_ICON, gives: 'the experience reports, shared by the people who lived them' },
+	sei: { name: 'Subjective Effect Index', href: 'https://www.effectindex.com', logo: SEI_ICON, gives: 'careful descriptions of each effect' },
+	pw: { name: 'PsychonautWiki', href: 'https://psychonautwiki.org', logo: PW_ICON, gives: 'substance details, timing and tolerance' },
+	tripsit: { name: 'TripSit', href: 'https://tripsit.me', logo: TRIPSIT_ICON, gives: 'the drug combinations chart behind every mixing warning' },
+};
+function SourceLink({ src, href, children }: { src: keyof typeof SOURCES; href?: string; children?: React.ReactNode }) {
+	const s = SOURCES[src];
+	return (
+		<a className="rd-src" href={href || s.href} target="_blank" rel="noopener noreferrer" title={`${s.name}: ${s.gives}`}>
+			<img src={s.logo} alt="" width={16} height={16} />
+			{children ?? s.name}
+			<span style={{ color: C.faint }}>↗</span>
+		</a>
+	);
+}
+
+// Where a page's content comes from, shown on the page itself. Items can point at a specific page (href).
+function Sources({ list, className = 'mt-6' }: { list: (keyof typeof SOURCES | [keyof typeof SOURCES, string])[]; className?: string }) {
+	return (
+		<div className={`flex flex-wrap items-center gap-x-4 gap-y-2 text-xs ${className}`} style={{ color: C.soft, fontFamily: SANS, borderColor: C.line }}>
+			<span className="rd-label">Sources</span>
+			{list.map((it) => {
+				const [k, href] = Array.isArray(it) ? it : [it, undefined];
+				return <SourceLink key={k} src={k} href={href} />;
+			})}
+		</div>
+	);
+}
+
+// TripSit's combination chart is behind every mixing warning here, so they get their own badge wherever one shows.
+function TripSitBadge() {
+	return (
+		<a className="rd-ts" href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" title="Every mixing warning here comes from TripSit's drug combinations chart. Thank you, TripSit.">
+			<img src={TRIPSIT_ICON} alt="" width={20} height={20} />
+			<span>
+				Mixing guidance by <b>TripSit</b>
+			</span>
+			<span style={{ opacity: 0.55 }}>↗</span>
+		</a>
+	);
+}
 
 function Err({ q }: { q: { isError: boolean; error: unknown } }) {
 	if (!q.isError) return null;
@@ -2109,16 +2387,22 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [curveQ.data, denQ.data, w]);
 	const moodPts = rows(denQ).filter((r) => N(r.n) >= 3).sort((a, b) => N(a.bin) - N(b.bin)).map((r) => ({ x: (N(r.bin) + 0.5) * w, y: N(r.mood) }));
+	const dataEnd = Math.max(0, ...series.flatMap((x) => x.points.map((p) => p.x)), ...moodPts.map((p) => p.x)) + w / 2;
+	const chartMax = clamp(dataEnd, Math.min(horizon, w * 4), horizon);
 	const slice = clamp(Math.floor(cursor / w), 0, SLICES - 1);
 	const readout = series.map((s) => ({ ...s, v: interp(s.points, cursor) })).filter((r) => r.v != null).sort((a, b) => (b.v as number) - (a.v as number));
 	const shuffle = () => list.length && onOpen(S(list[Math.floor(Math.random() * list.length)].report_id));
+	// A dangerous or unsafe pair tints the whole page, so the risk is felt before anything is read.
+	const pairNote = withSub ? rows(pairQ)[0] : undefined;
+	const risk = pairNote ? N(pairNote.sev) : 0;
 
 	return (
-		<section className="rd-in">
+		<section className="rd-fade" style={{ position: 'relative', zIndex: 0 }}>
+			{risk >= 2 && <div aria-hidden className="rd-tint" style={{ background: RISK_TINT[risk] }} />}
 			<h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-4xl font-semibold sm:text-5xl">
 				{[sub, ...(withSub ? [withSub] : [])].map((n, i) => (
 					<span key={n} className="inline-flex items-center gap-3" style={{ whiteSpace: 'nowrap' }}>
-						{i > 0 && <span style={{ color: C.faint, fontWeight: 300 }}>+</span>}
+						{i > 0 && <span style={{ color: risk >= 2 ? RISK[risk].c : C.faint, fontWeight: 300 }}>+</span>}
 						<button title={n} onClick={() => open({ kind: 'substance', name: n })} className="inline-flex items-center gap-3">
 							<SubstanceIcon name={n} />
 							{short(n)}
@@ -2134,20 +2418,36 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 				))}
 				<span className="text-xs" style={{ color: C.faint }}>{only ? 'Nothing else taken' : 'May include other substances'}</span>
 			</div>
+			<Sources className="mt-4" list={['erowid', 'sei', 'pw', ...(withSub ? ['tripsit' as const] : [])]} />
 			{withSub && (
-				<div className="rd-card rd-in mt-6 p-5">
+				<div className="rd-card rd-in mt-6 p-5" style={risk >= 2 ? { background: RISK[risk].bg, borderColor: RISK[risk].c, padding: 28 } : undefined}>
 					{(() => {
-						const p = rows(pairQ)[0];
-						const sev = p ? N(p.sev) : 0;
-						const look = sev === 3 ? { c: C.coral, t: 'Listed as a dangerous combination' } : sev === 2 ? { c: C.amber, t: 'Listed as an unsafe combination' } : sev === 1 ? { c: C.lav, t: 'Listed as worth caution' } : null;
+						const p = pairNote;
+						const sev = risk;
+						const look = sev >= 2 ? RISK[sev] : sev === 1 ? { c: C.lav, t: 'Use caution' } : p?.status ? { c: C.mint, t: S(p.status) } : null;
 						return pairQ.isLoading ? (
 							<span style={{ color: C.faint }}>Checking interaction notes…</span>
 						) : look ? (
-							<div className="flex items-start gap-3">
-								<AlertTriangle size={20} color={look.c} style={{ flexShrink: 0, marginTop: 2 }} />
+							<div className="flex items-start gap-4">
+								{sev >= 2 ? (
+									<span className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 999, background: `${look.c}26`, flexShrink: 0 }}>
+										<AlertTriangle size={22} color={look.c} />
+									</span>
+								) : (
+									<AlertTriangle size={20} color={look.c} style={{ flexShrink: 0, marginTop: 2 }} />
+								)}
 								<div>
-									<div className="text-lg font-semibold" style={{ color: look.c }}>{look.t}</div>
-									<div className="mt-1 text-sm" style={{ color: C.faint }}>From TripSit-style interaction notes{p?.via ? ` (via ${S(p.via)})` : ''}.</div>
+									<div className={sev >= 2 ? 'text-2xl font-semibold' : 'text-lg font-semibold'} style={{ color: look.c, letterSpacing: '-0.01em' }}>{look.t}</div>
+									{p?.note && <p className="mt-2" style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.text }}>{S(p.note)}</p>}
+									<div className="mt-3 text-xs" style={{ color: C.faint }}>
+										{S(p?.via) === 'TripSit' ? (
+											<>
+												<TripSitBadge />
+											</>
+										) : (
+											`From interaction notes${p?.via ? ` (via ${S(p.via)})` : ''}.`
+										)}
+									</div>
 								</div>
 							</div>
 						) : (
@@ -2178,9 +2478,9 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 					{N(rows(denQ)[0]?.total) >= 20 && series.length > 0 && <div className="rd-card mt-4 p-5 text-sm" style={{ color: C.faint }}>Based on {N(rows(denQ)[0]?.total)} closely read reports with both.</div>}
 				</>
 			) : series.length > 0 ? (
-				<div className="rd-card mt-6 p-5 sm:p-6">
+				<section className="mt-10 border-t pt-7" style={{ borderColor: C.line }}>
 					<div className="flex flex-wrap items-baseline justify-between gap-2">
-						<h2 className="text-lg font-semibold">{withSub ? 'How it tends to unfold together' : 'How it tends to unfold'}</h2>
+						<h2 className="text-2xl font-semibold">{withSub ? 'How it tends to unfold together' : 'How it tends to unfold'}</h2>
 						<span className="text-sm" style={{ color: C.faint }}>From {N(rows(denQ)[0]?.total)} closely read reports · % mentioning each effect · drag across</span>
 					</div>
 					<div className="mt-5">
@@ -2190,10 +2490,10 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 								...(moodPts.length >= 3 ? [{ label: 'Mood', height: 60, min: -1.05, max: 1.05, diverging: true, linear: true, series: [{ key: 'mood', label: 'Mood', color: C.lav, points: moodPts }] }] : []),
 								...series.map((s) => ({ label: s.label, color: s.color, height: 40, min: 0, max: Math.max(10, ...s.points.map((p) => p.y)) * 1.1, series: [s] })),
 							]}
-							xMax={horizon}
-							x={cursor}
+							xMax={chartMax}
+							x={Math.min(cursor, chartMax)}
 							onScrub={setX}
-							xLabels={niceTicks(horizon).map((h) => ({ x: h, label: tickLabel(h) }))}
+							xLabels={niceTicks(chartMax).map((h) => ({ x: h, label: tickLabel(h) }))}
 						/>
 					</div>
 					<div className="mt-5">
@@ -2209,7 +2509,7 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 							))}
 						</div>
 					</div>
-				</div>
+				</section>
 			) : null}
 
 			<div className="mt-10 flex flex-wrap items-end justify-between gap-3">
@@ -2253,11 +2553,28 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 		.replace(/\t/g, ' ')
 		.replace(/([^\n.!?:"”)\]])\n(?![ ]*(T\s*\+|\d{1,2}[:.]\d{2}|\[|\n|[-–•*]))/g, '$1 ')
 		.replace(/(?<=\w)\uFFFD(?=\w)/g, '’').replace(/\uFFFD/g, '"');
-	const marks = useMemo(() => locateMarks(body, rows(marksQ)), [body, marksQ.data]);
+	const obs = rows(obsQ).filter((o) => o.hrs != null);
+	// Prefer the close reading's moments; fall back to the automatic time marks when it can't be placed.
+	const marks = useMemo(() => {
+		const fromObs = locateObs(body, obs);
+		return fromObs.length >= Math.max(2, obs.length * 0.4) ? fromObs : locateMarks(body, rows(marksQ));
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [body, marksQ.data, obsQ.data]);
 	const byTime = useMemo(() => [...marks].sort((a, b) => a.t - b.t || a.start - b.start), [marks]);
 	const doses = rows(dosesQ).map((d) => ({ sub: S(d.sub), amount: S(d.amount), route: S(d.route), t: d.t == null ? 0 : N(d.t), assumed: d.t == null }));
-	const obs = rows(obsQ).filter((o) => o.hrs != null);
 	const expected = useMemo(() => expectedCurves(doses, rows(timingQ)), [dosesQ.data, timingQ.data]);
+	// Effects that show up for the first time at each moment: where each one "became a thing".
+	const newEffects = useMemo(() => {
+		const seen = new Set<string>();
+		const out = new Map<string, string[]>();
+		for (const o of [...obs].sort((a, b) => N(a.hrs) - N(b.hrs))) {
+			const fresh = L(o.effects).filter((e) => !seen.has(e));
+			fresh.forEach((e) => seen.add(e));
+			if (fresh.length) out.set(S(o.obs_index), fresh);
+		}
+		return out;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [obsQ.data]);
 	const storyEnd = Math.max(0.25, ...byTime.map((m) => m.t), ...obs.map((o) => N(o.hrs)), ...doses.map((d) => d.t));
 	const [showAll, setShowAll] = useState(false);
 	const fullT = Math.min(Math.max(storyEnd, expected.end), storyEnd + 12);
@@ -2269,12 +2586,52 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const zoomed = coreEnd != null && !showAll;
 	const maxT = zoomed ? Math.min(fullT, Math.max(coreEnd! + 4, coreEnd! * 1.15)) : fullT;
 
+	// Turning points of the trip, each pinned to the nearest moment in the story and shown as a band in the text.
+	// Kicking in is the first moment with an effect (or the expected onset), peak and coming down follow the
+	// expected curve of the first thing taken, and last effects is the last moment of the main part.
+	const milestones = useMemo(() => {
+		const core = byTime.filter((m) => coreEnd == null || m.t <= coreEnd);
+		if (core.length < 3) return [] as Milestone[];
+		const first = [...doses].sort((a, b) => a.t - b.t)[0];
+		const t0 = first?.t ?? 0;
+		const main = expected.series.find((s) => s.label === first?.sub) ?? expected.series[0];
+		let onset: number | null = null, peak: number | null = null, down: number | null = null;
+		if (main?.points.length) {
+			const pts = main.points, top = Math.max(...pts.map((p) => p.y));
+			const pk = pts.find((p) => p.y === top)!;
+			onset = pts.find((p) => p.y >= 0.15 * top)?.x ?? null;
+			peak = pk.x;
+			down = pts.find((p) => p.x > pk.x && p.y <= 0.5 * top)?.x ?? null;
+		}
+		const felt = obs.find((o) => N(o.hrs) > t0 && L(o.effects).length > 0);
+		if (felt) onset = N(felt.hrs);
+		const near = (x: number | null) => {
+			if (x == null) return null;
+			const m = core.reduce((a, b) => (Math.abs(b.t - x) < Math.abs(a.t - x) ? b : a));
+			return Math.abs(m.t - x) <= Math.max(0.5, x * 0.35) ? m : null;
+		};
+		const out: Milestone[] = [];
+		const last = core[core.length - 1];
+		const downM = near(down);
+		for (const [label, m] of [['Kicking in', near(onset)], ['Peak', near(peak)], ['Coming down', downM === last ? core[core.length - 2] : downM], ['Last effects', last]] as [string, Mark | null][]) {
+			const prev = out[out.length - 1];
+			if (!m || (prev && m.t <= prev.t)) continue;
+			const lineStart = body.lastIndexOf('\n', m.start - 1) + 1;
+			const at = m.start - lineStart <= 60 && !marks.some((o) => o.start >= lineStart && o.start < m.start) ? lineStart : m.start;
+			out.push({ label, t: m.t, at });
+		}
+		return out;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [byTime, coreEnd, expected, obsQ.data, body]);
+
 	const [t, setT] = useState(0);
 	const [playing, setPlaying] = useState(false);
 	const [speed, setSpeed] = useState(1);
 	const [hoverEffect, setHoverEffect] = useState<string | null>(null);
 	const [atLink, setAtLink] = useDiveState<number | null>('at', null);
 	const [copied, setCopied] = useState(false);
+	const [dockOpen, setDockOpen] = useState(false);
+	const [allNames, setAllNames] = useState(false);
 	const { effectInfo, open, classOf } = useContext(OpenCtx);
 	const takenRef = useRef<HTMLOListElement | null>(null);
 	const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -2337,6 +2694,15 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 		if (playing && dosesTaken > lastDoses.current) holdUntil.current = Math.max(holdUntil.current, Date.now() + 1800 / Math.sqrt(speed));
 		lastDoses.current = dosesTaken;
 	}, [dosesTaken, playing]);
+	// The turning point we're in; a longer beat when playback reaches a new one.
+	const msIdx = milestones.reduce((k, m, i) => (m.t <= t + 1e-9 ? i : k), -1);
+	const phase = msIdx >= 0 ? milestones[msIdx] : null;
+	const lastMs = useRef(-1);
+	useEffect(() => {
+		if (playing && msIdx > lastMs.current) holdUntil.current = Math.max(holdUntil.current, Date.now() + 2400 / Math.sqrt(speed));
+		lastMs.current = msIdx;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [msIdx, playing]);
 
 	useEffect(() => {
 		if (!playing) return;
@@ -2364,18 +2730,22 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	}, [active?.start]);
 
 	const segments = useMemo(() => {
-		const parts: { text: string; from: number; mark?: Mark }[] = [];
+		const parts: { text: string; from: number; mark?: Mark; ms?: number }[] = [];
+		const cuts = [...milestones.map((ms, i) => ({ pos: ms.at, ms: i, mark: undefined })), ...marks.map((m) => ({ pos: m.start, ms: undefined, mark: m }))].sort((a, b) => a.pos - b.pos);
 		let pos = 0;
-		for (const m of marks) {
-			if (m.start > pos) parts.push({ text: body.slice(pos, m.start), from: pos });
-			parts.push({ text: body.slice(m.start, m.end), from: m.start, mark: m });
-			pos = m.end;
+		for (const c of cuts) {
+			if (c.pos > pos) parts.push({ text: body.slice(pos, c.pos), from: pos });
+			pos = Math.max(pos, c.pos);
+			if (c.mark) {
+				parts.push({ text: body.slice(c.mark.start, c.mark.end), from: c.mark.start, mark: c.mark });
+				pos = c.mark.end;
+			} else parts.push({ text: '', from: c.pos, ms: c.ms });
 		}
 		if (pos < body.length) parts.push({ text: body.slice(pos), from: pos });
 		return parts;
-	}, [body, marks]);
+	}, [body, marks, milestones]);
 
-	if (reportQ.isLoading || marksQ.isLoading) return <div className="rd-card animate-pulse" style={{ height: 420 }} />;
+	if (reportQ.isLoading || marksQ.isLoading || obsQ.isLoading) return <div className="rd-card animate-pulse" style={{ height: 420 }} />;
 	if (!report) return <p style={{ color: C.soft }}>Report not found.</p>;
 
 	const jump = (to: number) => {
@@ -2433,8 +2803,50 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const hourStep = maxT <= 2 ? 0.25 : maxT <= 6 ? 1 : maxT <= 14 ? 2 : 4;
 	const xLabels = Array.from({ length: Math.floor(maxT / hourStep) + 1 }, (_, i) => ({ x: i * hourStep, label: fmtT(i * hourStep) }));
 
+	// Active now: inside its expected effect curve, or (no timing data) taken within the last 6 h.
+	const activeSubs = [...new Set(takenSoFar.map((d) => d.sub))].filter((sub) => {
+		const ser = expected.series.find((x) => x.label === sub);
+		if (ser) return ser.points.length > 0 && t >= ser.points[0].x && t <= ser.points[ser.points.length - 1].x && (interp(ser.points, t) ?? 0) > 0.05;
+		return takenSoFar.some((d) => d.sub === sub && t - d.t <= 6);
+	});
+	const activeNotes = activeSubs.length < 2 ? [] : rows(pairsQ).filter((p) => activeSubs.includes(S(p.a)) && activeSubs.includes(S(p.b)));
+	const riskNow = Math.max(0, ...activeNotes.map((p) => N(p.sev)));
+	const mixing = (() => {
+							if (activeSubs.length < 2) return null;
+							const notes = activeNotes;
+							const major = notes.filter((p) => N(p.sev) >= 2).sort((a, b) => N(b.sev) - N(a.sev));
+							const minor = notes.filter((p) => p.sev != null && N(p.sev) < 2);
+							const low = notes.filter((p) => p.sev == null && p.status);
+							return (
+								<div className="mt-3 flex flex-wrap items-center gap-2">
+									<span className="rd-label pr-1">Mixing now</span>
+									{major.map((p) => {
+										const danger = N(p.sev) === 3;
+										const fg = danger ? C.coral : C.amber;
+										return (
+											<span key={`${S(p.a)}|${S(p.b)}`} className="rd-tag rd-in" title={S(p.note) || `Listed via: ${S(p.via)}`} style={{ background: danger ? 'rgba(255,163,182,.2)' : 'rgba(255,213,154,.16)', borderColor: fg, cursor: 'default' }}>
+												<AlertTriangle size={13} color={fg} />
+												{short(S(p.a))} + {short(S(p.b))}
+												<span style={{ color: fg }}>{danger ? 'dangerous' : 'unsafe'}</span>
+											</span>
+										);
+									})}
+									{!major.length && (
+										<span className="text-sm" style={{ color: C.soft }} title={[...minor, ...low].map((p) => `${S(p.a)} + ${S(p.b)}: ${S(p.status) || 'caution'}${p.note ? ' — ' + S(p.note) : ''}`).join('\n')}>
+											{activeSubs.map(short).join(' + ')}
+											<span style={{ color: C.faint }}>{minor.length ? ` · ${minor.length} caution${minor.length > 1 ? 's' : ''}` : low.length ? ' · low risk' : ' · no note on file'}</span>
+										</span>
+									)}
+									{notes.length > 0 && <TripSitBadge />}
+								</div>
+							);
+						})();
+	const moodScale = obs.length >= 2 ? 1 : 3;
+	const moodLine = moodPts.map((p) => ({ x: p.x, y: clamp(p.y * moodScale, -1, 1) }));
+	const moodNow = momentObs ? (MOMENT[S(momentObs.sentiment)] ?? MOMENT.neutral).y : clamp((interp(moodPts, t) ?? 0) * moodScale, -1, 1);
+
 	return (
-		<section className="rd-in">
+		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: dockOpen ? 340 : 120 }}>
 			<header>
 				{(() => {
 					const taken = [...new Set([...doses].sort((a, b) => a.t - b.t).map((d) => d.sub))];
@@ -2444,13 +2856,17 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 						<>
 							<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
 								<h1 className="flex flex-wrap items-center gap-x-4 gap-y-1 text-3xl font-semibold" style={{ letterSpacing: '-0.02em' }}>
-									{names.slice(0, 4).map((n) => (
+									{(allNames ? names : names.slice(0, 4)).map((n) => (
 										<button key={n} onClick={() => open({ kind: 'substance', name: n })} className="inline-flex items-center gap-2" style={{ whiteSpace: 'nowrap', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.25)', textDecorationThickness: 1, textUnderlineOffset: 6 }} title={`About ${n}`}>
 											<SubstanceIcon name={n} />
 											{short(n)}
 										</button>
 									))}
-									{names.length > 4 && <span className="text-xl font-normal" style={{ color: C.faint }}>+{names.length - 4}</span>}
+									{names.length > 4 && (
+										<button className="rd-btn" style={{ fontSize: 14, padding: '5px 12px', alignSelf: 'center' }} onClick={() => setAllNames(!allNames)} title={allNames ? 'Show fewer' : names.slice(4).join(', ')}>
+											{allNames ? 'Show fewer' : `+${names.length - 4} more`}
+										</button>
+									)}
 								</h1>
 								<div className="flex items-center gap-2">
 									<a
@@ -2511,74 +2927,60 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				})()}
 			</header>
 
+			{/* Mood tint: the page leans mint when it's going well, pink when it's rough */}
+			<div aria-hidden className="rd-tint" style={{ background: 'radial-gradient(1200px 520px at 50% -8%, rgba(140,236,214,.30), transparent 70%), radial-gradient(1000px 480px at 50% 108%, rgba(140,236,214,.22), transparent 70%)', opacity: clamp(moodNow, 0, 1) * 0.9 }} />
+			<div aria-hidden className="rd-tint" style={{ background: 'radial-gradient(1200px 520px at 50% -8%, rgba(255,150,180,.32), transparent 70%), radial-gradient(1000px 480px at 50% 108%, rgba(255,150,180,.24), transparent 70%)', opacity: clamp(-moodNow, 0, 1) * 0.9 }} />
+			{[2, 3].map((r) => (
+				<div key={r} aria-hidden className="rd-tint" style={{ background: RISK_TINT[r], opacity: riskNow === r ? 1 : 0 }} />
+			))}
+			<div aria-hidden className="rd-fadebar" />
+
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
 				<article ref={bodyRef} className="rd-story">
+					<div className="mb-6 flex flex-wrap items-center gap-2 text-sm" style={{ fontFamily: SANS, color: C.soft, whiteSpace: 'normal' }}>
+						<span>Shared on</span>
+						<SourceLink src="erowid" href={`https://erowid.org/experiences/exp.php?ID=${id.replace('erowid-', '')}`} />
+						<span>by the person who lived it, in their own words.</span>
+					</div>
 					{segments.map((s, i) =>
-						s.mark ? (
-							<span key={i} data-start={s.mark.start} className={`rd-mark ${active && s.mark.start === active.start ? 'active' : s.mark.t <= t + 1e-9 ? 'past' : 'future'}`} onClick={() => jump(s.mark!.t)} title={fmtT(s.mark.t)}>
-								{s.text}
+						s.ms != null ? (
+							<span key={i} role="button" tabIndex={0} className={`rd-ms ${s.ms === msIdx ? 'now' : s.ms < msIdx ? 'past' : 'future'}`} onClick={() => jump(milestones[s.ms!].t)} onKeyDown={(e) => e.key === 'Enter' && jump(milestones[s.ms!].t)}>
+								<span className="rd-ms-line" />
+								<span className="rd-ms-pill">
+									{milestones[s.ms].label}
+									<span className="rd-ms-t">{fmtT(milestones[s.ms].t)}</span>
+								</span>
+								<span className="rd-ms-line" />
 							</span>
+						) : s.mark ? (
+							<Fragment key={i}>
+								<span data-start={s.mark.start} className={`rd-mark ${s.text ? '' : 'stamp'} ${active && s.mark.start === active.start ? 'active' : s.mark.t <= t + 1e-9 ? 'past' : 'future'}`} onClick={() => jump(s.mark!.t)} title={fmtT(s.mark.t)}>
+									{s.text || fmtT(s.mark.t)}
+								</span>
+								{s.mark.method === 'obs' && s.mark.t <= t + 1e-9 && newEffects.get(s.mark.raw)?.slice(0, 3).map((e) => (
+									<button key={e} className="rd-eff rd-in" onClick={() => open({ kind: 'effect', name: e })} title={`${e} starts here`} style={{ background: HI[effectTone(effectInfo.get(e.toLowerCase()))] }}>
+										+ {e}
+									</button>
+								))}
+								{!s.text && ' '}
+							</Fragment>
 						) : (
 							<span key={i}>{renderPlain(s.text, s.from, `b${i}`)}</span>
 						),
 					)}
+					<Sources className="mt-10 border-t pt-5" list={[['erowid', `https://erowid.org/experiences/exp.php?ID=${id.replace('erowid-', '')}`], 'sei', 'pw', ...(rows(pairsQ).length ? ['tripsit' as const] : [])]} />
 				</article>
 
-				{/* Side panel: controls, the moment, what's in the system, and the charts */}
+				{/* Alongside the story: the moment, and the doses */}
 				<aside className="rd-side">
-					<div className="rd-card p-4">
-						<div className="flex items-center gap-3">
-							<button onClick={prevMark} className="rd-btn" aria-label="Previous mark" style={{ padding: 9 }}>
-								<SkipBack size={15} />
-							</button>
-							<button
-								onClick={() => {
-									if (t >= maxT) setT(0);
-									setPlaying(!playing);
-								}}
-								aria-label={playing ? 'Pause' : 'Play'}
-								className="flex items-center justify-center"
-								style={{ width: 46, height: 46, borderRadius: '50%', background: '#fff', color: C.deep, flexShrink: 0, boxShadow: playing ? '0 0 0 5px rgba(255,255,255,.15)' : 'none', transition: 'box-shadow .3s' }}
-							>
-								{playing ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: 3 }} />}
-							</button>
-							<button onClick={nextMark} className="rd-btn" aria-label="Next mark" style={{ padding: 9 }}>
-								<SkipForward size={15} />
-							</button>
-							<div className="ml-2">
-								<div className="text-3xl font-light tabular-nums" style={{ lineHeight: 1, letterSpacing: '-0.03em' }}>{fmtT(t)}</div>
-								<div className="rd-label mt-1" style={{ fontSize: 10 }}>since first dose</div>
-							</div>
-							<select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="rd-btn ml-auto" style={{ padding: '4px 8px', fontSize: 12 }} aria-label="Speed">
-								{[0.5, 1, 2, 4].map((v) => (
-									<option key={v} value={v} style={{ color: '#000' }}>
-										{v}×
-									</option>
-								))}
-							</select>
-						</div>
-					</div>
-
-					{lanes.length > 0 && (
-						<div className="rd-card p-4">
-							<ScrubChart id="rep" lanes={lanes} xMax={maxT} x={t} onScrub={jump} ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))} xLabels={xLabels} cursorLabel={fmtT(t)} />
-							<div className="mt-2 flex flex-wrap items-center gap-3 text-xs" style={{ color: C.faint }}>
-								{coreEnd != null && (
-									<button className="rd-btn" style={{ padding: '3px 10px', fontSize: 12 }} onClick={() => setShowAll(!showAll)}>
-										{showAll ? 'Focus on the main part' : `Show all ${fmtT(fullT)}`}
-									</button>
-								)}
-								{expected.missing.length > 0 && (
-									<span title={expected.missing.join(', ')}>
-										No timing data for {expected.missing.slice(0, 2).map(short).join(', ')}
-										{expected.missing.length > 2 ? ` +${expected.missing.length - 2}` : ''}
-									</span>
-								)}
-
 					<div key={heroKey} className="rd-card rd-in p-5" style={{ borderColor: nowMood ? `${nowMood.color}55` : undefined }}>
 						<div className="flex flex-wrap items-center gap-3">
-							<span className="rd-label">At {fmtT(t)}</span>
+							<span className="rd-label">
+								{phase && <span style={{ color: '#fff' }}>{phase.label} · </span>}
+								{phase ? '' : 'At '}
+								{fmtT(t)}
+							</span>
 							{nowMood && (
 								<span className="inline-flex items-center gap-2 text-sm font-semibold" style={{ color: nowMood.color }}>
 									<span className="rd-dot" style={{ width: 8, height: 8, background: nowMood.color }} />
@@ -2587,17 +2989,15 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 							)}
 						</div>
 						{momentObs ? (
-							<p className="mt-3" style={{ fontFamily: SERIF, fontSize: 18, lineHeight: 1.5, color: C.text }}>
+							<p className="mt-3" style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.5, color: C.text }}>
 								{markWords(S(momentObs.description), hiRules, hoverEffect, 'd')}
 							</p>
+						) : quote ? (
+							<p className="mt-3" style={{ fontFamily: SERIF, fontSize: 18, lineHeight: 1.5, color: C.text }}>
+								{markWords(quote, hiRules, hoverEffect, 'q')}
+							</p>
 						) : (
-							quote ? (
-								<p className="mt-3" style={{ fontFamily: SERIF, fontSize: 18, lineHeight: 1.5, color: C.text }}>
-									{markWords(quote, hiRules, hoverEffect, 'q')}
-								</p>
-							) : (
-								<p className="mt-3 text-sm" style={{ color: C.faint }}>Press play, or drag the timeline, to step through the story.</p>
-							)
+							<p className="mt-3 text-sm" style={{ color: C.faint }}>Press play, or drag the timeline, to step through the story.</p>
 						)}
 						{momentObs && L(momentObs.effects).length > 0 && (
 							<div className="mt-4 flex flex-wrap gap-2">
@@ -2618,12 +3018,14 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 					<div className="rd-card p-4">
 						<div className="flex items-baseline justify-between">
 							<span className="rd-label">Doses</span>
-							<span className="text-xs" style={{ color: C.faint }}>{takenSoFar.length} of {doses.length} taken · tap to jump</span>
+							<span className="text-xs" style={{ color: C.faint }}>
+								{takenSoFar.length} of {doses.length} taken · tap to jump
+							</span>
 						</div>
 						{doses.length === 0 ? (
 							<div className="mt-2 text-sm" style={{ color: C.faint }}>No doses recorded.</div>
 						) : (
-							<ol ref={takenRef} className="mt-2 grid gap-0.5" style={{ maxHeight: 210, overflowY: 'auto', scrollbarWidth: 'none' }}>
+							<ol ref={takenRef} className="mt-2 grid gap-0.5" style={{ maxHeight: 230, overflowY: 'auto', scrollbarWidth: 'none' }}>
 								{[...doses].sort((p, q) => p.t - q.t).map((d, i) => {
 									const taken = d.t <= t + 1e-9;
 									const latest = taken && i === takenSoFar.length - 1;
@@ -2635,12 +3037,14 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 											tabIndex={0}
 											onClick={() => jump(d.t)}
 											onKeyDown={(e) => e.key === 'Enter' && jump(d.t)}
-											className={`rd-hover flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1 text-sm ${latest ? 'rd-new' : ''}`}
+											className={`rd-hover rd-dose cursor-pointer rounded-lg px-2 py-1.5 text-sm ${latest ? 'rd-new' : ''}`}
 											title={d.assumed ? 'Time not given' : `Jump to ${fmtT(d.t)}`}
 											style={{ border: '1px solid transparent', opacity: taken ? 1 : 0.45, transition: 'opacity .3s' }}
 										>
-											<span className="tabular-nums" style={{ color: C.faint, width: 38, flexShrink: 0 }}>{d.assumed ? '—' : fmtT(d.t)}</span>
-											<ClassIcon cls={classOf(d.sub)} size={14} color={C.coral} />
+											<span className="tabular-nums" style={{ color: C.faint, textAlign: 'right' }}>{d.assumed ? '—' : fmtT(d.t)}</span>
+											<span className="flex justify-center">
+												<ClassIcon cls={classOf(d.sub)} size={14} color={C.coral} />
+											</span>
 											<button
 												onClick={(e) => {
 													e.stopPropagation();
@@ -2648,57 +3052,88 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 												}}
 												className="font-semibold"
 												title={`About ${d.sub}`}
-												style={{ whiteSpace: 'nowrap' }}
+												style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}
 											>
 												{short(d.sub)}
 											</button>
-											{d.route && <RouteIcon route={d.route} />}
-											{/\d/.test(d.amount) && <span style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.amount}</span>}
+											<span className="flex justify-center">{d.route && <RouteIcon route={d.route} />}</span>
+											<span className="tabular-nums" style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'right' }} title={d.amount}>
+												{/\d/.test(d.amount) ? d.amount : ''}
+											</span>
 										</li>
 									);
 								})}
 							</ol>
 						)}
-						{(() => {
-							// Active now: inside its expected effect curve, or (no timing data) taken within the last 6 h.
-							const activeSubs = [...new Set(takenSoFar.map((d) => d.sub))].filter((sub) => {
-								const ser = expected.series.find((x) => x.label === sub);
-								if (ser) return ser.points.length > 0 && t >= ser.points[0].x && t <= ser.points[ser.points.length - 1].x && (interp(ser.points, t) ?? 0) > 0.05;
-								return takenSoFar.some((d) => d.sub === sub && t - d.t <= 6);
-							});
-							if (activeSubs.length < 2) return null;
-							const notes = rows(pairsQ).filter((p) => activeSubs.includes(S(p.a)) && activeSubs.includes(S(p.b)));
-							const major = notes.filter((p) => N(p.sev) >= 2).sort((a, b) => N(b.sev) - N(a.sev));
-							const minor = notes.filter((p) => N(p.sev) < 2);
-							return (
-								<div className="mt-3 flex flex-wrap items-center gap-2">
-									<span className="rd-label pr-1">Mixing now</span>
-									{major.map((p) => {
-										const danger = N(p.sev) === 3;
-										const fg = danger ? C.coral : C.amber;
-										return (
-											<span key={`${S(p.a)}|${S(p.b)}`} className="rd-tag rd-in" title={`Listed via: ${S(p.via)}`} style={{ background: danger ? 'rgba(255,163,182,.2)' : 'rgba(255,213,154,.16)', borderColor: fg, cursor: 'default' }}>
-												<AlertTriangle size={13} color={fg} />
-												{short(S(p.a))} + {short(S(p.b))}
-												<span style={{ color: fg }}>{danger ? 'dangerous' : 'unsafe'}</span>
-											</span>
-										);
-									})}
-									{!major.length && (
-										<span className="text-sm" style={{ color: C.soft }} title={minor.map((p) => `${S(p.a)} + ${S(p.b)}`).join(', ')}>
-											{activeSubs.map(short).join(' + ')}
-											<span style={{ color: C.faint }}>{minor.length ? ` · ${minor.length} minor caution${minor.length > 1 ? 's' : ''}` : ' · no note on file'}</span>
-										</span>
-									)}
-								</div>
-							);
-						})()}
+						{mixing}
 					</div>
-
-							</div>
-						</div>
-					)}
 				</aside>
+			</div>
+
+			{/* Floating timeline dock */}
+			<div className="rd-dock" style={{ borderColor: `${moodColor(moodNow)}55`, boxShadow: `0 10px 40px rgba(10,4,40,.35), 0 0 0 1px ${moodColor(moodNow)}22` }}>
+				<div className="flex items-center gap-3">
+					<button onClick={prevMark} className="rd-btn rd-hide-sm" aria-label="Previous mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
+						<SkipBack size={15} />
+					</button>
+					<button
+						onClick={() => {
+							if (t >= maxT) setT(0);
+							setPlaying(!playing);
+						}}
+						aria-label={playing ? 'Pause' : 'Play'}
+						className="flex items-center justify-center"
+						style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', color: C.deep, flexShrink: 0, boxShadow: playing ? `0 0 0 5px ${moodColor(moodNow)}33` : 'none', transition: 'box-shadow .4s' }}
+					>
+						{playing ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
+					</button>
+					<button onClick={nextMark} className="rd-btn rd-hide-sm" aria-label="Next mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
+						<SkipForward size={15} />
+					</button>
+					<div className="text-xl font-light tabular-nums" style={{ minWidth: 56, letterSpacing: '-0.02em' }}>{fmtT(t)}</div>
+					<div className="flex-1" style={{ minWidth: 0 }}>
+						<MiniTimeline
+							xMax={maxT}
+							x={t}
+							onScrub={jump}
+							mood={moodLine}
+							drugs={expected.series}
+							ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))}
+							flags={milestones.map((m, i) => ({ x: m.t, label: m.label, on: i <= msIdx }))}
+						/>
+					</div>
+					<select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="rd-btn" style={{ padding: '3px 6px', fontSize: 12, background: 'transparent' }} aria-label="Speed">
+						{[0.5, 1, 2, 4].map((v) => (
+							<option key={v} value={v} style={{ color: '#000' }}>
+								{v}×
+							</option>
+						))}
+					</select>
+					<button className="rd-btn" aria-label={dockOpen ? 'Hide details' : 'Show details'} title={dockOpen ? 'Hide details' : 'Show mood and drug lanes'} style={{ padding: 6, background: 'transparent' }} onClick={() => setDockOpen(!dockOpen)}>
+						{dockOpen ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+					</button>
+				</div>
+				{dockOpen && (
+					<div className="rd-fade mt-3 border-t pt-3" style={{ borderColor: C.line, maxHeight: '38vh', overflowY: 'auto', scrollbarWidth: 'none' }}>
+						{lanes.length > 0 && (
+							<ScrubChart
+								id="rep"
+								lanes={lanes.map((l) => ({ ...l, height: l.diverging ? 56 : 34 }))}
+								xMax={maxT}
+								x={t}
+								onScrub={jump}
+								ticks={byTime.map((m, i) => ({ x: m.t, on: m.t <= t + 1e-9, active: i === activeIdx }))}
+								xLabels={xLabels}
+								cursorLabel={fmtT(t)}
+							/>
+						)}
+						{coreEnd != null && (
+							<button className="rd-btn mt-2" style={{ padding: '3px 10px', fontSize: 12 }} onClick={() => setShowAll(!showAll)}>
+								{showAll ? 'Focus on the main part' : `Show all ${fmtT(fullT)}`}
+							</button>
+						)}
+					</div>
+				)}
 			</div>
 			<Err q={marksQ} />
 		</section>
@@ -2738,7 +3173,7 @@ export default function ReportTimelapse() {
 	const kp = rows(kpiQ)[0];
 	// Show each substance on its own clock: a bit past when most people's last effects are noted.
 	const horizon = (() => {
-		const h = kp && N(kp.n_llm) >= 3 ? Math.max(N(kp.last_p75), N(kp.last_h)) * 1.25 : 12;
+		const h = kp && N(kp.n_llm) >= 3 ? Math.max(N(kp.last_h) * 1.6, N(kp.peak_h) * 2.5, 0.4) : 12;
 		const nice = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 16, 24];
 		const v = nice.find((x) => x >= h) ?? 24;
 		return withSub ? Math.max(v, 6) : v;
@@ -2784,8 +3219,8 @@ export default function ReportTimelapse() {
 		<OpenCtx.Provider value={{ open: setOpenItem, effectInfo, classOf: (n: string) => classMap.get(n) }}>
 			<main className="rd" style={{ minHeight: '100vh', background: BG, color: C.text }}>
 				<style>{CSS}</style>
-				<div className="px-4 py-6 sm:px-8 sm:py-8" style={{ maxWidth: onReport ? 1320 : 1120, margin: '0 auto', transition: 'max-width .3s' }}>
-					<header className="mb-10 flex flex-wrap items-center justify-between gap-4">
+				<div className="px-4 py-6 sm:px-8 sm:py-8" style={{ maxWidth: onReport ? 1320 : 1120, margin: '0 auto', transition: 'max-width .3s', position: 'relative', isolation: 'isolate' }}>
+					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
 						<button
 							onClick={() => {
 								setView('reports');
@@ -2807,7 +3242,7 @@ export default function ReportTimelapse() {
 					</header>
 
 					{view === 'reports' && (sub || reportId) && (
-						<nav className="mb-6 flex items-center gap-2 text-sm" style={{ color: C.faint }}>
+						<nav className="mb-6 flex items-center gap-2 text-sm" style={{ color: C.faint, position: 'relative', zIndex: 2 }}>
 							<button onClick={() => (setSub(undefined as unknown as null), setWithSub(undefined as unknown as null), clearReport())} style={{ color: C.soft }}>
 								All substances
 							</button>
@@ -2832,9 +3267,17 @@ export default function ReportTimelapse() {
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
 					{view === 'effects' && <EffectsBrowse q={effectsQ} />}
 
-					<p className="mt-16 text-xs" style={{ color: C.faint }}>
-						Reports from Erowid · Effect descriptions from the Subjective Effect Index · Not medical advice.
-					</p>
+					<footer className="mt-16 border-t pt-6 text-sm" style={{ borderColor: C.line, color: C.soft }}>
+						<div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+							<span>With thanks to</span>
+							{(Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map((k) => (
+								<SourceLink key={k} src={k} />
+							))}
+						</div>
+						<p className="mt-3 text-xs" style={{ color: C.faint }}>
+							Stories from Erowid, effect descriptions from the Subjective Effect Index, substance details from PsychonautWiki, and mixing guidance from TripSit. Not medical advice.
+						</p>
+					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} />
 			</main>
