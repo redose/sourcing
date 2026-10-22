@@ -4011,13 +4011,22 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 const SPUNION_CSS = `
 @keyframes sp-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
 @keyframes sp-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
-@keyframes sp-hop { 0% { transform: translateY(0) scale(1, 1); } 30% { transform: translateY(2px) scale(1.08, .9); } 60% { transform: translateY(-12px) scale(.94, 1.06); } 100% { transform: translateY(0) scale(1, 1); } }
+@keyframes sp-hop {
+  0% { transform: translateY(0) scale(1.15, .82); }
+  12% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: cubic-bezier(.2,.7,.4,1); }
+  32% { transform: translateY(-55%) scale(1, 1); animation-timing-function: cubic-bezier(.6,0,.8,.3); }
+  50% { transform: translateY(0) scale(1.18, .8); }
+  60% { transform: translateY(-4%) scale(.94, 1.06); animation-timing-function: cubic-bezier(.2,.7,.4,1); }
+  76% { transform: translateY(-28%) scale(1, 1); animation-timing-function: cubic-bezier(.6,0,.8,.3); }
+  90% { transform: translateY(0) scale(1.08, .9); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
 .sp-wrap { position: fixed; right: 18px; bottom: 18px; z-index: 35; display: flex; align-items: flex-end; gap: 10px; pointer-events: none; }
 .sp-wrap > * { pointer-events: auto; }
 .sp-me { width: 68px; height: 68px; cursor: pointer; filter: drop-shadow(0 8px 18px rgba(10,4,40,.35)); background: none; border: 0; padding: 0; }
 .sp-me svg { overflow: visible; display: block; }
 .sp-body { animation: sp-bob 3.4s ease-in-out infinite; transform-origin: 50% 92%; transform-box: fill-box; }
-.sp-me.hop .sp-body { animation: sp-hop .55s ease-out 1, sp-bob 3.4s ease-in-out .55s infinite; }
+.sp-me.hop .sp-body { animation: sp-hop .9s linear 1, sp-bob 3.4s ease-in-out .9s infinite; }
 .sp-eye { animation: sp-blink 4.7s infinite; transform-origin: center; transform-box: fill-box; }
 .sp-eye.r { animation-duration: 6.1s; animation-delay: 2.3s; }
 .sp-bubble { position: relative; max-width: min(280px, calc(100vw - 110px)); margin-bottom: 30px; padding: 12px 34px 12px 14px; border-radius: 18px 18px 6px 18px;
@@ -4106,9 +4115,17 @@ function Spunion({ tips, lift, autoOpen }: { tips: string[]; lift: boolean; auto
 	}, [key]);
 	if (!tips.length) return null;
 	const tip = tips[i % tips.length];
+	// Every so often he does a little double bounce, just to say hi.
+	useEffect(() => {
+		const timer = setInterval(() => {
+			setHop(true);
+			setTimeout(() => setHop(false), 950);
+		}, 8000);
+		return () => clearInterval(timer);
+	}, []);
 	const next = () => {
 		setHop(true);
-		setTimeout(() => setHop(false), 560);
+		setTimeout(() => setHop(false), 950);
 		if (open) setI(i + 1);
 		setOpen(true);
 	};
@@ -4235,15 +4252,28 @@ export default function ReportTimelapse() {
 		}
 	}, []);
 	const pairSev = onSub && withSub ? N(rows(comboPairQ)[0]?.sev) : 0;
+	// On a substance page his tip comes from its own timing (the same numbers as the page's dose curve), and only when
+	// there's something worth saying: slow to kick in, or quick to wear off.
+	const subTimingPageQ = useSQLQuery(timingSQL(onSub && !withSub ? [sub!] : []), { enabled: onSub && !withSub });
+	const subTip = (() => {
+		if (!onSub || withSub) return '';
+		const name = short(sub!);
+		if (isGroup(sub!)) return `${name} is a group of drugs, not one. Effects and timing depend on which one it really is.`;
+		const t = rows(subTimingPageQ).find((r) => S(r.route) === '*');
+		if (!t) return '';
+		if (N(t.on_m) >= 0.5) return `${name} can take about ${fmtDur(N(t.on_m))} to kick in. Waiting before taking more is never wrong.`;
+		if (N(t.end_m) > 0 && N(t.end_m) <= 3) return `${name} usually wears off within about ${fmtDur(N(t.end_m))}, which makes topping up tempting. Pace yourself.`;
+		return '';
+	})();
 	const spunionTips = [
 		onReport ? 'Scroll through the story and the timeline follows along. Or press play and I’ll walk you through it.'
 		: pairSev >= 2 ? `${short(sub!)} with ${short(withSub!)} is a risky mix. If you go ahead anyway: go low, go slow, and don’t do it alone.`
 		: onSub && withSub ? `Here’s how ${short(sub!)} and ${short(withSub!)} tend to go together, from people who tried it.`
-		: onSub ? `New to ${short(sub!)}? Give it time to kick in before taking more.`
+		: onSub ? subTip
 		: view === 'effects' ? 'Tap an effect to see what it is, and what people had taken when they felt it.'
 		: 'Hi, I’m Spunion! Tap a substance to see how it usually goes.',
 		...SPUNION_TIPS,
-	];
+	].filter(Boolean) as string[];
 	// He opens his bubble by himself only when it matters; otherwise he waits to be tapped.
 	const spunionSpeaks = pairSev >= 2 || (!greeted && !onSub && !onReport);
 	const goCombo = (a: string, b: string) => {
