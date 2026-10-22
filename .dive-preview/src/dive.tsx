@@ -1796,7 +1796,7 @@ function CombosList({ name, onCombo, bare }: { name: string; onCombo: (a: string
 		<>
 			{!bare && <span className="rd-label">Most often combined with</span>}
 			{combosQ.isLoading ? (
-				<div className="mt-3 flex items-center justify-center" style={{ height: 180 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} /></div>
+				<div className="mt-3 flex items-center justify-center" style={{ height: 180 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} style={{ opacity: 0.55 }} /></div>
 			) : rows(combosQ).length === 0 ? (
 				<p className="mt-2 text-sm" style={{ color: C.faint }}>No combinations on record.</p>
 			) : (
@@ -2735,7 +2735,7 @@ function TripSitBadge() {
 function Loading({ height = 200, className = '' }: { height?: number; className?: string }) {
 	return (
 		<div className={`rd-card flex items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
-			<img src={LOADING_PILL} alt="" width={56} height={56} />
+			<img src={LOADING_PILL} alt="" width={56} height={56} style={{ opacity: 0.55 }} />
 		</div>
 	);
 }
@@ -2863,7 +2863,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 		<div className="mt-6 grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))' }}>
 			<AnswerCard q="How long does it last?">
 				{timingQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 80 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} /></div>
+					<div className="flex items-center justify-center" style={{ height: 80 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} style={{ opacity: 0.55 }} /></div>
 				) : (
 					<>
 						<p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.5 }}>
@@ -2877,7 +2877,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="How did it go?">
 				{summaryQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 120 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} /></div>
+					<div className="flex items-center justify-center" style={{ height: 120 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} style={{ opacity: 0.55 }} /></div>
 				) : (
 					<div className="grid gap-4">
 						{groups.map((g) => {
@@ -2918,7 +2918,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="What's different together?">
 				{effectsQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 100 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} /></div>
+					<div className="flex items-center justify-center" style={{ height: 100 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} style={{ opacity: 0.55 }} /></div>
 				) : togN < 3 ? (
 					<p className="text-sm" style={{ color: C.soft }}>Too few closely read reports with both to compare.</p>
 				) : more.length + less.length === 0 ? (
@@ -2958,7 +2958,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="What did people take first?">
 				{seqQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 60 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} /></div>
+					<div className="flex items-center justify-center" style={{ height: 60 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" width={36} height={36} style={{ opacity: 0.55 }} /></div>
 				) : !seq || N(seq.n) < 3 ? (
 					<p className="text-sm" style={{ color: C.soft }}>Not enough reports say when each one was taken.</p>
 				) : (
