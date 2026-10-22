@@ -2318,7 +2318,7 @@ function SubstanceOverview({ name }: { name: string }) {
 // Street names from the DEA's slang list, NoSlang and Dope Lookup. Entries that name something around the drug
 // (a pipe, a dealer crew, a price) rather than the drug itself are left out; names for mixes are kept apart.
 const streetNamesSQL = (name: string) => `
-SELECT street_name AS term, coalesce(is_combo, false) AS combo, len(sources) AS n_src
+SELECT street_name AS term, coalesce(is_combo, false) AS combo, len(sources) AS n_src, ai_model IS NOT NULL AS ai
 FROM ${DB}."street_names"
 WHERE substance = '${esc(name)}'
   AND NOT regexp_matches(lower(coalesce(description, '')), 'pipe|crew|sham|seller|dealer|user|vial|paraphernalia|equipment|house|amount|price|person|police|addict|buy|sell|smok|inject|money')
@@ -2354,38 +2354,37 @@ SELECT
 
 function StreetNames({ name, known }: { name: string; known: string[] }) {
 	const q = useSQLQuery(streetNamesSQL(name));
-	const [open, setOpen] = useState(false);
+	const [all, setAll] = useState(false);
 	const seen = new Set(known.map((k) => k.toLowerCase()));
-	const all = rows(q).filter((r) => !seen.has(S(r.term).toLowerCase()));
-	const names = all.filter((r) => !r.combo).map((r) => S(r.term));
-	const mixes = all.filter((r) => r.combo).map((r) => S(r.term));
+	const list = rows(q).filter((r) => !seen.has(S(r.term).toLowerCase()));
+	const names = list.filter((r) => !r.combo);
+	const mixes = list.filter((r) => r.combo).map((r) => S(r.term));
 	if (!names.length && !mixes.length) return null;
+	const shown = all ? names : names.slice(0, 40);
+	const anyAi = names.some((r) => r.ai);
 	return (
-		<div className="mt-2">
-			<button className="text-sm font-semibold" style={{ color: C.soft, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.3)', textUnderlineOffset: 4 }} onClick={() => setOpen(!open)}>
-				{open ? 'Hide street names' : `+${names.length + mixes.length} street names`}
-			</button>
-			{open && (
-				<div className="rd-fade mt-3 max-w-4xl">
-					<p className="text-sm" style={{ color: C.soft, lineHeight: 1.9 }}>
-						{names.map((t, i) => (
-							<span key={t} style={{ whiteSpace: 'nowrap' }}>
-								{i > 0 && <span style={{ color: C.faint }}> · </span>}
-								{t}
-							</span>
-						))}
-					</p>
-					{mixes.length > 0 && (
-						<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.7 }}>
-							<span className="rd-label mr-2">For mixes</span>
-							{mixes.join(' · ')}
-						</p>
-					)}
-					<p className="mt-2 text-xs" style={{ color: C.faint }}>
-						From the DEA's slang list, NoSlang and Dope Lookup. Street names change fast and vary from place to place.
-					</p>
+		<div className="mt-3 max-w-5xl text-sm" style={{ color: C.soft, lineHeight: 1.85 }}>
+			<span className="rd-label mr-2">Street names</span>
+			{shown.map((r, i) => (
+				<span key={S(r.term)} style={{ whiteSpace: 'nowrap' }} title={r.ai ? 'Matched to this substance by AI' : undefined}>
+					{i > 0 && <span style={{ color: C.faint }}> · </span>}
+					<span style={r.ai ? { color: C.faint, fontStyle: 'italic' } : undefined}>{S(r.term)}</span>
+				</span>
+			))}
+			{names.length > 40 && (
+				<button className="ml-2 font-semibold" style={{ color: C.text, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.3)', textUnderlineOffset: 4 }} onClick={() => setAll(!all)}>
+					{all ? 'fewer' : `+${names.length - 40} more`}
+				</button>
+			)}
+			{mixes.length > 0 && (
+				<div className="mt-1">
+					<span className="rd-label mr-2">For mixes</span>
+					{mixes.join(' · ')}
 				</div>
 			)}
+			<div className="mt-1 text-xs" style={{ color: C.faint }}>
+				From Dope Lookup, NoSlang and the DEA’s slang list{anyAi ? '; names in italics were matched to this substance by AI' : ''}. Street names change fast and vary from place to place.
+			</div>
 		</div>
 	);
 }
