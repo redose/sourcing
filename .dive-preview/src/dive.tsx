@@ -1505,7 +1505,7 @@ const OpenCtx = createContext<{ open: (o: Open) => void; effectInfo: Map<string,
 function EffectTag({ name }: { name: string }) {
 	const { open, effectInfo } = useContext(OpenCtx);
 	return (
-		<button className="rd-tag" onClick={() => open({ kind: 'effect', name })}>
+		<button className="rd-tag" onClick={() => open({ kind: 'effect', name })} title={`${name}: tap for what it is (from the Subjective Effect Index)`}>
 			<span className="rd-dot" style={{ background: TONE_DOT[effectTone(effectInfo.get(name.toLowerCase()))] }} />
 			{name}
 		</button>
@@ -1561,7 +1561,22 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 					<div className="rd-in mt-5 grid gap-6">
 						{S(r.category) && <div className="text-sm" style={{ color: C.faint }}>{S(r.category)}</div>}
 						{S(r.description) && (
-							<p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.55 }}>{sentences(S(r.description).replace(/,(\S)/g, ', $1'), 1)}</p>
+							<div>
+								<p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.55 }}>{sentences(S(r.description).replace(/,(\S)/g, ', $1'), 1)}</p>
+								<a
+									href={S(r.url) || SOURCES.sei.href}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="mt-2 inline-flex items-center gap-2 text-xs"
+									style={{ color: C.soft, textDecoration: 'none' }}
+								>
+									<img src={/psychonautwiki/i.test(S(r.url)) ? PW_ICON : SEI_ICON} alt="" width={14} height={14} style={{ borderRadius: 3 }} />
+									<span style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>
+										Description from {/psychonautwiki/i.test(S(r.url)) ? 'PsychonautWiki' : 'the Subjective Effect Index'}
+									</span>
+									↗
+								</a>
+							</div>
 						)}
 						<div className="grid grid-cols-3 gap-3">
 							{[
@@ -1708,7 +1723,13 @@ function EffectsBrowse({ q }: { q: Q }) {
 			<p className="mt-2" style={{ color: C.soft }}>
 				Everything people described, grouped by type. Tap one to learn what it is.
 			</p>
-			<Sources className="mt-3" list={['sei', 'erowid']} />
+			<a href={SOURCES.sei.href} target="_blank" rel="noopener noreferrer" className="rd-card rd-hover mt-5 flex items-center gap-4 p-4" style={{ textDecoration: 'none', maxWidth: 760 }}>
+				<img src={SEI_ICON} alt="" width={36} height={36} style={{ borderRadius: 8, flexShrink: 0 }} />
+				<span className="text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
+					Effect names, categories and descriptions come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b>, a community project carefully documenting what each effect feels like. Which effects show up in which stories comes from our close readings.
+				</span>
+				<span className="ml-auto text-sm font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>Visit ↗</span>
+			</a>
 			<input ref={searchRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search effects" className="rd-card mt-6 w-full px-5 py-3 text-base" style={{ borderRadius: 999, color: C.text, outline: 'none' }} />
 			{q.isLoading ? (
 				<Loading height={240} className="mt-6" />
@@ -1727,6 +1748,15 @@ function EffectsBrowse({ q }: { q: Q }) {
 						</div>
 					))}
 				</div>
+			)}
+			{!q.isLoading && (
+				<p className="mt-10 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+					<img src={SEI_ICON} alt="" width={14} height={14} style={{ borderRadius: 3 }} />
+					Effect names, categories and descriptions:{' '}
+					<a href={SOURCES.sei.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+						Subjective Effect Index
+					</a>
+				</p>
 			)}
 			<Err q={q} />
 		</section>
