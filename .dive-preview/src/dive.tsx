@@ -2742,10 +2742,19 @@ function TripSitBadge() {
 }
 
 // Loading: the little pill with electrons going round, in place of a grey placeholder of the same height.
-// Loading: the faint pill, once per page for the main content. Secondary sections pass quiet and just hold
-// their space until they arrive.
+// Loading: the faint pill, and only ever one on screen. The first loader to appear owns it; any other loader at the
+// same time (or one marked quiet) just holds its space until its content arrives.
+let pillOwner: object | null = null;
 function Loading({ height = 200, className = '', quiet }: { height?: number; className?: string; quiet?: boolean }) {
-	if (quiet) return <div className={className} style={{ height }} aria-busy="true" />;
+	const me = useRef<object>({});
+	if (!quiet && pillOwner == null) pillOwner = me.current;
+	useEffect(
+		() => () => {
+			if (pillOwner === me.current) pillOwner = null;
+		},
+		[],
+	);
+	if (pillOwner !== me.current) return <div className={className} style={{ height }} aria-busy="true" />;
 	return (
 		<div className={`flex items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
 			<img src={LOADING_PILL} alt="" className="rd-watermark" width={Math.min(72, Math.round(height * 0.5))} height={Math.min(72, Math.round(height * 0.5))} />
