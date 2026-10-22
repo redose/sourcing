@@ -2692,6 +2692,203 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport }: { subs: Record<
 	);
 }
 
+// Live counts for the "How it works" page.
+const aboutSQL = `
+SELECT
+  (SELECT count(*) FROM ${DB}."experience_reports") AS reports,
+  (SELECT count(*) FROM ${DB}."llm_extractions") AS read_closely,
+  (SELECT count(*) FROM ${DB}."llm_observations") AS moments,
+  (SELECT count(DISTINCT canonical_substance) FROM ${DB}."report_doses") AS substances,
+  (SELECT count(DISTINCT effect_name) FROM ${DB}."llm_observation_effects") AS effects,
+  (SELECT count(*) FROM ${DB}."tripsit_combos") AS pairs,
+  (SELECT count(*) FROM ${DB}."street_names") AS street_names,
+  (SELECT min(TRY_CAST(experience_year AS INTEGER)) FROM ${DB}."experience_reports" WHERE TRY_CAST(experience_year AS INTEGER) > 1950) AS first_year,
+  (SELECT max(TRY_CAST(experience_year AS INTEGER)) FROM ${DB}."experience_reports" WHERE TRY_CAST(experience_year AS INTEGER) < 2100) AS last_year`;
+
+// "How it works": where everything on the site comes from, how the numbers are worked out, and where they fall short.
+function AboutPage() {
+	const q = useSQLQuery(aboutSQL);
+	const r = rows(q)[0];
+	const n = (v: unknown) => (r ? N(v).toLocaleString() : '…');
+	const pct = r ? Math.round((100 * N(r.read_closely)) / Math.max(1, N(r.reports))) : 0;
+	const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+		<section className="mt-10">
+			<h2 className="text-xl font-semibold">{title}</h2>
+			<div className="mt-2 grid gap-3" style={{ color: C.soft, lineHeight: 1.7, fontSize: 16.5 }}>
+				{children}
+			</div>
+		</section>
+	);
+	return (
+		<section className="rd-in max-w-3xl">
+			<h1 className="text-4xl font-semibold">How this works</h1>
+			<p className="mt-3" style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.5 }}>
+				re:dose turns thousands of first-hand drug experience reports into something you can explore: how a substance usually plays out, what people felt, how mixes went, and the stories themselves. Here’s where it all comes from and how the conclusions are reached.
+			</p>
+			<div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+				{[
+					[n(r?.reports), 'stories'],
+					[n(r?.read_closely), `read closely (${pct}%)`],
+					[n(r?.moments), 'timed moments'],
+					[n(r?.substances), 'substances'],
+					[n(r?.effects), 'kinds of effect'],
+					[n(r?.street_names), 'street names'],
+				].map(([v, l]) => (
+					<div key={l}>
+						<div className="text-3xl font-light tabular-nums" style={{ letterSpacing: '-0.02em' }}>{v}</div>
+						<div className="rd-label mt-1">{l}</div>
+					</div>
+				))}
+			</div>
+
+			<Section title="Where the stories come from">
+				<p>
+					Every story is an experience report published on <b style={{ color: '#fff' }}>Erowid</b>, written by the person who lived it{r ? `, covering experiences from ${N(r.first_year)} to ${N(r.last_year)}` : ''}. We show them as written, link back to the original, and never change their words. Authors are anonymous; we only show what Erowid lists, like the year and the author’s age and gender.
+				</p>
+			</Section>
+
+			<Section title="Reading a story closely">
+				<p>
+					About {pct}% of the stories have been read closely by an AI model (Claude). For each one it notes every dose (what, how much, how it was taken, and when), then the moments the writer describes, each with a time, a short quote, the effects in it, and whether it felt good, rough or mixed. It also notes how the trip went overall and whether the writer would do it again.
+				</p>
+				<p>
+					Those readings power the timelines, moods and most of the numbers. They can be wrong, especially when a story is vague about time. Wherever a story is shown, its own words are right there to check against, and the quotes are taken straight from the text.
+				</p>
+			</Section>
+
+			<Section title="How the timing is worked out">
+				<p>
+					“Kicks in”, “strongest” and “mostly gone” are typical values across closely read stories: for each one we take when effects were first noticed, when they were described as strongest, and the last moment effects were mentioned, measured from the dose, then take the middle of the range. We only show a timing when at least six stories give one, and use route-specific timing (swallowed, smoked, snorted…) when there are enough of those.
+				</p>
+				<p>
+					On a story page, the drug lanes show these typical curves placed at the writer’s own dose times, so you can see what would usually be happening at each point, next to what they actually describe.
+				</p>
+			</Section>
+
+			<Section title="How “how it went” is worked out">
+				<p>
+					Good and rough come from the close readings: the share of stories whose writer described the experience overall as positive or negative, and the share who said they’d do it again. For mixes, the same is done for stories with both substances, next to each substance on its own. These describe the people who wrote reports, not everyone who has taken something.
+				</p>
+			</Section>
+
+			<Section title="How mixing warnings are decided">
+				<p>
+					Warnings come first from <b style={{ color: '#fff' }}>TripSit</b>’s drug combinations chart ({n(r?.pairs)} pairs of drug groups), which rates pairs as dangerous, unsafe, caution or low risk, often with a note on why. When TripSit doesn’t cover a pair, we fall back to the interaction lists on <b style={{ color: '#fff' }}>PsychonautWiki</b>. If a pair only matches through a broad class word like “stimulants” or “depressants”, it is capped at caution, since that’s too blunt to call something dangerous.
+				</p>
+				<p>“No note on file” is never the same as safe.</p>
+			</Section>
+
+			<Section title="Effects, substance details and shared tolerance">
+				<p>
+					Effect names and their descriptions come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b>; which effects appear in which stories comes from the close readings. Substance details (what kind of drug it is, tolerance, how habit-forming it is, safety notes) come from <b style={{ color: '#fff' }}>PsychonautWiki</b>. “Shares tolerance with” groups PsychonautWiki’s cross-tolerance notes into families like psychedelics, stimulants or opioids, and links substances in the same family.
+				</p>
+			</Section>
+
+			<Section title="Street names">
+				<p>
+					Street names come from public slang lists: <b style={{ color: '#fff' }}>Dope Lookup</b>, <b style={{ color: '#fff' }}>NoSlang</b> and the <b style={{ color: '#fff' }}>DEA</b>. Entries that describe paraphernalia or dealing rather than the drug are left out. Some names were matched to a substance by AI; those are shown in italics. Slang changes fast and varies by place.
+				</p>
+			</Section>
+
+			<Section title="What to keep in mind">
+				<ul className="grid gap-2" style={{ listStyle: 'disc', paddingLeft: 20 }}>
+					<li>These are self-reports. Doses, timing and even what was actually taken can be wrong, and untested drugs often aren’t what they’re sold as.</li>
+					<li>People who write reports aren’t everyone. Unusual, intense and rough experiences are more likely to be written up.</li>
+					<li>Some reports are filed under a group (like “opioids”) rather than a specific drug, so their numbers mix different drugs.</li>
+					<li>Typical timings are a middle point, not a promise. Body, dose, setting and what else is in your system all change things.</li>
+					<li>Nothing here is medical advice. If something feels wrong, get help.</li>
+				</ul>
+			</Section>
+
+			<Section title="Who’s behind it">
+				<p>
+					re:dose is a harm-reduction community. If you want to talk something through with people who get it, or help make this better, come say hi on{' '}
+					<a href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+						Discord
+					</a>
+					. The data runs on <b style={{ color: '#fff' }}>MotherDuck</b>.
+				</p>
+			</Section>
+		</section>
+	);
+}
+
+// A shuffled set of closely read stories, each with a line in the writer's own words (a quoted moment from the close
+// reading), optionally only the ones that went well, were mixed, or were rough.
+const storiesSQL = (seed: number, mood: string) => `
+WITH quote AS (
+  SELECT report_id, arg_max(description, length(description)) AS q
+  FROM ${DB}."llm_observations"
+  WHERE description LIKE '"%' AND length(description) BETWEEN 50 AND 220
+  GROUP BY 1
+)
+SELECT r.id, array_to_string(list_distinct(r.substances), ' · ') AS subs, r.experience_year AS yr, x.overall_sentiment AS overall,
+  trim(both '"' FROM quote.q) AS quote,
+  (SELECT canonical_substance FROM ${DB}."report_doses" d WHERE d.report_id = r.id AND canonical_substance IS NOT NULL LIMIT 1) AS first_sub
+FROM ${DB}."llm_extractions" x
+JOIN ${DB}."experience_reports" r ON r.id = x.report_id
+JOIN quote ON quote.report_id = r.id
+${mood ? `WHERE x.overall_sentiment = '${esc(mood)}'` : ''}
+ORDER BY hash(r.id || '${seed}')
+LIMIT 24`;
+
+function StoriesBrowse({ onOpen }: { onOpen: (id: string, sub: string) => void }) {
+	const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e6));
+	const [mood, setMood] = useState('');
+	const q = useSQLQuery(storiesSQL(seed, mood));
+	const list = rows(q);
+	const moods: [string, string][] = [
+		['', 'All'],
+		['positive', 'Went well'],
+		['mixed', 'Mixed'],
+		['negative', 'Rough'],
+	];
+	return (
+		<section className="rd-in">
+			<h1 className="text-4xl font-semibold">Stories</h1>
+			<p className="mt-2" style={{ color: C.soft }}>
+				Real experiences, in the words of the people who had them. Pick one to replay it.
+			</p>
+			<div className="mt-5 flex flex-wrap items-center gap-2">
+				{moods.map(([k, label]) => (
+					<button key={k} className="rd-nav" aria-current={mood === k ? 'page' : undefined} onClick={() => setMood(k)} style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }}>
+						{label}
+					</button>
+				))}
+				<button className="rd-btn ml-auto flex items-center gap-2" onClick={() => setSeed(Math.floor(Math.random() * 1e6))}>
+					<Shuffle size={15} /> Shuffle
+				</button>
+			</div>
+			{q.isLoading ? (
+				<Loading height={320} className="mt-6" />
+			) : (
+				<div className="mt-6 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+					{list.map((r) => {
+						const m = MOMENT[S(r.overall)];
+						return (
+							<button key={S(r.id)} onClick={() => onOpen(S(r.id), S(r.first_sub))} className="rd-card rd-hover grid content-start gap-3 p-5 text-left">
+								<p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 18, lineHeight: 1.45, color: C.text }}>“{S(r.quote)}”</p>
+								<div className="text-sm font-semibold" style={{ color: C.soft }}>{S(r.subs)}</div>
+								<div className="flex items-center gap-3 text-xs" style={{ color: C.faint }}>
+									{r.yr != null && <span>{N(r.yr)}</span>}
+									{m && (
+										<span className="inline-flex items-center gap-1.5" style={{ color: m.color }}>
+											<span className="rd-dot" style={{ background: m.color }} />
+											{({ positive: 'went well', negative: 'was rough', mixed: 'was mixed', neutral: 'neutral' } as Record<string, string>)[S(r.overall)]}
+										</span>
+									)}
+									<span className="ml-auto">#{S(r.id).replace('erowid-', '')}</span>
+								</div>
+							</button>
+						);
+					})}
+				</div>
+			)}
+			<Err q={q} />
+		</section>
+	);
+}
+
 // ── Small pieces ──────────────────────────────────────────────────
 
 const TRIPSIT_COMBOS = 'https://wiki.tripsit.me/wiki/Drug_combinations';
@@ -4335,7 +4532,7 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 type Q = ReturnType<typeof useSQLQuery>;
 
 export default function ReportTimelapse() {
-	const [view, setView] = useDiveState<'reports' | 'substances' | 'effects'>('view', 'reports');
+	const [view, setView] = useDiveState<'reports' | 'substances' | 'effects' | 'about'>('view', 'substances');
 	const [sub, setSub] = useDiveState<string | null>('substance', null);
 	const [reportId, setReportId] = useDiveState<string | null>('report', null);
 	const [withSub, setWithSub] = useDiveState<string | null>('with', null);
@@ -4438,6 +4635,23 @@ export default function ReportTimelapse() {
 	].filter(Boolean) as string[];
 	// He opens his bubble by himself only when it matters; otherwise he waits to be tapped.
 	const spunionSpeaks = pairSev >= 2 || (!greeted && !onSub && !onReport);
+	const goReport = (id: string, s: string) => {
+		setView('reports');
+		if (s) setSub(s);
+		setWithSub(undefined as unknown as null);
+		setAtLink(undefined as unknown as null);
+		setOpenItem(null);
+		setReportId(id);
+	};
+	const goView = (v: 'reports' | 'substances' | 'effects' | 'about') => {
+		setView(v);
+		setSub(undefined as unknown as null);
+		setWithSub(undefined as unknown as null);
+		clearReport();
+		setOpenItem(null);
+	};
+	// Which nav item is "here": a substance or pair page counts as Substances, a story as Stories.
+	const navHere = view === 'reports' ? (reportId || !sub ? 'reports' : 'substances') : view;
 	const goCombo = (a: string, b: string) => {
 		setView('reports');
 		setSub(a);
@@ -4456,7 +4670,7 @@ export default function ReportTimelapse() {
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
 						<button
 							onClick={() => {
-								setView('reports');
+								setView('substances');
 								setSub(undefined as unknown as null);
 								setWithSub(undefined as unknown as null);
 								clearReport();
@@ -4470,19 +4684,19 @@ export default function ReportTimelapse() {
 							subs={rows(pickQ)}
 							onSubstance={goSubstance}
 							onEffect={(e) => setOpenItem({ kind: 'effect', name: e })}
-							onReport={(id, s) => {
-								setView('reports');
-								if (s) setSub(s);
-								setWithSub(undefined as unknown as null);
-								setAtLink(undefined as unknown as null);
-								setOpenItem(null);
-								setReportId(id);
-							}}
+							onReport={goReport}
 						/>
 						<nav className="flex items-center gap-1">
-							{(['reports', 'substances', 'effects'] as const).map((v) => (
-								<button key={v} className="rd-nav" aria-current={view === v ? 'page' : undefined} onClick={() => setView(v)}>
-									{v[0].toUpperCase() + v.slice(1)}
+							{(
+								[
+									['substances', 'Substances'],
+									['reports', 'Stories'],
+									['effects', 'Effects'],
+									['about', 'How it works'],
+								] as const
+							).map(([v, label]) => (
+								<button key={v} className="rd-nav" aria-current={navHere === v ? 'page' : undefined} onClick={() => goView(v)} style={{ whiteSpace: 'nowrap' }}>
+									{label}
 								</button>
 							))}
 							<a className="rd-nav inline-flex items-center gap-2" href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" title="Join the re:dose community on Discord" style={{ textDecoration: 'none' }}>
@@ -4495,7 +4709,7 @@ export default function ReportTimelapse() {
 
 					{view === 'reports' && (sub || reportId) && (
 						<nav className="mb-6 flex items-center gap-2 text-sm" style={{ color: C.faint, position: 'relative', zIndex: 2 }}>
-							<button onClick={() => (setSub(undefined as unknown as null), setWithSub(undefined as unknown as null), clearReport())} style={{ color: C.soft }}>
+							<button onClick={() => goView('substances')} style={{ color: C.soft }}>
 								All substances
 							</button>
 							{sub && (
@@ -4513,7 +4727,8 @@ export default function ReportTimelapse() {
 						</nav>
 					)}
 
-					{view === 'reports' && !sub && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
+					{view === 'reports' && !sub && !reportId && <StoriesBrowse onOpen={goReport} />}
+					{view === 'about' && <AboutPage />}
 					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} onCombo={goCombo} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
 					{onReport && <TimelapseStep id={reportId!} reportQ={reportQ} marksQ={marksQ} dosesQ={dosesQ} obsQ={obsQ} timingQ={timingQ} pairsQ={pairsQ} frozen={!!openItem} />}
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
@@ -4532,6 +4747,9 @@ export default function ReportTimelapse() {
 							</div>
 						)}
 						<div className="flex flex-wrap items-center gap-4">
+							<button className="text-xs" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={() => goView('about')}>
+								How this works
+							</button>
 							<span className="text-xs" style={{ color: C.faint }}>Not medical advice.</span>
 							<a className="rd-btn inline-flex items-center gap-2" href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: 13, padding: '6px 12px' }}>
 								<DiscordIcon size={15} />
