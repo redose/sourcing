@@ -4044,7 +4044,7 @@ export default function ReportTimelapse() {
 		<OpenCtx.Provider value={{ open: setOpenItem, effectInfo, classOf: (n: string) => classMap.get(n) }}>
 			<main className="rd" style={{ minHeight: '100vh', background: BG, color: C.text }}>
 				<style>{CSS}</style>
-				<div className="px-4 py-6 sm:px-8 sm:py-8" style={{ maxWidth: onReport ? 1320 : 1120, margin: '0 auto', transition: 'max-width .3s', position: 'relative', isolation: 'isolate' }}>
+				<div className="px-4 py-6 sm:px-8 sm:py-8" style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate' }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '90px 140px' }} />
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
