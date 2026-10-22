@@ -2989,6 +2989,26 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [obsQ.data]);
 	const [allTags, setAllTags] = useState(false);
+	// No titles in the data, so the header borrows one line in the author's own words: a verbatim quote from the
+	// close reading (never a paraphrase), preferring moments that match how it went overall and say the most.
+	const headline = useMemo(() => {
+		const want = S(rows(reportQ)[0]?.overall);
+		const fold = (x: string) => x.toLowerCase().replace(/[‘’`]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ');
+		const story = fold(body);
+		let best = { text: '', score: -Infinity };
+		for (const o of obs) {
+			for (const frag of S(o.description).split(/\s*(?:\.\.\.|…)\s*/)) {
+				for (const sent of frag.replace(/^["“\s]+|["”\s]+$/g, '').match(/[^.!?]+[.!?]*/g) ?? []) {
+					const t = sent.trim();
+					if (t.length < 35 || t.length > 130 || !story.includes(fold(t).replace(/[.!?]+$/, ''))) continue;
+					const score = (S(o.sentiment) === want ? 2 : 0) + L(o.effects).length * 0.3 - Math.abs(t.length - 80) / 40;
+					if (score > best.score) best = { text: t, score };
+				}
+			}
+		}
+		return best.text;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [obsQ.data, reportQ.data]);
 	// Effects that show up for the first time at each moment: where each one "became a thing".
 	const newEffects = useMemo(() => {
 		const seen = new Set<string>();
@@ -3407,6 +3427,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 					const overallWord = { positive: 'went well', negative: 'was rough', mixed: 'was mixed', neutral: 'was neutral' }[S(report.overall)];
 					return (
 						<>
+							<div className="rd-label mb-3">Experience report</div>
 							<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
 								<h1 className="flex flex-wrap items-center gap-x-4 gap-y-1 text-3xl font-semibold" style={{ letterSpacing: '-0.02em' }}>
 									{(allNames ? names : names.slice(0, 4)).map((n) => (
@@ -3450,6 +3471,11 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 									</button>
 								</div>
 							</div>
+							{headline && (
+								<p className="mt-4" style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 22, lineHeight: 1.4, color: C.soft, maxWidth: 820 }}>
+									“{headline}”
+								</p>
+							)}
 							<p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" style={{ color: C.faint }}>
 									{report.yr != null && (
 										<span className="inline-flex items-center gap-1.5" title="Year of the experience">
@@ -3476,7 +3502,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 									)}
 								</p>
 								{allEffects.length > 0 && (
-									<div className="mt-5 flex flex-wrap items-center gap-2">
+									<div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-5" style={{ borderColor: C.line }}>
 										<span className="rd-label mr-1">What happened</span>
 										{(allTags ? allEffects : allEffects.slice(0, 6)).map(([e, v]) => (
 											<span key={e} style={{ opacity: v.first <= t + 1e-9 ? 1 : 0.4, transition: 'opacity .6s' }} title={`First at ${fmtT(v.first)} · mentioned ${v.n}×`}>
