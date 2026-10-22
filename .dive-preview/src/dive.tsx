@@ -2720,9 +2720,38 @@ SELECT
   (SELECT min(TRY_CAST(experience_year AS INTEGER)) FROM ${DB}."experience_reports" WHERE TRY_CAST(experience_year AS INTEGER) > 1950) AS first_year,
   (SELECT max(TRY_CAST(experience_year AS INTEGER)) FROM ${DB}."experience_reports" WHERE TRY_CAST(experience_year AS INTEGER) < 2100) AS last_year`;
 
+// One real close reading, shown as stored, on the About page.
+const sampleReadingSQL = `SELECT report_id, extraction FROM ${DB}."llm_extractions" WHERE report_id = 'erowid-101907'`;
+// Downloadable, re:dose's own derived numbers (no story text): one row per substance, and effects by substance.
+const downloadSubstancesSQL = `
+SELECT d.canonical_substance AS substance, count(DISTINCT d.report_id) AS reports, count(DISTINCT x.report_id) AS read_closely,
+  round(avg((x.overall_sentiment = 'positive')::INT), 3) AS share_went_well, round(avg((x.overall_sentiment = 'negative')::INT), 3) AS share_rough,
+  round(avg(x.would_repeat::INT), 3) AS share_would_repeat
+FROM ${DB}."report_doses" d LEFT JOIN ${DB}."llm_extractions" x USING (report_id)
+WHERE d.canonical_substance IS NOT NULL
+GROUP BY 1 HAVING count(DISTINCT d.report_id) >= 10
+ORDER BY reports DESC`;
+const downloadEffectsSQL = `
+SELECT d.canonical_substance AS substance, e.effect_name AS effect, count(DISTINCT e.report_id) AS reports_mentioning
+FROM ${DB}."llm_observation_effects" e JOIN ${DB}."report_doses" d USING (report_id)
+WHERE e.confidence <> 'low' AND d.canonical_substance IS NOT NULL
+GROUP BY 1, 2 HAVING count(DISTINCT e.report_id) >= 3
+ORDER BY substance, reports_mentioning DESC`;
+
 // "How it works": where everything on the site comes from, how the numbers are worked out, and where they fall short.
 function AboutPage() {
 	const q = useSQLQuery(aboutSQL);
+	const sampleQ = useSQLQuery(sampleReadingSQL);
+	const subsDl = useSQLQuery(downloadSubstancesSQL, { enabled: false });
+	const effectsDl = useSQLQuery(downloadEffectsSQL, { enabled: false });
+	const sample = (() => {
+		try {
+			const x = JSON.parse(S(rows(sampleQ)[0]?.extraction) || '{}');
+			return JSON.stringify({ doses: (x.doses ?? []).slice(0, 2), observations: (x.observations ?? []).slice(1, 3), overall: x.overall }, null, 2);
+		} catch {
+			return '';
+		}
+	})();
 	const r = rows(q)[0];
 	const n = (v: unknown) => (r ? N(v).toLocaleString() : '…');
 	const pct = r ? Math.round((100 * N(r.read_closely)) / Math.max(1, N(r.reports))) : 0;
@@ -2738,9 +2767,15 @@ function AboutPage() {
 	return (
 		<section className="rd-in max-w-3xl">
 			<h1 style={{ fontFamily: SANS, fontSize: 44, fontWeight: 650, letterSpacing: '-0.025em', lineHeight: 1.1 }}>How this works</h1>
-			<p className="mt-4" style={{ fontFamily: SERIF, fontSize: 23, lineHeight: 1.55, color: 'rgba(255,255,255,.92)', maxWidth: 680 }}>
-				re:dose turns thousands of first-hand drug experience reports into something you can explore: how a substance usually plays out, what people felt, how mixes went, and the stories themselves. Here’s where it all comes from and how the conclusions are reached.
-			</p>
+			<div className="mt-6 flex items-end gap-4">
+				<span className="sp-me" aria-hidden style={{ width: 84, height: 84, flexShrink: 0, cursor: 'default' }}>
+					<style>{SPUNION_CSS}</style>
+					<SpunionSvg />
+				</span>
+				<div className="sp-bubble" style={{ maxWidth: 600, marginBottom: 18, padding: '14px 18px', fontFamily: SERIF, fontSize: 18.5, lineHeight: 1.5 }}>
+					Hi, I’m Spunion! re:dose takes thousands of first-hand stories and turns them into something you can explore: how a substance usually plays out, what people felt, how mixes went, and the stories themselves. Here’s exactly how that works, and where it falls short.
+				</div>
+			</div>
 			<div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
 				{[
 					[n(r?.reports), 'stories'],
@@ -2756,6 +2791,32 @@ function AboutPage() {
 					</div>
 				))}
 			</div>
+
+			<section className="mt-12">
+				<h2 style={{ fontFamily: SANS, fontSize: 22, fontWeight: 650, letterSpacing: '-0.015em' }}>How it fits together</h2>
+				<div className="mt-4 grid items-stretch gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
+					{(
+						[
+							['Stories', `${n(r?.reports)} first-hand reports from Erowid, in the writers’ own words.`],
+							['Close reading', 'Each story read for doses, timed moments, effects and mood. Quotes stay word for word.'],
+							['Joined with', 'Effect descriptions (Subjective Effect Index), substance details (PsychonautWiki), mixing chart (TripSit), street-name lists.'],
+							['What you see', 'Typical timelines, “how it went”, mixing warnings, and every story to replay.'],
+						] as const
+					).map(([title, text], i, all) => (
+						<Fragment key={title}>
+							<div className="rd-card p-4">
+								<div className="rd-label" style={{ color: C.mint }}>{`${i + 1}. ${title}`}</div>
+								<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>{text}</p>
+							</div>
+							{i < all.length - 1 && (
+								<div className="flex items-center justify-center" aria-hidden style={{ color: C.faint }}>
+									<ChevronRight size={20} className="rd-hide-sm" />
+								</div>
+							)}
+						</Fragment>
+					))}
+				</div>
+			</section>
 
 			<Section title="Where the stories come from">
 				<p>
@@ -2803,6 +2864,34 @@ function AboutPage() {
 			<Section title="Street names">
 				<p>
 					Street names come from public slang lists: <b style={{ color: '#fff' }}>Dope Lookup</b>, <b style={{ color: '#fff' }}>NoSlang</b> and the <b style={{ color: '#fff' }}>DEA</b>. Entries that describe paraphernalia or dealing rather than the drug are left out. Some names were matched to a substance by AI; those are shown in italics. Slang changes fast and varies by place.
+				</p>
+			</Section>
+
+			<Section title="A peek at the raw data">
+				<p>
+					This is what a close reading looks like as it’s stored: the first two doses and two of the timed moments from{' '}
+					<a href="https://erowid.org/experiences/exp.php?ID=101907" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+						this story on Erowid
+					</a>
+					. Every number on the site is built up from thousands of these.
+				</p>
+				{sample ? (
+					<pre className="rd-card overflow-x-auto p-4" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12.5, lineHeight: 1.55, color: C.soft, whiteSpace: 'pre', maxHeight: 420 }}>
+						{sample}
+					</pre>
+				) : (
+					<Loading height={160} quiet />
+				)}
+				<div className="flex flex-wrap items-center gap-3" style={{ fontFamily: SANS }}>
+					<button className="rd-btn text-sm" onClick={() => subsDl.exportAs({ format: 'csv', filename: 'redose-substances' })}>
+						Download: substance summary (CSV)
+					</button>
+					<button className="rd-btn text-sm" onClick={() => effectsDl.exportAs({ format: 'csv', filename: 'redose-effects-by-substance' })}>
+						Download: effects by substance (CSV)
+					</button>
+				</div>
+				<p className="text-sm" style={{ color: C.faint, fontFamily: SANS }}>
+					These are re:dose’s own derived numbers. The stories themselves belong to their writers and Erowid, so read them there.
 				</p>
 			</Section>
 
