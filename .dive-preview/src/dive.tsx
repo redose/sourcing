@@ -1979,23 +1979,15 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 									transition: 'opacity .3s ease, transform .3s ease, border-color .3s ease, background .3s ease',
 								}}
 							>
-								<div className="flex items-center gap-3">
+								{/* The name gets its own line so it never gets squeezed; everything else sits small underneath. */}
+								<div className="flex items-center gap-2.5">
 									<ClassIcon cls={classOf(name)} size={20} color={isFocus ? C.text : C.lav} />
-									<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+									<span className="font-semibold" style={{ whiteSpace: 'nowrap' }} title={name}>
 										{short(name)}
-									</span>
-									{isGroup(name) && <GroupBadge />}
-									{r.hit.via && (
-										<span className="text-xs italic" style={{ color: C.mint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }} title={`Also called “${r.hit.via}”`}>
-											“{r.hit.via}”
-										</span>
-									)}
-									<span className="ml-auto text-xs tabular-nums" style={{ color: C.faint, whiteSpace: 'nowrap' }}>
-										{focus && !isFocus && together != null ? `${together} together` : `${N(r.n)} reports`}
 									</span>
 									{!focus && (
 										<button
-											className="rd-btn"
+											className="rd-btn ml-auto"
 											title={`What ${short(name)} was mixed with`}
 											aria-label={`What ${short(name)} was mixed with`}
 											onClick={(e) => {
@@ -2006,6 +1998,17 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 										>
 											<Link2 size={13} />
 										</button>
+									)}
+								</div>
+								<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style={{ paddingLeft: 30, color: C.faint }}>
+									<span className="tabular-nums" style={{ whiteSpace: 'nowrap' }}>
+										{focus && !isFocus && together != null ? `${together} together` : `${N(r.n)} reports`}
+									</span>
+									{isGroup(name) && <GroupBadge />}
+									{r.hit.via && (
+										<span className="italic" style={{ color: C.mint, whiteSpace: 'nowrap' }} title={`Also called “${r.hit.via}”`}>
+											“{r.hit.via}”
+										</span>
 									)}
 								</div>
 							</div>
