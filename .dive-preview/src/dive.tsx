@@ -720,9 +720,9 @@ const CSS = `
 @keyframes rd-fade { from { opacity: 0; } to { opacity: 1; } }
 .rd-fade { animation: rd-fade .4s ease-out both; }
 @keyframes rd-drift { from { transform: translate(0, 0); } to { transform: translate(260px, 130px); } }
-.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 260px; opacity: .03; animation: rd-drift 240s linear infinite;
-  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, transparent 35%, #000 100%); mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, transparent 35%, #000 100%); }
-.rd-molecules.b { background-size: 430px; opacity: .018; animation-duration: 340s; animation-direction: reverse; }
+.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 260px; opacity: .045; animation: rd-drift 240s linear infinite;
+  -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); }
+.rd-molecules.b { background-size: 430px; opacity: .028; animation-duration: 340s; animation-direction: reverse; }
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
