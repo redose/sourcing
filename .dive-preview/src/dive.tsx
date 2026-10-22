@@ -1894,7 +1894,9 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 						Showing what people combined with <b style={{ color: C.text }}>{short(focus)}</b>. Pick one to see that mix, or tap anywhere to go back.
 					</>
 				) : (
-					'Tap one to see what it was combined with.'
+					<>
+						Tap one to see how it usually goes. <Link2 size={13} style={{ display: 'inline', verticalAlign: -2 }} /> shows what it was mixed with.
+					</>
 				)}
 			</p>
 			<Sources className="mt-3" list={['erowid', 'pw', 'tripsit']} />
@@ -1924,9 +1926,9 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 								tabIndex={0}
 								onClick={(e) => {
 									e.stopPropagation();
-									if (!focus || isFocus) setFocus(isFocus ? null : name);
-									else if (together != null) onCombo(focus, name);
-									else setFocus(name);
+									if (focus && isFocus) setFocus(null);
+									else if (focus && together != null) onCombo(focus, name);
+									else onPick(name);
 								}}
 								onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLElement).click()}
 								className="rd-card rd-hover px-4 py-3"
@@ -1949,6 +1951,20 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 									<span className="ml-auto text-xs tabular-nums" style={{ color: C.faint, whiteSpace: 'nowrap' }}>
 										{focus && !isFocus && together != null ? `${together} together` : `${N(r.n)} reports`}
 									</span>
+									{!focus && (
+										<button
+											className="rd-btn"
+											title={`What ${short(name)} was mixed with`}
+											aria-label={`What ${short(name)} was mixed with`}
+											onClick={(e) => {
+												e.stopPropagation();
+												setFocus(name);
+											}}
+											style={{ padding: 5, background: 'transparent', flexShrink: 0 }}
+										>
+											<Link2 size={13} />
+										</button>
+									)}
 								</div>
 							</div>
 						);
@@ -2182,6 +2198,20 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 // The top of a substance's own page: what it is (and what people call it), how a dose usually plays out, what to
 // watch for, what people feel. Tolerance and what it's mixed with sit in their own cards below.
 function SubstanceOverview({ name }: { name: string }) {
+	// The overview is a small slideshow: it moves on by itself every few seconds until you point at it or pick a slide.
+	const [slide, setSlide] = useState(0);
+	const [hold, setHold] = useState(false);
+	const [manual, setManual] = useState(false);
+	const slideCount = useRef(1);
+	useEffect(() => {
+		setSlide(0);
+		setManual(false);
+	}, [name]);
+	useEffect(() => {
+		if (hold || manual) return;
+		const timer = setTimeout(() => setSlide((i) => (i + 1) % Math.max(1, slideCount.current)), 9000);
+		return () => clearTimeout(timer);
+	}, [slide, hold, manual]);
 	const detailQ = useSQLQuery(substanceDetailSQL(name));
 	const timingQ = useSQLQuery(timingSQL([name]));
 	const membersQ = useSQLQuery(groupMembersSQL(name), { enabled: isGroup(name) });
@@ -2190,6 +2220,73 @@ function SubstanceOverview({ name }: { name: string }) {
 	if (!r) return null;
 	const { kindLine, warning, aka, timing: t, group } = describeSubstance(name, r, rows(timingQ));
 	const members = rows(membersQ).map((m) => S(m.name)).filter((m) => m.toLowerCase() !== name.toLowerCase());
+	const about = (
+		<div className="max-w-3xl">
+			{kindLine && <p style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1.45 }}>{kindLine}</p>}
+			{group ? (
+				members.length > 0 && (
+					<p className="mt-4" style={{ color: C.soft, lineHeight: 1.5 }}>
+						Reports filed here sometimes name the drug:{' '}
+						{members.map((m, i) => (
+							<span key={m}>
+								{i > 0 && ', '}
+								<b style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{m}</b>
+							</span>
+						))}
+						. Others just say “{short(name).toLowerCase()}”.
+					</p>
+				)
+			) : t ? (
+				<div className="mt-5">
+					<div className="rd-label mb-2">How a dose usually plays out</div>
+					<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} />
+				</div>
+			) : (
+				<p className="mt-3 text-sm" style={{ color: C.faint }}>Not enough closely read reports to time it yet.</p>
+			)}
+		</div>
+	);
+	const glance = (
+		<ul className="grid max-w-3xl gap-3.5" style={{ lineHeight: 1.45 }}>
+			{S(r.addiction) && (
+				<li className="flex items-start gap-3">
+					{/high|very|extreme|moderate|addictive/i.test(S(r.addiction)) && !/^non|not /i.test(S(r.addiction)) ? (
+						<AlertTriangle size={17} color={RISK[2].c} style={{ flexShrink: 0, marginTop: 2 }} />
+					) : (
+						<Check size={17} color={C.mint} style={{ flexShrink: 0, marginTop: 2 }} />
+					)}
+					<span>{S(r.addiction)[0].toUpperCase() + S(r.addiction).slice(1)}</span>
+				</li>
+			)}
+			{(S(r.tolerance_zero) || S(r.tolerance_full)) && (
+				<li className="flex items-start gap-3">
+					<RotateCcw size={16} color={C.lav} style={{ flexShrink: 0, marginTop: 3 }} />
+					<span>
+						{S(r.tolerance_zero)
+							? `Tolerance resets ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ').replace(/^(?=\d)/, 'after ')}`
+							: `Tolerance ${S(r.tolerance_full).replace(/^with\s+/i, 'builds with ')}`}
+					</span>
+				</li>
+			)}
+			{L(r.cross_tol).length > 0 && <CrossTolLine name={name} />}
+			<li className="flex items-start gap-3">
+				<Calendar size={16} color={C.faint} style={{ flexShrink: 0, marginTop: 3 }} />
+				<span style={{ color: C.soft }}>
+					{N(r.n_reports).toLocaleString()} reports · {N(r.n_read)} read closely
+				</span>
+			</li>
+		</ul>
+	);
+	const feel = (
+		<div className="flex flex-wrap gap-2">
+			{L(r.effects).map((e) => (
+				<EffectTag key={e} name={e} />
+			))}
+		</div>
+	);
+	const slides = ([['What it is', about], ['At a glance', glance], ['What people feel', L(r.effects).length ? feel : null]] as [string, JSX.Element | null][]).filter((x) => x[1]);
+	slideCount.current = slides.length;
+	const slideAt = Math.min(slide, slides.length - 1);
 	return (
 		<>
 			{aka.length > 0 && (
@@ -2203,81 +2300,34 @@ function SubstanceOverview({ name }: { name: string }) {
 					))}
 				</p>
 			)}
-			<div className="rd-card rd-in mt-6 p-6 sm:p-7">
-				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-					<div className="min-w-0">
-						{kindLine && <p style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.45 }}>{kindLine}</p>}
-						{group ? (
-							members.length > 0 && (
-								<p className="mt-4" style={{ color: C.soft, lineHeight: 1.5 }}>
-									Reports filed here sometimes name the drug:{' '}
-									{members.map((m, i) => (
-										<span key={m}>
-											{i > 0 && ', '}
-											<b style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{m}</b>
-										</span>
-									))}
-									. Others just say “{short(name).toLowerCase()}”.
-								</p>
-							)
-						) : t ? (
-							<div className="mt-5">
-								<div className="rd-label mb-2">How a dose usually plays out</div>
-								<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} />
-							</div>
-						) : (
-							<p className="mt-3 text-sm" style={{ color: C.faint }}>Not enough closely read reports to time it yet.</p>
-						)}
-					</div>
-					<div className="min-w-0">
-						<div className="rd-label mb-3">At a glance</div>
-						<ul className="grid gap-3 text-sm" style={{ lineHeight: 1.45 }}>
-							{warning && (
-								<li className="flex items-start gap-2.5" title={warning}>
-									<AlertTriangle size={16} color={C.coral} style={{ flexShrink: 0, marginTop: 1 }} />
-									<span style={{ color: '#fff', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{warning}</span>
-								</li>
-							)}
-							{S(r.addiction) && (
-								<li className="flex items-start gap-2.5">
-									{/high|very|extreme|moderate|addictive/i.test(S(r.addiction)) && !/^non|not /i.test(S(r.addiction)) ? (
-										<AlertTriangle size={16} color={C.amber} style={{ flexShrink: 0, marginTop: 1 }} />
-									) : (
-										<Check size={16} color={C.mint} style={{ flexShrink: 0, marginTop: 1 }} />
-									)}
-									<span style={{ color: C.soft }}>{S(r.addiction)[0].toUpperCase() + S(r.addiction).slice(1)}</span>
-								</li>
-							)}
-							{(S(r.tolerance_zero) || S(r.tolerance_full)) && (
-								<li className="flex items-start gap-2.5">
-									<RotateCcw size={15} color={C.lav} style={{ flexShrink: 0, marginTop: 2 }} />
-									<span style={{ color: C.soft }}>
-										{S(r.tolerance_zero)
-											? `Tolerance resets ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ').replace(/^(?=\d)/, 'after ')}`
-											: `Tolerance ${S(r.tolerance_full).replace(/^with\s+/i, 'builds with ')}`}
-									</span>
-								</li>
-							)}
-							{L(r.cross_tol).length > 0 && <CrossTolLine name={name} />}
-							<li className="flex items-start gap-2.5">
-								<Calendar size={15} color={C.faint} style={{ flexShrink: 0, marginTop: 2 }} />
-								<span style={{ color: C.faint }}>
-									{N(r.n_reports).toLocaleString()} reports · {N(r.n_read)} read closely
-								</span>
-							</li>
-						</ul>
-					</div>
+			{warning && (
+				<div className="rd-in mt-5 flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: 'rgba(255,110,130,.13)', border: '1px solid rgba(255,125,142,.45)', lineHeight: 1.5, maxWidth: 900 }}>
+					<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
+					<span>{warning}</span>
 				</div>
-				{L(r.effects).length > 0 && (
-					<div className="mt-7 border-t pt-5" style={{ borderColor: C.line }}>
-						<div className="rd-label mb-3">What people mostly feel</div>
-						<div className="flex flex-wrap gap-2">
-							{L(r.effects).map((e) => (
-								<EffectTag key={e} name={e} />
-							))}
-						</div>
-					</div>
-				)}
+			)}
+			<div className="rd-card rd-in mt-5 p-6 sm:p-7" onMouseEnter={() => setHold(true)} onMouseLeave={() => setHold(false)}>
+				<div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2" role="tablist">
+					{slides.map(([label], i) => (
+						<button
+							key={label}
+							role="tab"
+							aria-selected={i === slideAt}
+							onClick={() => {
+								setSlide(i);
+								setManual(true);
+							}}
+							className="flex items-center gap-2 text-sm font-semibold"
+							style={{ color: i === slideAt ? '#fff' : C.faint, transition: 'color .2s' }}
+						>
+							<span className="rounded-full" style={{ width: i === slideAt ? 22 : 8, height: 8, background: i === slideAt ? C.mint : 'rgba(255,255,255,.25)', transition: 'width .3s, background .3s' }} />
+							{label}
+						</button>
+					))}
+				</div>
+				<div key={slideAt} className="rd-fade" style={{ minHeight: 170 }}>
+					{slides[slideAt]?.[1]}
+				</div>
 			</div>
 		</>
 	);
@@ -3870,12 +3920,16 @@ function SpunionSvg() {
 	);
 }
 
-function Spunion({ tips, lift }: { tips: string[]; lift: boolean }) {
+function Spunion({ tips, lift, autoOpen }: { tips: string[]; lift: boolean; autoOpen: boolean }) {
 	const [i, setI] = useState(0);
-	const [open, setOpen] = useState(true);
+	const [open, setOpen] = useState(autoOpen);
 	const [hop, setHop] = useState(false);
 	const key = tips.join('|');
-	useEffect(() => setI(0), [key]);
+	useEffect(() => {
+		setI(0);
+		setOpen(autoOpen);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [key]);
 	if (!tips.length) return null;
 	const tip = tips[i % tips.length];
 	const next = () => {
@@ -4005,12 +4059,20 @@ export default function ReportTimelapse() {
 			/* private mode: he'll just say hi again next time */
 		}
 	}, []);
-	const spunionTips = (() => {
-		const pairSev = onSub && withSub ? N(rows(comboPairQ)[0]?.sev) : 0;
-		if (pairSev >= 2) return [`${short(sub!)} with ${short(withSub!)} is a risky mix. If you go ahead anyway: go low, go slow, and don’t do it alone.`, SPUNION_TIPS[1]];
-		if (!greeted && !onSub && !onReport) return ['Hi, I’m Spunion! Tap a substance to see how it usually goes, or tap two to see how they mix.', ...SPUNION_TIPS];
-		return [];
-	})();
+	const pairSev = onSub && withSub ? N(rows(comboPairQ)[0]?.sev) : 0;
+	const spunionTips = [
+		onReport ? 'Scroll through the story and the timeline follows along. Or press play and I’ll walk you through it.'
+		: pairSev >= 2 ? `${short(sub!)} with ${short(withSub!)} is a risky mix. If you go ahead anyway: go low, go slow, and don’t do it alone.`
+		: onSub && withSub ? `Here’s how ${short(sub!)} and ${short(withSub!)} tend to go together, from people who tried it.`
+		: onSub ? `New to ${short(sub!)}? Give it time to kick in before taking more.`
+		: view === 'effects' ? 'Tap an effect to see what it is, and what people had taken when they felt it.'
+		: 'Hi, I’m Spunion! Tap a substance to see how it usually goes.',
+		...SPUNION_TIPS,
+	];
+	// He opens his bubble by himself only when it matters; otherwise he waits to be tapped.
+	const spunionSpeaks = pairSev >= 2 || (!greeted && !onSub && !onReport);
+	const reportWarns = onReport && rows(pairsQ).some((p) => p.sev != null && N(p.sev) >= 1);
+	const wideMain = useWide();
 	const goCombo = (a: string, b: string) => {
 		setView('reports');
 		setSub(a);
@@ -4099,7 +4161,7 @@ export default function ReportTimelapse() {
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} />
-				{!openItem && <Spunion tips={spunionTips} lift={onReport} />}
+				{!openItem && !(reportWarns && wideMain) && <Spunion tips={spunionTips} lift={onReport} autoOpen={spunionSpeaks} />}
 			</main>
 		</OpenCtx.Provider>
 	);
