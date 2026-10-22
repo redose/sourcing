@@ -743,7 +743,7 @@ const CSS = `
 .rd h1, .rd h2 { letter-spacing: -0.02em; }
 .rd svg, .rd svg text { user-select: none; -webkit-user-select: none; }
 .rd-tl { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 56px; align-items: start; }
-.rd-story { font-family: ${SERIF}; font-size: 21px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; transition: color .6s; }
+.rd-story { font-family: ${SERIF}; font-size: 19px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; transition: color .6s; }
 .rd-story.focus { color: rgba(255,255,255,.42); }
 .rd-side > * { min-width: 0; }
 .rd-side { position: sticky; top: 84px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 96px); overflow-y: auto; scrollbar-width: none; }
@@ -3559,11 +3559,11 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 							</span>
 						)}
 						{momentObs ? (
-							<p style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.5, color: C.text }}>
+							<p style={{ fontFamily: SERIF, fontSize: 25, lineHeight: 1.38, letterSpacing: '-0.005em', color: C.text }}>
 								{markWords(S(momentObs.description), hiRules, hoverEffect, 'd')}
 							</p>
 						) : quote ? (
-							<p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.5, color: C.text }}>
+							<p style={{ fontFamily: SERIF, fontSize: 23, lineHeight: 1.4, color: C.text }}>
 								{markWords(quote, hiRules, hoverEffect, 'q')}
 							</p>
 						) : (
