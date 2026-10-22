@@ -2373,11 +2373,16 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 	if (!p) return null;
 	const sev = N(p.sev);
 	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
+	const loud = Math.max(...items.map((q) => N(q.sev))) >= 2;
 	const reason = p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
 	return (
 		<div
 			className="rd-in mt-6"
-			style={{ position: 'sticky', top: 10, zIndex: 20, borderRadius: 18, border: `1px solid ${look.fg}66`, background: look.bg, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 10px 30px rgba(10,4,40,.25)', transition: 'background .4s, border-color .4s' }}
+			style={
+				loud
+					? { position: 'sticky', top: 10, zIndex: 20, borderRadius: 18, border: `1px solid ${look.fg}66`, background: look.bg, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 10px 30px rgba(10,4,40,.25)', transition: 'background .4s, border-color .4s' }
+					: { borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }
+			}
 			onMouseEnter={() => setPaused(true)}
 			onMouseLeave={() => setPaused(false)}
 			aria-live="polite"
@@ -3353,7 +3358,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 						/>
 					)}
 					{coreEnd != null && (
-						<button className="rd-btn mt-2" style={{ padding: '3px 10px', fontSize: 12 }} onClick={() => setShowAll(!showAll)}>
+						<button className="mt-1 text-xs" style={{ color: C.faint, textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={() => setShowAll(!showAll)}>
 							{showAll ? 'Focus on the main part' : `Show all ${fmtT(fullT)}`}
 						</button>
 					)}
@@ -3473,14 +3478,14 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 								{allEffects.length > 0 && (
 									<div className="mt-5 flex flex-wrap items-center gap-2">
 										<span className="rd-label mr-1">What happened</span>
-										{(allTags ? allEffects : allEffects.slice(0, 12)).map(([e, v]) => (
+										{(allTags ? allEffects : allEffects.slice(0, 6)).map(([e, v]) => (
 											<span key={e} style={{ opacity: v.first <= t + 1e-9 ? 1 : 0.4, transition: 'opacity .6s' }} title={`First at ${fmtT(v.first)} · mentioned ${v.n}×`}>
 												<EffectTag name={e} />
 											</span>
 										))}
-										{allEffects.length > 12 && (
+										{allEffects.length > 6 && (
 											<button className="text-sm" style={{ color: C.faint }} onClick={() => setAllTags(!allTags)}>
-												{allTags ? 'Show fewer' : `+${allEffects.length - 12} more`}
+												{allTags ? 'Show fewer' : `+${allEffects.length - 6} more`}
 											</button>
 										)}
 									</div>
@@ -3532,7 +3537,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				</article>
 
 				{/* Alongside the story: the moment, and the doses */}
-				<aside className="rd-side" style={bannerItems.length ? undefined : { top: 12, maxHeight: 'calc(100vh - 24px)' }}>
+				<aside className="rd-side" style={bannerItems.some((p) => N(p.sev) >= 2) ? undefined : { top: 12, maxHeight: 'calc(100vh - 24px)' }}>
 					{wide && timeline(true)}
 					<div key={heroKey} className="rd-in px-1 pb-2 pt-3">
 						<div className="flex flex-wrap items-center gap-3">
