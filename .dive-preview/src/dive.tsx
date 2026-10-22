@@ -2161,7 +2161,7 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 			: tox
 				? `${tox[0].toUpperCase()}${tox.slice(1)}.`
 				: '';
-	const aka = L(r.aka).filter((a) => a.toLowerCase() !== name.toLowerCase()).slice(0, allNames ? 999 : 6);
+	const aka = L(r.aka).filter((a) => a.toLowerCase() !== name.toLowerCase() && a.toLowerCase() !== short(name).toLowerCase()).slice(0, allNames ? 999 : 6);
 	return { desc, kindLine, warning, aka, timing: group ? undefined : t, group };
 }
 
@@ -3956,6 +3956,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	});
 	const activeNotes = activeSubs.length < 2 ? [] : rows(pairsQ).filter((p) => activeSubs.includes(S(p.a)) && activeSubs.includes(S(p.b)));
 	const riskNow = Math.max(0, ...activeNotes.map((p) => N(p.sev)));
+	const storyRisk = Math.max(0, ...rows(pairsQ).map((p) => N(p.sev)));
 	// Every risky pair in the story, for the banner: the ones mixing right now first, then the worst.
 	const bannerItems = rows(pairsQ)
 		.filter((p) => p.sev != null && N(p.sev) >= 1)
@@ -4172,6 +4173,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 									)}
 								</p>
 							<Sources className="mt-3" list={['sei', 'pw', ...(rows(pairsQ).length ? ['tripsit' as const] : [])]} />
+								{bannerItems.length > 0 && <MixCards items={bannerItems} />}
 								{allEffects.length > 0 && (
 									<div className="mt-6 flex flex-wrap items-center gap-2 border-t pt-5" style={{ borderColor: C.line }}>
 										<span className="rd-label mr-1">What happened</span>
@@ -4196,11 +4198,10 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 			<div aria-hidden className="rd-tint" style={{ background: 'radial-gradient(1200px 520px at 50% -8%, rgba(140,236,214,.30), transparent 70%), radial-gradient(1000px 480px at 50% 108%, rgba(140,236,214,.22), transparent 70%)', opacity: clamp(moodNow, 0, 1) * 0.9 }} />
 			<div aria-hidden className="rd-tint" style={{ background: 'radial-gradient(1200px 520px at 50% -8%, rgba(255,150,180,.32), transparent 70%), radial-gradient(1000px 480px at 50% 108%, rgba(255,150,180,.24), transparent 70%)', opacity: clamp(-moodNow, 0, 1) * 0.9 }} />
 			{[2, 3].map((r) => (
-				<div key={r} aria-hidden className="rd-tint" style={{ background: RISK_TINT[r], opacity: riskNow === r ? 1 : 0 }} />
+				<div key={r} aria-hidden className="rd-tint" style={{ background: RISK_TINT[r], opacity: riskNow === r ? 1 : storyRisk === r && riskNow < r ? 0.5 : 0 }} />
 			))}
 			{!wide && <div aria-hidden className="rd-fadebar" />}
 
-			{bannerItems.length > 0 && <MixCards items={bannerItems} />}
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
 				<article ref={bodyRef} className={`rd-story ${active && playing ? 'focus' : ''}`}>
@@ -4693,7 +4694,7 @@ export default function ReportTimelapse() {
 									['substances', 'Substances'],
 									['reports', 'Stories'],
 									['effects', 'Effects'],
-									['about', 'How it works'],
+									['about', 'About'],
 								] as const
 							).map(([v, label]) => (
 								<button key={v} className="rd-nav" aria-current={navHere === v ? 'page' : undefined} onClick={() => goView(v)} style={{ whiteSpace: 'nowrap' }}>
@@ -4749,7 +4750,7 @@ export default function ReportTimelapse() {
 						)}
 						<div className="flex flex-wrap items-center gap-4">
 							<button className="text-xs" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={() => goView('about')}>
-								How this works
+								About
 							</button>
 							<span className="text-xs" style={{ color: C.faint }}>Not medical advice.</span>
 						</div>
