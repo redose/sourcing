@@ -748,8 +748,8 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-newfx { 0% { box-shadow: 0 0 0 0 rgba(166,242,228,.55); } 70% { box-shadow: 0 0 0 10px rgba(166,242,228,0); } 100% { box-shadow: 0 0 0 0 rgba(166,242,228,0); } }
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
-@keyframes rd-watermark { 0%, 100% { opacity: .1; } 50% { opacity: .2; } }
-.rd-watermark { opacity: .14; animation: rd-watermark 2.8s ease-in-out infinite; pointer-events: none; }
+@keyframes rd-watermark { 0%, 100% { opacity: .18; } 50% { opacity: .3; } }
+.rd-watermark { filter: brightness(0); opacity: .24; animation: rd-watermark 2.8s ease-in-out infinite; pointer-events: none; }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
 .rd-new { border-color: rgba(217,207,255,.7) !important; animation: rd-new 1.6s ease-out both; }
@@ -1799,7 +1799,7 @@ function CombosList({ name, onCombo, bare }: { name: string; onCombo: (a: string
 		<>
 			{!bare && <span className="rd-label">Most often combined with</span>}
 			{combosQ.isLoading ? (
-				<div className="mt-3 flex items-center justify-center" style={{ height: 180 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={64} height={64} /></div>
+				<div className="mt-3 flex items-center justify-center" style={{ height: 180 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
 			) : rows(combosQ).length === 0 ? (
 				<p className="mt-2 text-sm" style={{ color: C.faint }}>No combinations on record.</p>
 			) : (
@@ -2739,7 +2739,7 @@ function TripSitBadge() {
 function Loading({ height = 200, className = '' }: { height?: number; className?: string }) {
 	return (
 		<div className={`flex items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
-			<img src={LOADING_PILL} alt="" className="rd-watermark" width={Math.min(150, Math.round(height * 0.7))} height={Math.min(150, Math.round(height * 0.7))} />
+			<img src={LOADING_PILL} alt="" className="rd-watermark" width={Math.min(72, Math.round(height * 0.5))} height={Math.min(72, Math.round(height * 0.5))} />
 		</div>
 	);
 }
@@ -2867,7 +2867,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 		<div className="mt-6 grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))' }}>
 			<AnswerCard q="How long does it last?">
 				{timingQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 80 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={64} height={64} /></div>
+					<div className="flex items-center justify-center" style={{ height: 80 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
 				) : (
 					<>
 						<p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.5 }}>
@@ -2881,7 +2881,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="How did it go?">
 				{summaryQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 120 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={64} height={64} /></div>
+					<div className="flex items-center justify-center" style={{ height: 120 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
 				) : (
 					<div className="grid gap-4">
 						{groups.map((g) => {
@@ -2922,7 +2922,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="What's different together?">
 				{effectsQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 100 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={64} height={64} /></div>
+					<div className="flex items-center justify-center" style={{ height: 100 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
 				) : togN < 3 ? (
 					<p className="text-sm" style={{ color: C.soft }}>Too few closely read reports with both to compare.</p>
 				) : more.length + less.length === 0 ? (
@@ -2962,7 +2962,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="What did people take first?">
 				{seqQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 60 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={64} height={64} /></div>
+					<div className="flex items-center justify-center" style={{ height: 60 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
 				) : !seq || N(seq.n) < 3 ? (
 					<p className="text-sm" style={{ color: C.soft }}>Not enough reports say when each one was taken.</p>
 				) : (
