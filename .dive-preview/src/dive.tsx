@@ -719,6 +719,10 @@ const CSS = `
 /* Opacity-only entrance: a transform here would stop position: fixed children (the dock, the mood tint) from fixing to the viewport. */
 @keyframes rd-fade { from { opacity: 0; } to { opacity: 1; } }
 .rd-fade { animation: rd-fade .4s ease-out both; }
+@keyframes rd-drift { from { transform: translate(0, 0); } to { transform: translate(260px, 130px); } }
+.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 260px; opacity: .055; animation: rd-drift 180s linear infinite; }
+.rd-molecules.b { background-size: 430px; opacity: .03; animation-duration: 260s; animation-direction: reverse; }
+@media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
 .rd-new { border-color: rgba(217,207,255,.7) !important; animation: rd-new 1.6s ease-out both; }
@@ -770,7 +774,7 @@ const CSS = `
 .rd-logo { display: inline-flex; padding: 4px; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid ${C.line}; transition: background .2s, border-color .2s; }
 .rd-logo:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.3); }
 .rd-logo img { display: block; border-radius: 4px; }
-.rd-dose { display: grid; grid-template-columns: 40px 16px minmax(0,1fr) 16px minmax(0,auto); align-items: center; column-gap: 10px; }
+.rd-dose { display: grid; grid-template-columns: 40px 16px max-content 16px minmax(0,1fr); align-items: center; column-gap: 10px; }
 .rd-mark.stamp { margin-right: 2px; }
 .rd-eff { font-family: ${SANS}; font-size: 12px; font-weight: 600; color: #fff; border-radius: 999px; padding: 1px 8px; margin: 0 3px; white-space: nowrap; vertical-align: 1px; }
 .rd-ms { display: flex; align-items: center; gap: 14px; margin: 26px 0 14px; cursor: pointer; white-space: nowrap; line-height: 1; font-family: ${SANS}; transition: opacity .4s; }
@@ -2043,8 +2047,9 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 	const chem = L(r.chem).filter((c) => !/^substituted /i.test(c) || L(r.chem).length === 1);
 	const kind = [cls.join(' and '), chem[0] ? `from the ${chem[0].toLowerCase()} family` : ''].filter(Boolean).join(' ');
 	const article = /^[aeiou]/i.test(kind) ? 'An' : 'A';
+	const kindLine = kind ? `${article} ${kind}.` : '';
 	const desc = [
-		kind ? `${article} ${kind}.` : '',
+		kindLine,
 		t ? `In reports, people usually notice it within ${fmtDur(N(t.on_m))}, feel it most around ${fmtDur(N(t.pk_m))}, and it fades by about ${fmtDur(N(t.end_m))}.` : '',
 	].filter(Boolean).join(' ');
 	// The safety note: MAOIs first (TripSit's grouping), then a summary that actually reads as one, then toxicity.
@@ -2058,7 +2063,7 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 				? `${tox[0].toUpperCase()}${tox.slice(1)}.`
 				: '';
 	const aka = L(r.aka).filter((a) => a.toLowerCase() !== name.toLowerCase()).slice(0, 6);
-	return { desc, warning, aka, timing: t };
+	return { desc, kindLine, warning, aka, timing: t };
 }
 
 // How one dose usually plays out, as a shape: nothing → first effects → strongest → fading. The three moments are
@@ -2074,7 +2079,7 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 		[end, 0.22],
 		[span, 0],
 	];
-	const H = 76;
+	const H = 54;
 	const path = pts.map(([v, y], i) => `${i ? 'L' : 'M'}${x(v) * 10},${H - y * (H - 8)}`).join(' ');
 	const marks = [
 		{ v: on, label: 'Kicks in', color: C.lav },
@@ -2106,14 +2111,14 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 				<span>Dose</span>
 				<span>{fmtDur(span)}</span>
 			</div>
-			<div className="mt-5 grid grid-cols-3 gap-4">
+			<div className="mt-3 grid grid-cols-3 gap-4">
 				{marks.map((m) => (
 					<div key={m.label}>
 						<div className="flex items-center gap-2">
 							<span className="rd-dot" style={{ width: 9, height: 9, background: m.color }} />
 							<span className="rd-label" style={{ color: C.soft }}>{m.label}</span>
 						</div>
-						<div className="mt-1 text-3xl font-light" style={{ letterSpacing: '-0.02em' }}>
+						<div className="mt-0.5 text-2xl font-light" style={{ letterSpacing: '-0.02em' }}>
 							{m.label === 'Mostly gone' ? 'by ' : '~'}
 							{fmtDur(m.v)}
 						</div>
@@ -2132,8 +2137,7 @@ function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: strin
 	const r = rows(detailQ)[0];
 	if (detailQ.isLoading || timingQ.isLoading) return <div className="rd-card mt-6 animate-pulse" style={{ height: 360 }} />;
 	if (!r) return null;
-	const { desc, warning, aka, timing: t } = describeSubstance(name, r, rows(timingQ));
-	const hasTol = S(r.tolerance_full) || S(r.addiction) || L(r.cross_tol).length > 0;
+	const { kindLine, warning, aka, timing: t } = describeSubstance(name, r, rows(timingQ));
 	return (
 		<>
 			{aka.length > 0 && (
@@ -2147,22 +2151,59 @@ function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: strin
 					))}
 				</p>
 			)}
-			<div className="rd-card rd-in mt-6 grid gap-8 p-6 sm:p-9">
-				{desc && <p style={{ fontFamily: SERIF, fontSize: 24, lineHeight: 1.5, maxWidth: 820 }}>{desc}</p>}
-				{t && (
-					<div>
-						<div className="rd-label mb-3">How a dose usually plays out</div>
-						<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} />
+			<div className="rd-card rd-in mt-6 p-6 sm:p-7">
+				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+					<div className="min-w-0">
+						{kindLine && <p style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.45 }}>{kindLine}</p>}
+						{t ? (
+							<div className="mt-5">
+								<div className="rd-label mb-2">How a dose usually plays out</div>
+								<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} />
+							</div>
+						) : (
+							<p className="mt-3 text-sm" style={{ color: C.faint }}>Not enough closely read reports to time it yet.</p>
+						)}
 					</div>
-				)}
-				{warning && (
-					<div className="flex items-start gap-3 rounded-2xl p-4" style={{ background: 'rgba(255,163,182,.12)', border: '1px solid rgba(255,163,182,.4)', color: C.text, lineHeight: 1.5 }}>
-						<AlertTriangle size={18} color={C.coral} style={{ flexShrink: 0, marginTop: 2 }} />
-						<span>{warning}</span>
+					<div className="min-w-0">
+						<div className="rd-label mb-3">At a glance</div>
+						<ul className="grid gap-3 text-sm" style={{ lineHeight: 1.45 }}>
+							{warning && (
+								<li className="flex items-start gap-2.5" title={warning}>
+									<AlertTriangle size={16} color={C.coral} style={{ flexShrink: 0, marginTop: 1 }} />
+									<span style={{ color: '#fff', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{warning}</span>
+								</li>
+							)}
+							{S(r.addiction) && (
+								<li className="flex items-start gap-2.5">
+									{/high|very|extreme|moderate|addictive/i.test(S(r.addiction)) && !/^non|not /i.test(S(r.addiction)) ? (
+										<AlertTriangle size={16} color={C.amber} style={{ flexShrink: 0, marginTop: 1 }} />
+									) : (
+										<Check size={16} color={C.mint} style={{ flexShrink: 0, marginTop: 1 }} />
+									)}
+									<span style={{ color: C.soft }}>{S(r.addiction)[0].toUpperCase() + S(r.addiction).slice(1)}</span>
+								</li>
+							)}
+							{(S(r.tolerance_zero) || S(r.tolerance_full)) && (
+								<li className="flex items-start gap-2.5">
+									<RotateCcw size={15} color={C.lav} style={{ flexShrink: 0, marginTop: 2 }} />
+									<span style={{ color: C.soft }}>
+										{S(r.tolerance_zero)
+											? `Tolerance resets ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ').replace(/^(?=\d)/, 'after ')}`
+											: `Tolerance ${S(r.tolerance_full).replace(/^with\s+/i, 'builds with ')}`}
+									</span>
+								</li>
+							)}
+							<li className="flex items-start gap-2.5">
+								<Calendar size={15} color={C.faint} style={{ flexShrink: 0, marginTop: 2 }} />
+								<span style={{ color: C.faint }}>
+									{N(r.n_reports).toLocaleString()} reports · {N(r.n_read)} read closely
+								</span>
+							</li>
+						</ul>
 					</div>
-				)}
+				</div>
 				{L(r.effects).length > 0 && (
-					<div>
+					<div className="mt-7 border-t pt-5" style={{ borderColor: C.line }}>
 						<div className="rd-label mb-3">What people mostly feel</div>
 						<div className="flex flex-wrap gap-2">
 							{L(r.effects).map((e) => (
@@ -2172,22 +2213,10 @@ function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: strin
 					</div>
 				)}
 			</div>
-			<div className={`mt-6 grid gap-6 ${hasTol ? 'lg:grid-cols-2' : ''}`}>
-				{hasTol && (
-					<div className="rd-card grid content-start gap-4 p-6">
-						<span className="rd-label">Tolerance and habit</span>
-						{S(r.tolerance_full) && (
-							<p style={{ color: C.soft, lineHeight: 1.5 }}>
-								Tolerance builds {S(r.tolerance_full).replace(/^with\s+/i, '')}
-								{S(r.tolerance_zero) ? `, and is back to baseline ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ').replace(/^(?=\d)/, 'after ')}` : ''}.
-							</p>
-						)}
-						{S(r.addiction) && (
-							<p style={{ color: C.soft, lineHeight: 1.5 }}>
-								<span style={{ color: '#fff' }}>{S(r.addiction)[0].toUpperCase() + S(r.addiction).slice(1)}</span>.
-							</p>
-						)}
-						{L(r.cross_tol).length > 0 && <CrossTol name={name} />}
+			<div className={`mt-6 grid gap-6 ${L(r.cross_tol).length > 0 ? 'lg:grid-cols-2' : ''}`}>
+				{L(r.cross_tol).length > 0 && (
+					<div className="rd-card content-start p-6">
+						<CrossTol name={name} />
 					</div>
 				)}
 				<div className="rd-card content-start p-6">
@@ -2967,7 +2996,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const [hoverEffect, setHoverEffect] = useState<string | null>(null);
 	const [atLink, setAtLink] = useDiveState<number | null>('at', null);
 	const [copied, setCopied] = useState(false);
-	const [dockOpen, setDockOpen] = useState(false);
+	const [dockOpen, setDockOpen] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(min-width: 961px)').matches);
 	const [allNames, setAllNames] = useState(false);
 	const wide = useWide();
 	const { effectInfo, open, classOf } = useContext(OpenCtx);
@@ -3409,7 +3438,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
-				<article ref={bodyRef} className={`rd-story ${active && (playing || t > 0) ? 'focus' : ''}`}>
+				<article ref={bodyRef} className={`rd-story ${active && playing ? 'focus' : ''}`}>
 					{segments.map((s, i) =>
 						s.ms != null ? (
 							<span key={i} role="button" tabIndex={0} className={`rd-ms ${s.ms === msIdx ? 'now' : s.ms < msIdx ? 'past' : 'future'}`} onClick={() => jump(milestones[s.ms!].t)} onKeyDown={(e) => e.key === 'Enter' && jump(milestones[s.ms!].t)}>
@@ -3443,7 +3472,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				<aside className="rd-side">
 					{mixing && <div className="rd-card rd-in p-4">{mixing}</div>}
 					{wide && timeline(true)}
-					<div key={heroKey} className="rd-card rd-in p-5" style={{ borderColor: nowMood ? `${nowMood.color}55` : undefined }}>
+					<div key={heroKey} className="rd-in px-1 pb-2 pt-3">
 						<div className="flex flex-wrap items-center gap-3">
 							<span className="rd-label">
 								{phase && <span style={{ color: '#fff' }}>{phase.label} · </span>}
@@ -3457,12 +3486,17 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 								</span>
 							)}
 						</div>
+						{(momentObs || quote) && (
+							<span aria-hidden style={{ display: 'block', fontFamily: SERIF, fontSize: 64, lineHeight: 1, height: 30, marginTop: 10, color: nowMood?.color ?? C.lav, opacity: 0.8, transition: 'color .6s' }}>
+								“
+							</span>
+						)}
 						{momentObs ? (
-							<p className="mt-3" style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.5, color: C.text }}>
+							<p style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.5, color: C.text }}>
 								{markWords(S(momentObs.description), hiRules, hoverEffect, 'd')}
 							</p>
 						) : quote ? (
-							<p className="mt-3" style={{ fontFamily: SERIF, fontSize: 18, lineHeight: 1.5, color: C.text }}>
+							<p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.5, color: C.text }}>
 								{markWords(quote, hiRules, hoverEffect, 'q')}
 							</p>
 						) : (
@@ -3552,6 +3586,117 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	);
 }
 
+// ── Spunion ───────────────────────────────────────────────────────
+// re:dose's mascot, drawn as SVG so each eye can blink on its own. He bobs gently, blinks one eye at a time
+// (the two eyes run on different clocks), and offers a tip for the page in a speech bubble. Tap him for the next
+// tip; close the bubble and he stays quietly in the corner.
+
+const SPUNION_CSS = `
+@keyframes sp-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
+@keyframes sp-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
+@keyframes sp-hop { 0% { transform: translateY(0) scale(1, 1); } 30% { transform: translateY(2px) scale(1.08, .9); } 60% { transform: translateY(-12px) scale(.94, 1.06); } 100% { transform: translateY(0) scale(1, 1); } }
+.sp-wrap { position: fixed; right: 18px; bottom: 18px; z-index: 35; display: flex; align-items: flex-end; gap: 10px; pointer-events: none; }
+.sp-wrap > * { pointer-events: auto; }
+.sp-me { width: 68px; height: 68px; cursor: pointer; filter: drop-shadow(0 8px 18px rgba(10,4,40,.35)); background: none; border: 0; padding: 0; }
+.sp-me svg { overflow: visible; display: block; }
+.sp-body { animation: sp-bob 3.4s ease-in-out infinite; transform-origin: 50% 92%; transform-box: fill-box; }
+.sp-me.hop .sp-body { animation: sp-hop .55s ease-out 1, sp-bob 3.4s ease-in-out .55s infinite; }
+.sp-eye { animation: sp-blink 4.7s infinite; transform-origin: center; transform-box: fill-box; }
+.sp-eye.r { animation-duration: 6.1s; animation-delay: 2.3s; }
+.sp-bubble { position: relative; max-width: min(280px, calc(100vw - 110px)); margin-bottom: 30px; padding: 12px 34px 12px 14px; border-radius: 18px 18px 6px 18px;
+  background: rgba(40,31,92,.92); border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 34px rgba(10,4,40,.35); font-size: 14px; line-height: 1.45; color: #fff; }
+.sp-bubble b { color: #8ff4c8; }
+@media (max-width: 960px) { .sp-wrap.lift { bottom: 104px; } .sp-me { width: 54px; height: 54px; } }
+@media (prefers-reduced-motion: reduce) { .sp-body, .sp-eye, .sp-me.hop .sp-body { animation: none !important; } }
+`;
+
+function SpunionSvg() {
+	return (
+		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden>
+			<g className="sp-body">
+				<path
+					d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
+					fill="#7ffcc4"
+					stroke="#000"
+					strokeWidth="18"
+					strokeLinejoin="round"
+				/>
+				{/* blush */}
+				<ellipse cx="120" cy="392" rx="30" ry="15" fill="#ff5c93" opacity="0.6" />
+				<ellipse cx="405" cy="350" rx="24" ry="12" fill="#ff5c93" opacity="0.6" />
+				{/* left eye */}
+				<g className="sp-eye">
+					<circle cx="185" cy="300" r="86" fill="#000" />
+					<circle cx="185" cy="300" r="70" fill="none" stroke="#fff" strokeWidth="5" />
+					<circle cx="160" cy="272" r="17" fill="#fff" />
+					<circle cx="205" cy="322" r="7" fill="#fff" />
+				</g>
+				{/* right eye */}
+				<g className="sp-eye r">
+					<circle cx="357" cy="268" r="64" fill="#000" />
+					<circle cx="357" cy="268" r="49" fill="none" stroke="#fff" strokeWidth="5" />
+					<circle cx="339" cy="248" r="12" fill="#fff" />
+					<circle cx="372" cy="284" r="5" fill="#fff" />
+				</g>
+			</g>
+		</svg>
+	);
+}
+
+function Spunion({ tips, lift }: { tips: string[]; lift: boolean }) {
+	const [i, setI] = useState(0);
+	const [open, setOpen] = useState(true);
+	const [hop, setHop] = useState(false);
+	const key = tips.join('|');
+	useEffect(() => setI(0), [key]);
+	if (!tips.length) return null;
+	const tip = tips[i % tips.length];
+	const next = () => {
+		setHop(true);
+		setTimeout(() => setHop(false), 560);
+		if (open) setI(i + 1);
+		setOpen(true);
+	};
+	return (
+		<div className={`sp-wrap ${lift ? 'lift' : ''}`}>
+			<style>{SPUNION_CSS}</style>
+			{open && (
+				<div key={tip} className="sp-bubble rd-in" role="status">
+					{tip}
+					<button onClick={() => setOpen(false)} aria-label="Hide tip" style={{ position: 'absolute', top: 9, right: 9, color: 'rgba(255,255,255,.6)' }}>
+						<X size={14} />
+					</button>
+				</div>
+			)}
+			<button className={`sp-me ${hop ? 'hop' : ''}`} onClick={next} aria-label={open ? 'Spunion: next tip' : 'Spunion: show a tip'} title="Spunion">
+				<SpunionSvg />
+			</button>
+		</div>
+	);
+}
+
+// General harm-reduction tips Spunion cycles through after the page's own.
+const SPUNION_TIPS = [
+	'Start low and go slow, especially with something new.',
+	'Most of the risk is in mixing. Check a combination before you try it.',
+	'Testing kits can tell you what’s really in your stuff.',
+	'Effects can take a while. Waiting before taking more is never wrong.',
+	'Rough time? You’re not alone. The re:dose community is on Discord.',
+];
+
+// A faint field of molecules behind everything: hexagon rings, bonds and atoms, drifting very slowly.
+const MOLECULE_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260' fill='none' stroke='white' stroke-width='1.3'>
+<path d='M70 54 L92.5 67 L92.5 93 L70 106 L47.5 93 L47.5 67 Z'/><path d='M74 62 L88 70 M88 90 L74 98'/>
+<path d='M92.5 67 L130 48 L165 70 L165 110'/><path d='M161 74 L161 106'/>
+<path d='M190 163 L209 174 L209 196 L190 207 L171 196 L171 174 Z'/><path d='M171 196 L140 215 M190 163 L190 135'/>
+<circle cx='190' cy='130' r='5'/>
+<g fill='white' stroke='none'><circle cx='70' cy='54' r='3'/><circle cx='92.5' cy='67' r='3'/><circle cx='92.5' cy='93' r='3'/><circle cx='70' cy='106' r='3'/>
+<circle cx='47.5' cy='93' r='3'/><circle cx='47.5' cy='67' r='3'/><circle cx='130' cy='48' r='3.5'/><circle cx='165' cy='70' r='3'/><circle cx='165' cy='110' r='3.5'/>
+<circle cx='209' cy='174' r='3'/><circle cx='209' cy='196' r='3'/><circle cx='190' cy='207' r='3'/><circle cx='171' cy='196' r='3'/><circle cx='171' cy='174' r='3'/>
+<circle cx='190' cy='163' r='3'/><circle cx='140' cy='215' r='3.5'/><circle cx='28' cy='200' r='2'/><circle cx='238' cy='36' r='2'/><circle cx='118' cy='158' r='1.6'/></g></svg>`;
+const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")`;
+
 // ── Main ──────────────────────────────────────────────────────────
 
 type Q = ReturnType<typeof useSQLQuery>;
@@ -3619,6 +3764,18 @@ export default function ReportTimelapse() {
 		clearReport();
 		setOpenItem(null);
 	};
+	// What Spunion says on this page, before the general tips.
+	const spunionTips = (() => {
+		const pairSev = withSub ? N(rows(comboPairQ)[0]?.sev) : 0;
+		const own =
+			onReport ? ['Scroll through the story and the timeline follows along. Or press play and I’ll walk you through it.']
+			: onSub && withSub && pairSev >= 2 ? [`${short(sub!)} with ${short(withSub)} is a risky mix. If you go ahead anyway: go low, go slow, and don’t do it alone.`]
+			: onSub && withSub ? [`Here’s how ${short(sub!)} and ${short(withSub)} tend to go together, from people who tried it.`]
+			: onSub ? [`New to ${short(sub!)}? The curve up top shows when people usually feel it. Give it that long before taking more.`]
+			: view === 'effects' ? ['Tap an effect to see what it is, and what people had taken when they felt it.']
+			: ['Hi, I’m Spunion! Tap a substance to see how it usually goes, or tap two to see how they mix.'];
+		return [...own, ...SPUNION_TIPS];
+	})();
 	const goCombo = (a: string, b: string) => {
 		setView('reports');
 		setSub(a);
@@ -3632,6 +3789,8 @@ export default function ReportTimelapse() {
 			<main className="rd" style={{ minHeight: '100vh', background: BG, color: C.text }}>
 				<style>{CSS}</style>
 				<div className="px-4 py-6 sm:px-8 sm:py-8" style={{ maxWidth: onReport ? 1320 : 1120, margin: '0 auto', transition: 'max-width .3s', position: 'relative', isolation: 'isolate' }}>
+					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
+					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '90px 140px' }} />
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
 						<button
 							onClick={() => {
@@ -3705,6 +3864,7 @@ export default function ReportTimelapse() {
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} />
+				{!openItem && <Spunion tips={spunionTips} lift={onReport} />}
 			</main>
 		</OpenCtx.Provider>
 	);
