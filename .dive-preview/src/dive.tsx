@@ -2366,10 +2366,12 @@ function StreetNames({ name, known }: { name: string; known: string[] }) {
 		<div className="mt-3 max-w-5xl text-sm" style={{ color: C.soft, lineHeight: 1.85 }}>
 			<span className="rd-label mr-2">Street names</span>
 			{shown.map((r, i) => (
-				<span key={S(r.term)} style={{ whiteSpace: 'nowrap' }} title={r.ai ? 'Matched to this substance by AI' : undefined}>
+				<Fragment key={S(r.term)}>
 					{i > 0 && <span style={{ color: C.faint }}> · </span>}
-					<span style={r.ai ? { color: C.faint, fontStyle: 'italic' } : undefined}>{S(r.term)}</span>
-				</span>
+					<span title={r.ai ? 'Matched to this substance by AI' : undefined} style={{ whiteSpace: 'nowrap', ...(r.ai ? { color: C.faint, fontStyle: 'italic' } : {}) }}>
+						{S(r.term)}
+					</span>
+				</Fragment>
 			))}
 			{names.length > 40 && (
 				<button className="ml-2 font-semibold" style={{ color: C.text, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.3)', textUnderlineOffset: 4 }} onClick={() => setAll(!all)}>
