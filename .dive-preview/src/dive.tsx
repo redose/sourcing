@@ -757,7 +757,7 @@ const CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-.rd-bounce { display: block; opacity: .3; animation: rd-bounce 1s infinite; transform-origin: 50% 100%; pointer-events: none; margin-top: 60px; }
+.rd-bounce { display: block; opacity: .3; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; pointer-events: none; margin-top: 60px; }
 @media (prefers-reduced-motion: reduce) { .rd-bounce { animation: none; } }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
