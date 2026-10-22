@@ -865,11 +865,27 @@ type EffectInfo = { blurb: string; url: string; neg?: number; pos?: number };
 const effectTone = (i?: { neg?: number; pos?: number }) =>
 	!i || i.neg == null ? 'neutral' : i.neg >= 0.55 ? 'negative' : (i.pos ?? 0) >= 0.6 ? 'positive' : 'neutral';
 const TONE_DOT: Record<string, string> = { negative: C.coral, positive: C.mint, neutral: C.lav };
-// How a risky pair looks: TripSit's Dangerous (3) and Unsafe (2), each with a card wash and a page tint.
-const RISK: Record<number, { c: string; t: string; bg: string }> = {
-	3: { c: C.coral, t: 'Dangerous combination', bg: 'rgba(255,140,165,.14)' },
-	2: { c: C.amber, t: 'Unsafe combination', bg: 'rgba(255,200,130,.11)' },
+// How risk looks everywhere (pair pages, the report banner, combination lists): one colour, word and pill per
+// level. Dangerous (3) and unsafe (2) get solid pills and a page tint; caution (1) is an outline.
+const RISK: Record<number, { c: string; t: string; word: string; bg: string; banner: string }> = {
+	3: { c: C.coral, t: 'Dangerous combination', word: 'Dangerous', bg: 'rgba(255,140,165,.16)', banner: 'rgba(120,36,78,.74)' },
+	2: { c: C.amber, t: 'Unsafe combination', word: 'Unsafe', bg: 'rgba(255,200,130,.12)', banner: 'rgba(108,68,36,.68)' },
+	1: { c: C.lav, t: 'Use caution', word: 'Caution', bg: 'rgba(217,207,255,.07)', banner: 'rgba(52,40,110,.74)' },
 };
+function RiskPill({ sev, small }: { sev: number; small?: boolean }) {
+	const r = RISK[sev];
+	if (!r) return null;
+	const solid = sev >= 2;
+	return (
+		<span
+			className="inline-flex items-center gap-1 rounded-full font-bold uppercase"
+			style={{ padding: small ? '2px 8px' : '4px 11px', fontSize: small ? 10.5 : 12, letterSpacing: '.08em', whiteSpace: 'nowrap', background: solid ? r.c : 'transparent', color: solid ? C.deep : r.c, border: `1px solid ${r.c}` }}
+		>
+			<AlertTriangle size={small ? 11 : 13} strokeWidth={2.5} />
+			{r.word}
+		</span>
+	);
+}
 const RISK_TINT: Record<number, string> = {
 	3: 'radial-gradient(1300px 560px at 50% -10%, rgba(255,120,150,.34), transparent 70%), radial-gradient(900px 420px at 50% 110%, rgba(255,120,150,.18), transparent 70%)',
 	2: 'radial-gradient(1300px 560px at 50% -10%, rgba(255,190,120,.28), transparent 70%), radial-gradient(900px 420px at 50% 110%, rgba(255,190,120,.14), transparent 70%)',
@@ -1739,7 +1755,6 @@ function OutcomeBar({ pos, neg, n }: { pos: unknown; neg: unknown; n: number }) 
 function CombosList({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
 	const { classOf } = useContext(OpenCtx);
 	const combosQ = useSQLQuery(focusCombosSQL(name));
-	const SEV: Record<number, { w: string; c: string }> = { 3: { w: 'dangerous', c: C.coral }, 2: { w: 'unsafe', c: C.amber }, 1: { w: 'caution', c: C.lav } };
 	return (
 		<>
 			<span className="rd-label">Most often combined with</span>
@@ -1751,7 +1766,7 @@ function CombosList({ name, onCombo }: { name: string; onCombo: (a: string, b: s
 				<div className="mt-2 grid">
 					{rows(combosQ).map((r) => {
 						const other = S(r.s);
-						const sev = SEV[N(r.sev)];
+						const sev = r.sev == null ? 0 : N(r.sev);
 						return (
 							<button
 								key={other}
@@ -1763,16 +1778,8 @@ function CombosList({ name, onCombo }: { name: string; onCombo: (a: string, b: s
 									<ClassIcon cls={classOf(other)} size={16} color={C.coral} />
 									{short(other)}
 								</span>
-								<span className="text-xs font-semibold" style={{ color: sev?.c ?? C.faint, whiteSpace: 'nowrap' }}>
-									{sev ? (
-										<span className="inline-flex items-center gap-1" title={S(r.note)}>
-											<AlertTriangle size={12} /> {sev.w}
-										</span>
-									) : r.status ? (
-										<span style={{ color: C.mint }} title={S(r.note)}>low risk</span>
-									) : (
-										'no note'
-									)}
+								<span className="text-xs font-semibold" style={{ whiteSpace: 'nowrap' }} title={S(r.note) || undefined}>
+									{sev ? <RiskPill sev={sev} small /> : r.status ? <span style={{ color: C.mint }}>low risk</span> : <span style={{ color: C.faint }}>no note</span>}
 								</span>
 								<ChevronRight size={14} color={C.faint} style={{ gridRow: '1 / 3', gridColumn: 3 }} />
 								<span className="flex flex-wrap items-center gap-x-3 gap-y-1" style={{ gridColumn: '1 / 3' }}>
@@ -2368,10 +2375,7 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 	const p = items[Math.min(idx, items.length - 1)];
 	if (!p) return null;
 	const sev = N(p.sev);
-	const look =
-		sev === 3 ? { fg: C.coral, bg: 'rgba(120,40,80,.55)', t: 'dangerous together' }
-		: sev === 2 ? { fg: C.amber, bg: 'rgba(110,70,40,.5)', t: 'unsafe together' }
-		: { fg: C.lav, bg: 'rgba(52,40,110,.7)', t: 'use caution' };
+	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
 	const reason = p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
 	return (
 		<div
@@ -2382,13 +2386,13 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 			aria-live="polite"
 		>
 			<div className="flex items-center gap-3 px-4 py-2.5">
-				<AlertTriangle size={17} color={look.fg} style={{ flexShrink: 0 }} />
 				<button key={idx} className="rd-fade flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setFull(!full)} title={full ? 'Show less' : 'Read the whole note'}>
-					<b className="font-semibold" style={{ color: look.fg, whiteSpace: 'nowrap' }}>
-						{short(S(p.a))} + {short(S(p.b))}: {look.t}
+					<RiskPill sev={sev} />
+					<b className="font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>
+						{short(S(p.a))} + {short(S(p.b))}
 					</b>
 					{p.now && (
-						<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: look.fg, color: C.deep, whiteSpace: 'nowrap' }}>
+						<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ border: '1px solid rgba(255,255,255,.6)', color: '#fff', whiteSpace: 'nowrap' }}>
 							mixing now
 						</span>
 					)}
@@ -2416,7 +2420,7 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 				</button>
 			</div>
 			{full && (
-				<div className="rd-fade flex flex-wrap items-end justify-between gap-3 px-4 pb-4" style={{ paddingLeft: 46 }}>
+				<div className="rd-fade flex flex-wrap items-end justify-between gap-3 px-4 pb-4">
 					<p style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.text, maxWidth: 820 }}>
 						{reason}
 						{!p.note && (
@@ -2831,11 +2835,11 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 			</div>
 			<Sources className="mt-4" list={['erowid', 'sei', 'pw', ...(withSub ? ['tripsit' as const] : [])]} />
 			{withSub && (
-				<div className="rd-card rd-in mt-6 p-5" style={risk >= 2 ? { background: RISK[risk].bg, borderColor: RISK[risk].c, padding: 28 } : undefined}>
+				<div className="rd-card rd-in mt-6 p-5" style={risk >= 1 ? { background: RISK[risk].bg, borderColor: risk >= 2 ? RISK[risk].c : `${RISK[risk].c}88`, padding: risk >= 2 ? 28 : undefined } : undefined}>
 					{(() => {
 						const p = pairNote;
 						const sev = risk;
-						const look = sev >= 2 ? RISK[sev] : sev === 1 ? { c: C.lav, t: 'Use caution' } : p?.status ? { c: C.mint, t: S(p.status) } : null;
+						const look = sev >= 1 ? RISK[sev] : p?.status ? { c: C.mint, t: S(p.status) } : null;
 						return pairQ.isLoading ? (
 							<span style={{ color: C.faint }}>Checking interaction notes…</span>
 						) : look ? (
@@ -2848,7 +2852,16 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 									<AlertTriangle size={20} color={look.c} style={{ flexShrink: 0, marginTop: 2 }} />
 								)}
 								<div>
-									<div className={sev >= 2 ? 'text-2xl font-semibold' : 'text-lg font-semibold'} style={{ color: look.c, letterSpacing: '-0.01em' }}>{look.t}</div>
+									{sev >= 1 ? (
+										<div className="flex flex-wrap items-center gap-3">
+											<RiskPill sev={sev} />
+											<span className={sev >= 2 ? 'text-2xl font-semibold' : 'text-lg font-semibold'} style={{ color: look.c, letterSpacing: '-0.01em' }}>
+												{sev === 3 ? 'Avoid this combination' : sev === 2 ? 'Real risk of harm together' : 'Take care with this mix'}
+											</span>
+										</div>
+									) : (
+										<div className="text-lg font-semibold" style={{ color: look.c }}>{look.t}</div>
+									)}
 									{p?.note && <p className="mt-2" style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.text }}>{S(p.note)}</p>}
 									<div className="mt-3 text-xs" style={{ color: C.faint }}>
 										{S(p?.via) === 'TripSit' ? (
