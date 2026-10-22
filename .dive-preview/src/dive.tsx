@@ -750,8 +750,14 @@ const CSS = `
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
 @keyframes rd-watermark { 0%, 100% { opacity: .22; } 50% { opacity: .35; } }
 .rd-watermark { opacity: .28; animation: rd-watermark 2.8s ease-in-out infinite; pointer-events: none; }
-@keyframes rd-bounce { 0%, 100% { transform: translateY(0) scale(1.08, .9); } 18% { transform: translateY(-4px) scale(.96, 1.05); } 50% { transform: translateY(-34px) scale(.98, 1.02); } 82% { transform: translateY(-4px) scale(.98, 1.03); } }
-.rd-bounce { display: block; opacity: .3; animation: rd-bounce 1.1s cubic-bezier(.45,0,.55,1) infinite; transform-origin: 50% 100%; pointer-events: none; }
+@keyframes rd-bounce {
+  0% { transform: translateY(0) scale(1.22, .76); animation-timing-function: cubic-bezier(.2,.7,.4,1); }
+  12% { transform: translateY(-8%) scale(.9, 1.12); animation-timing-function: cubic-bezier(.2,.7,.4,1); }
+  50% { transform: translateY(-75%) scale(1, 1); animation-timing-function: cubic-bezier(.6,0,.8,.3); }
+  88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
+  100% { transform: translateY(0) scale(1.22, .76); }
+}
+.rd-bounce { display: block; opacity: .3; animation: rd-bounce 1s infinite; transform-origin: 50% 100%; pointer-events: none; margin-top: 60px; }
 @media (prefers-reduced-motion: reduce) { .rd-bounce { animation: none; } }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
