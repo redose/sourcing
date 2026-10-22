@@ -735,6 +735,8 @@ const CSS = `
   -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); }
 .rd-molecules.b { background-size: 430px; opacity: .028; animation-duration: 340s; animation-direction: reverse; }
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
+@keyframes rd-newfx { 0% { box-shadow: 0 0 0 0 rgba(166,242,228,.55); } 70% { box-shadow: 0 0 0 10px rgba(166,242,228,0); } 100% { box-shadow: 0 0 0 0 rgba(166,242,228,0); } }
+.rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
 .rd-new { border-color: rgba(217,207,255,.7) !important; animation: rd-new 1.6s ease-out both; }
@@ -786,7 +788,6 @@ const CSS = `
 .rd-logo img { display: block; border-radius: 4px; }
 .rd-dose { display: grid; grid-template-columns: 40px 16px max-content 16px minmax(0,1fr); align-items: center; column-gap: 10px; }
 .rd-mark.stamp { margin-right: 2px; }
-.rd-eff { font-family: ${SANS}; font-size: 12px; font-weight: 600; color: #fff; border-radius: 999px; padding: 1px 8px; margin: 0 3px; white-space: nowrap; vertical-align: 1px; }
 .rd-ms { display: flex; align-items: center; gap: 14px; margin: 26px 0 14px; cursor: pointer; white-space: nowrap; line-height: 1; font-family: ${SANS}; transition: opacity .4s; }
 .rd-ms-line { flex: 1; height: 1px; background: rgba(255,255,255,.2); transition: background .4s; }
 .rd-ms-pill { display: inline-flex; align-items: baseline; gap: 10px; padding: 8px 16px; border-radius: 999px; border: 1px solid ${C.line};
@@ -2466,22 +2467,22 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 			</div>
 		);
 
-	// Wide screens: Spunion at the bottom-left, saying it in a speech bubble.
+	// Wide screens: Spunion in the bottom-right corner, saying it in a speech bubble.
 	return (
-		<div style={{ position: 'fixed', left: 0, right: 0, bottom: 14, zIndex: 32, display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none' }}>
+		<div style={{ position: 'fixed', left: 0, right: 0, bottom: 14, zIndex: 32, display: 'flex', justifyContent: 'flex-end', padding: '0 18px', pointerEvents: 'none' }}>
 			<style>{SPUNION_CSS}</style>
-			<div className="rd-in flex items-end gap-3" style={{ width: 'min(960px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-				<span className={`sp-me ${hop ? 'hop' : ''}`} aria-hidden style={{ width: 66, height: 66, flexShrink: 0, cursor: 'default' }}>
-					<SpunionSvg worried={sev >= 2} />
-				</span>
+			<div className="rd-in flex items-end gap-3" style={{ width: 'min(640px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
 				<div
 					aria-live="polite"
-					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 8, padding: '10px 14px', borderRadius: '20px 20px 20px 6px', border: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, background: look.bg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 14px 40px rgba(10,4,40,.45)', transition: 'background .4s, border-color .4s' }}
+					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 8, padding: '10px 14px', borderRadius: '20px 20px 6px 20px', border: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, background: look.bg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 14px 40px rgba(10,4,40,.45)', transition: 'background .4s, border-color .4s' }}
 				>
-					<span aria-hidden style={{ position: 'absolute', left: -7, bottom: 10, width: 13, height: 13, background: look.bg, borderLeft: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, borderBottom: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, transform: 'rotate(45deg)', borderRadius: '0 0 0 3px' }} />
+					<span aria-hidden style={{ position: 'absolute', right: -7, bottom: 10, width: 13, height: 13, background: look.bg, borderRight: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, borderBottom: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, transform: 'rotate(-45deg)', borderRadius: '0 0 3px 0' }} />
 					{row}
 					{note}
 				</div>
+				<span className={`sp-me ${hop ? 'hop' : ''}`} aria-hidden style={{ width: 66, height: 66, flexShrink: 0, cursor: 'default' }}>
+					<SpunionSvg worried={sev >= 2} />
+				</span>
 			</div>
 		</div>
 	);
@@ -3598,11 +3599,6 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 								<span data-start={s.mark.start} data-t={s.mark.t} className={`rd-mark ${s.text ? '' : 'stamp'} ${active && s.mark.start === active.start ? 'active' : s.mark.t <= t + 1e-9 ? 'past' : 'future'}`} onClick={() => jump(s.mark!.t)} title={fmtT(s.mark.t)}>
 									{s.text || fmtT(s.mark.t)}
 								</span>
-								{s.mark.method === 'obs' && s.mark.t <= t + 1e-9 && newEffects.get(s.mark.raw)?.slice(0, 3).map((e) => (
-									<button key={e} className="rd-eff rd-in" onClick={() => open({ kind: 'effect', name: e })} title={`${e} starts here`} style={{ background: HI[effectTone(effectInfo.get(e.toLowerCase()))] }}>
-										+ {e}
-									</button>
-								))}
 								{!s.text && ' '}
 							</Fragment>
 						) : (
@@ -3645,15 +3641,37 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 						) : (
 							<p className="mt-3 text-sm" style={{ color: C.faint }}>Press play, or drag the timeline, to step through the story.</p>
 						)}
-						{momentObs && L(momentObs.effects).length > 0 && (
-							<div className="mt-4 flex flex-wrap gap-2">
-								{L(momentObs.effects).map((e) => (
-									<span key={e} onMouseEnter={() => setHoverEffect(e)} onMouseLeave={() => setHoverEffect(null)} onFocus={() => setHoverEffect(e)} onBlur={() => setHoverEffect(null)} style={{ borderBottom: `2px solid ${HI[effectTone(effectInfo.get(e.toLowerCase()))]}`, borderRadius: 999, paddingBottom: 2 }}>
-										<EffectTag name={e} />
-									</span>
-								))}
-							</div>
-						)}
+						{momentObs && L(momentObs.effects).length > 0 && (() => {
+							// Effects that start at this moment come first, marked new; the rest carry on from before.
+							const fresh = new Set(newEffects.get(S(momentObs.obs_index)) ?? []);
+							const ordered = [...L(momentObs.effects)].sort((a, b) => Number(fresh.has(b)) - Number(fresh.has(a)));
+							return (
+								<div className="mt-4">
+									{fresh.size > 0 && <div className="rd-label mb-2" style={{ color: C.mint }}>New here</div>}
+									<div className="flex flex-wrap gap-2">
+										{ordered.map((e) => (
+											<span
+												key={e}
+												className={fresh.has(e) ? 'rd-newfx' : ''}
+												onMouseEnter={() => setHoverEffect(e)}
+												onMouseLeave={() => setHoverEffect(null)}
+												onFocus={() => setHoverEffect(e)}
+												onBlur={() => setHoverEffect(null)}
+												style={{ position: 'relative', borderBottom: `2px solid ${HI[effectTone(effectInfo.get(e.toLowerCase()))]}`, borderRadius: 999, paddingBottom: 2, opacity: fresh.size && !fresh.has(e) ? 0.7 : 1 }}
+												title={fresh.has(e) ? `${e} starts here` : `${e}, continuing`}
+											>
+												<EffectTag name={e} />
+												{fresh.has(e) && (
+													<span className="absolute rounded-full px-1.5 font-bold uppercase" style={{ top: -7, right: -4, fontSize: 9, background: C.mint, color: C.deep, letterSpacing: '.06em', lineHeight: '14px' }}>
+														new
+													</span>
+												)}
+											</span>
+										))}
+									</div>
+								</div>
+							);
+						})()}
 						{playing && hold && hold.key === heroKey && (
 							<div className="mt-5" style={{ height: 2, background: 'rgba(255,255,255,.1)', borderRadius: 2, overflow: 'hidden' }} aria-hidden>
 								<div key={hold.key} style={{ height: 2, background: C.lav, animation: `rd-fill ${hold.ms}ms linear both` }} />
