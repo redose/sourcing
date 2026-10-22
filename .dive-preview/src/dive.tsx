@@ -1,6 +1,6 @@
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
-import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, Globe, Link2, Pause, Play, Repeat, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
+import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, Link2, Pause, Play, Repeat, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
 
@@ -776,11 +776,9 @@ const CSS = `
 .rd-mark.past { background: rgba(217,207,255,.18); color: #fff; }
 .rd-mark.future { color: rgba(255,255,255,.6); box-shadow: inset 0 -1px 0 rgba(255,255,255,.35); }
 .rd-mark.active { background: rgba(143,244,247,.22); color: #fff; animation: rd-mark 2.6s ease-in-out infinite; }
-.rd-ts { display: inline-flex; align-items: center; padding: 3px; border-radius: 999px; background: rgba(10,6,30,.35); border: 1px solid rgba(255,255,255,.14);
-  font-family: ${SANS}; font-size: 12px; white-space: nowrap; vertical-align: middle; }
-.rd-ts a { display: inline-flex; align-items: center; gap: 7px; height: 22px; padding: 0 9px; border-radius: 999px; color: ${C.soft}; text-decoration: none; transition: background .2s, color .2s; }
-.rd-ts a:first-child { padding-left: 1px; padding-right: 11px; border-right: 1px solid rgba(255,255,255,.12); border-radius: 999px 0 0 999px; }
-.rd-ts a:hover { background: rgba(255,255,255,.12); color: #fff; }
+.rd-ts { display: inline-flex; align-items: center; gap: 7px; padding: 3px 11px 3px 3px; border-radius: 999px; background: rgba(10,6,30,.35); border: 1px solid rgba(255,255,255,.14);
+  color: ${C.soft}; font-family: ${SANS}; font-size: 12px; white-space: nowrap; text-decoration: none; vertical-align: middle; transition: background .2s, border-color .2s; }
+.rd-ts:hover { background: rgba(10,6,30,.55); border-color: rgba(255,255,255,.32); }
 .rd-ts b { color: #fff; font-weight: 700; }
 .rd-ts img { display: block; border-radius: 999px; }
 .rd-logo { display: inline-flex; padding: 4px; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid ${C.line}; transition: background .2s, border-color .2s; }
@@ -2274,7 +2272,6 @@ function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: strin
 // ── Small pieces ──────────────────────────────────────────────────
 
 const TRIPSIT_COMBOS = 'https://wiki.tripsit.me/wiki/Drug_combinations';
-const TRIPSIT_DISCORD = 'https://discord.gg/tripsit';
 const REDOSE_DISCORD = 'https://discord.com/invite/WzWc5MQSnW';
 const DiscordIcon = ({ size = 16 }: { size?: number }) => (
 	<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -2442,18 +2439,11 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 // TripSit's combination chart is behind every mixing warning here, so they get their own badge wherever one shows.
 function TripSitBadge() {
 	return (
-		<span className="rd-ts">
-			<a href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" title="Mixing guidance from TripSit's drug combinations chart. Thank you, TripSit.">
-				<img src={TRIPSIT_ICON} alt="" width={20} height={20} />
-				<b>TripSit</b>
-			</a>
-			<a href="https://tripsit.me" target="_blank" rel="noopener noreferrer" title="TripSit's website" aria-label="TripSit's website">
-				<Globe size={14} />
-			</a>
-			<a href={TRIPSIT_DISCORD} target="_blank" rel="noopener noreferrer" title="Talk to someone on TripSit's Discord" aria-label="TripSit's Discord">
-				<DiscordIcon size={14} />
-			</a>
-		</span>
+		<a className="rd-ts" href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" title="From TripSit's drug combinations chart. Thank you, TripSit.">
+			<img src={TRIPSIT_ICON} alt="" width={20} height={20} />
+			<b>TripSit</b>
+			<span style={{ opacity: 0.55 }}>↗</span>
+		</a>
 	);
 }
 
