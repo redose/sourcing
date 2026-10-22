@@ -2413,7 +2413,7 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 	const p = items[Math.min(idx, items.length - 1)];
 	const sev = p ? N(p.sev) : 0;
 	const reason = !p ? '' : p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
-	const phrases = useMemo(() => notePhrases(reason), [reason]);
+	const phrases = useMemo(() => notePhrases(reason, docked ? 110 : 64), [reason, docked]);
 	useEffect(() => {
 		setIdx(0);
 		setPart(0);
@@ -2445,57 +2445,68 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 	const inkSoft = docked ? C.soft : '#4a3f78';
 	const last = part === phrases.length - 1;
 
-	const body = (
+	const phrase = (
+		<span key={`${idx}-${part}`} className="rd-fade min-w-0" title={reason} style={{ fontFamily: SERIF, fontSize: docked ? 15 : 15.5, lineHeight: 1.35, color: inkSoft, ...(docked ? {} : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }) }}>
+			{phrases[part]}
+			{last && !p.note && (
+				<>
+					{' '}
+					<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ color: ink, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+						why ↗
+					</a>
+				</>
+			)}
+		</span>
+	);
+	const head = (
 		<>
-			<div className={`flex items-center ${docked ? 'flex-wrap gap-x-2 gap-y-1' : 'gap-3'}`}>
-				<RiskPill sev={sev} small={docked} solid={!docked} />
-				<b className="font-semibold" style={{ color: ink, whiteSpace: 'nowrap', fontSize: docked ? 13 : undefined }}>
-					{short(S(p.a))} + {short(S(p.b))}
-				</b>
-				{p.now && (
-					<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ border: `1.5px solid ${docked ? 'rgba(255,255,255,.6)' : ink}`, color: ink, whiteSpace: 'nowrap' }}>
-						mixing now
-					</span>
-				)}
-				<span className="ml-auto flex items-center gap-1.5" style={{ flexShrink: 0 }}>
-					{items.length > 1 &&
-						!docked &&
-						items.map((q, i) => (
-							<button
-								key={i}
-								onClick={() => {
-									setIdx(i);
-									setPart(0);
-								}}
-								aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
-								title={`${short(S(q.a))} + ${short(S(q.b))}`}
-								style={{ width: i === idx ? 16 : 7, height: 7, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, border: docked ? 0 : '1.5px solid #0d0820', opacity: i === idx ? 1 : 0.5, transition: 'width .3s, opacity .3s' }}
-							/>
-						))}
-					{S(p.via) === 'TripSit' && !docked && (
-						<a href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" title="From TripSit's drug combinations chart" style={{ marginLeft: 6 }}>
-							<img src={TRIPSIT_ICON} alt="TripSit" width={18} height={18} style={{ borderRadius: 999, display: 'block' }} />
-						</a>
-					)}
+			<RiskPill sev={sev} small solid={!docked} />
+			<b className="font-semibold" style={{ color: ink, whiteSpace: 'nowrap', fontSize: 13.5 }}>
+				{short(S(p.a))} + {short(S(p.b))}
+			</b>
+			{p.now && (
+				<span className="rounded-full px-1.5 text-xs font-semibold" style={{ border: `1.5px solid ${docked ? 'rgba(255,255,255,.6)' : ink}`, color: ink, whiteSpace: 'nowrap', lineHeight: '16px' }}>
+					now
 				</span>
-			</div>
-			<p key={`${idx}-${part}`} className="rd-fade mt-1.5" title={reason} style={{ fontFamily: SERIF, fontSize: docked ? 15 : 16.5, lineHeight: 1.4, color: inkSoft, minHeight: '1.4em' }}>
-				{phrases[part]}
-				{last && !p.note && (
-					<>
-						{' '}
-						<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ color: ink, textDecoration: 'underline', textUnderlineOffset: 3 }}>
-							Read why ↗
-						</a>
-					</>
-				)}
-				{phrases.length > 1 && (
-					<span style={{ marginLeft: 8, fontFamily: SANS, fontSize: 11, color: inkSoft, opacity: 0.7, whiteSpace: 'nowrap' }}>
-						{part + 1}/{phrases.length}
-					</span>
-				)}
-			</p>
+			)}
 		</>
+	);
+	const body = docked ? (
+		<>
+			<div className="flex flex-wrap items-center gap-x-2 gap-y-1">{head}</div>
+			<div className="mt-1">{phrase}</div>
+		</>
+	) : (
+		<div className="flex items-center gap-2.5">
+			{head}
+			{phrase}
+			{phrases.length > 1 && (
+				<span style={{ fontSize: 10.5, color: inkSoft, opacity: 0.7, whiteSpace: 'nowrap' }}>
+					{part + 1}/{phrases.length}
+				</span>
+			)}
+			{items.length > 1 && (
+				<span className="flex items-center gap-1" style={{ flexShrink: 0 }}>
+					{items.map((q, i) => (
+						<button
+							key={i}
+							onClick={() => {
+								setIdx(i);
+								setPart(0);
+							}}
+							aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
+							title={`${short(S(q.a))} + ${short(S(q.b))}`}
+							style={{ width: i === idx ? 12 : 6, height: 6, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, opacity: i === idx ? 1 : 0.5, transition: 'width .3s, opacity .3s' }}
+						/>
+					))}
+				</span>
+			)}
+			{S(p.via) === 'TripSit' && (
+				<a href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" title="From TripSit's drug combinations chart" style={{ flexShrink: 0 }}>
+					<img src={TRIPSIT_ICON} alt="TripSit" width={16} height={16} style={{ borderRadius: 999, display: 'block' }} />
+				</a>
+			)}
+		</div>
 	);
 
 	// On phones it's the top row of the timeline dock, so nothing stacks on top of anything.
@@ -2510,20 +2521,20 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 	return (
 		<div style={{ position: 'fixed', left: 0, right: 0, bottom: 14, zIndex: 32, display: 'flex', justifyContent: 'flex-end', padding: '0 18px', pointerEvents: 'none' }}>
 			<style>{SPUNION_CSS}</style>
-			<div className="rd-in flex items-end gap-3" style={{ width: 'min(600px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+			<div className="rd-in flex items-end gap-2.5" style={{ width: 'min(620px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
 				<div
 					key={`b${idx}`}
 					className="sp-bubble-pop"
 					aria-live="polite"
-					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 14, padding: '11px 16px 12px', borderRadius: 24, border: '3px solid #0d0820', background: '#fffaf1', color: ink, boxShadow: `6px 6px 0 ${look.fg}` }}
+					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 10, padding: '7px 14px 7px 8px', borderRadius: 999, border: '2px solid #0d0820', background: '#fffaf1', color: ink, boxShadow: `3px 3px 0 ${look.fg}` }}
 				>
-					<svg aria-hidden width="30" height="26" viewBox="0 0 30 26" style={{ position: 'absolute', right: -25, bottom: 6, overflow: 'visible' }}>
-						<path d="M0 2 C10 6 18 12 27 22 C18 21 9 18 0 16 Z" fill="#fffaf1" stroke="#0d0820" strokeWidth="3" strokeLinejoin="round" />
-						<path d="M-2.5 4.5 L-2.5 13.5" stroke="#fffaf1" strokeWidth="5" />
+					<svg aria-hidden width="18" height="14" viewBox="0 0 18 14" style={{ position: 'absolute', right: -14, bottom: 6, overflow: 'visible' }}>
+						<path d="M0 1 C6 3 11 7 16 12 C10 12 5 10 0 9 Z" fill="#fffaf1" stroke="#0d0820" strokeWidth="2" strokeLinejoin="round" />
+						<path d="M-1.6 2.5 L-1.6 7.5" stroke="#fffaf1" strokeWidth="3.4" />
 					</svg>
 					{body}
 				</div>
-				<span className={`sp-me ${hop ? 'hop' : ''}`} aria-hidden style={{ width: 66, height: 66, flexShrink: 0, cursor: 'default' }}>
+				<span className={`sp-me ${hop ? 'hop' : ''}`} aria-hidden style={{ width: 54, height: 54, flexShrink: 0, cursor: 'default' }}>
 					<SpunionSvg worried={sev >= 2} />
 				</span>
 			</div>
