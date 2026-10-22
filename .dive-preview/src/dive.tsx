@@ -2975,6 +2975,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const bodyRef = useRef<HTMLDivElement | null>(null);
 	const holdUntil = useRef(0);
 	const follow = useRef(false);
+	const autoScroll = useRef(0); // until when scroll events are our own
 	const frozenRef = useRef(frozen);
 	frozenRef.current = frozen;
 
@@ -3063,9 +3064,38 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 		if (!active || !bodyRef.current) return;
 		const box = bodyRef.current;
 		const el = box.querySelector(`[data-start="${active.start}"]`) as HTMLElement | null;
-		if (el && (playing || follow.current)) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+		if (el && (playing || follow.current)) {
+			autoScroll.current = Date.now() + 900;
+			el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+		}
 		follow.current = false;
 	}, [active?.start]);
+
+	// Reading moves the timeline: while not playing, the moment is the last time mark above the reading line.
+	// Scrolls we cause ourselves (following playback or a jump) are ignored.
+	useEffect(() => {
+		let raf = 0;
+		const onScroll = () => {
+			if (raf) return;
+			raf = requestAnimationFrame(() => {
+				raf = 0;
+				if (playing || Date.now() < autoScroll.current || !bodyRef.current) return;
+				const line = window.innerHeight * 0.45;
+				let best: { top: number; t: number } | null = null;
+				for (const el of bodyRef.current.querySelectorAll<HTMLElement>('[data-t]')) {
+					const top = el.getBoundingClientRect().top;
+					if (top <= line && (!best || top > best.top)) best = { top, t: Number(el.dataset.t) };
+				}
+				const next = best ? best.t : 0;
+				setT((prev) => (Math.abs(prev - next) > 1e-6 ? next : prev));
+			});
+		};
+		window.addEventListener('scroll', onScroll, { passive: true });
+		return () => {
+			window.removeEventListener('scroll', onScroll);
+			cancelAnimationFrame(raf);
+		};
+	}, [playing]);
 
 	const segments = useMemo(() => {
 		const parts: { text: string; from: number; mark?: Mark; ms?: number }[] = [];
@@ -3161,7 +3191,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 								return `https://psychonautwiki.org/wiki/${encodeURIComponent(page.replace(/ /g, '_'))}#Dangerous_interactions`;
 							};
 							return (
-								<div className="mt-3">
+								<div>
 									<div className="flex flex-wrap items-center gap-2">
 										<span className="rd-label pr-1">Mixing now</span>
 										<span className="text-sm" style={{ color: C.soft }}>
@@ -3392,7 +3422,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 							</span>
 						) : s.mark ? (
 							<Fragment key={i}>
-								<span data-start={s.mark.start} className={`rd-mark ${s.text ? '' : 'stamp'} ${active && s.mark.start === active.start ? 'active' : s.mark.t <= t + 1e-9 ? 'past' : 'future'}`} onClick={() => jump(s.mark!.t)} title={fmtT(s.mark.t)}>
+								<span data-start={s.mark.start} data-t={s.mark.t} className={`rd-mark ${s.text ? '' : 'stamp'} ${active && s.mark.start === active.start ? 'active' : s.mark.t <= t + 1e-9 ? 'past' : 'future'}`} onClick={() => jump(s.mark!.t)} title={fmtT(s.mark.t)}>
 									{s.text || fmtT(s.mark.t)}
 								</span>
 								{s.mark.method === 'obs' && s.mark.t <= t + 1e-9 && newEffects.get(s.mark.raw)?.slice(0, 3).map((e) => (
@@ -3411,6 +3441,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 
 				{/* Alongside the story: the moment, and the doses */}
 				<aside className="rd-side">
+					{mixing && <div className="rd-card rd-in p-4">{mixing}</div>}
 					{wide && timeline(true)}
 					<div key={heroKey} className="rd-card rd-in p-5" style={{ borderColor: nowMood ? `${nowMood.color}55` : undefined }}>
 						<div className="flex flex-wrap items-center gap-3">
@@ -3511,7 +3542,6 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 								})}
 							</ol>
 						)}
-						{mixing}
 					</div>
 				</aside>
 			</div>
