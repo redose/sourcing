@@ -2388,19 +2388,50 @@ const pwInteractions = (p: Record<string, unknown>) => {
 
 // Risky pairs in this story, as a banner that stays at the top while reading: one pair at a time (worst and
 // "mixing now" first), cycling every few seconds unless pointed at, with the reason on one line. Tap to read it all.
+// Split a note into short phrases that fit on one line: sentences, and long sentences at commas or semicolons.
+const notePhrases = (text: string, max = 110) => {
+	const out: string[] = [];
+	for (const sentence of text.match(/[^.!?]+[.!?]*/g) ?? [text]) {
+		let cur = '';
+		for (const part of sentence.trim().split(/(?<=[,;:])\s+/)) {
+			if (cur && (cur + ' ' + part).length > max) {
+				out.push(cur);
+				cur = part;
+			} else cur = cur ? `${cur} ${part}` : part;
+		}
+		if (cur) out.push(cur);
+	}
+	return out.filter(Boolean);
+};
+
 function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now: boolean })[]; docked?: boolean }) {
 	const [idx, setIdx] = useState(0);
+	const [part, setPart] = useState(0);
 	const [paused, setPaused] = useState(false);
-	const [full, setFull] = useState(false);
 	const [hop, setHop] = useState(false);
 	const key = items.map((p) => `${S(p.a)}|${S(p.b)}|${p.now ? 1 : 0}`).join(',');
-	useEffect(() => setIdx(0), [key]);
-	useEffect(() => {
-		if (items.length < 2 || paused || full) return;
-		const timer = setInterval(() => setIdx((i) => (i + 1) % items.length), 7000);
-		return () => clearInterval(timer);
-	}, [items.length, paused, full, key]);
 	const p = items[Math.min(idx, items.length - 1)];
+	const sev = p ? N(p.sev) : 0;
+	const reason = !p ? '' : p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
+	const phrases = useMemo(() => notePhrases(reason), [reason]);
+	useEffect(() => {
+		setIdx(0);
+		setPart(0);
+	}, [key]);
+	// Show each phrase long enough to read (~250 ms a word, at least 3.5 s), then the next; after the last phrase,
+	// move on to the next pair. Pointing at the bubble pauses it.
+	useEffect(() => {
+		if (paused || !phrases.length) return;
+		const words = (phrases[part] ?? '').split(/\s+/).length;
+		const timer = setTimeout(() => {
+			if (part < phrases.length - 1) setPart(part + 1);
+			else {
+				setPart(0);
+				if (items.length > 1) setIdx((i) => (i + 1) % items.length);
+			}
+		}, Math.max(3500, words * 250));
+		return () => clearTimeout(timer);
+	}, [part, phrases, paused, items.length]);
 	// Spunion hops for attention when he moves on to another pair or a mix starts happening.
 	useEffect(() => {
 		setHop(true);
@@ -2408,72 +2439,70 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 		return () => clearTimeout(timer);
 	}, [idx, p?.now]);
 	if (!p) return null;
-	const sev = N(p.sev);
 	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
-	const reason = p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
 	// Spunion's speech bubble is a cartoon one: warm white, his own thick black outline, a hard shadow in the risk colour.
-	const ink = '#1d1440';
-	const inkSoft = '#4a3f78';
+	const ink = docked ? '#fff' : '#1d1440';
+	const inkSoft = docked ? C.soft : '#4a3f78';
+	const last = part === phrases.length - 1;
 
-	const row = (
-		<div className="flex items-center gap-3">
-			<button key={idx} className={`rd-fade flex min-w-0 flex-1 items-center text-left ${docked ? 'flex-wrap gap-x-2 gap-y-1' : 'gap-3'}`} onClick={() => setFull(!full)} title={full ? 'Show less' : 'Read the whole note'}>
+	const body = (
+		<>
+			<div className={`flex items-center ${docked ? 'flex-wrap gap-x-2 gap-y-1' : 'gap-3'}`}>
 				<RiskPill sev={sev} small={docked} solid={!docked} />
-				<b className="font-semibold" style={{ color: docked ? '#fff' : ink, whiteSpace: 'nowrap', fontSize: docked ? 13 : undefined }}>
+				<b className="font-semibold" style={{ color: ink, whiteSpace: 'nowrap', fontSize: docked ? 13 : undefined }}>
 					{short(S(p.a))} + {short(S(p.b))}
 				</b>
 				{p.now && (
-					<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ border: `1.5px solid ${docked ? 'rgba(255,255,255,.6)' : ink}`, color: docked ? '#fff' : ink, whiteSpace: 'nowrap' }}>
+					<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ border: `1.5px solid ${docked ? 'rgba(255,255,255,.6)' : ink}`, color: ink, whiteSpace: 'nowrap' }}>
 						mixing now
 					</span>
 				)}
-				{!full && !docked && (
-					<span className="min-w-0 text-sm" style={{ color: inkSoft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-						{reason}
-					</span>
-				)}
-			</button>
-			{items.length > 1 && !docked && (
-				<div className="flex items-center gap-1.5" style={{ flexShrink: 0 }}>
-					{items.map((q, i) => (
-						<button
-							key={i}
-							onClick={() => setIdx(i)}
-							aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
-							title={`${short(S(q.a))} + ${short(S(q.b))}`}
-							style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
-						/>
-					))}
-				</div>
-			)}
-			<button onClick={() => setFull(!full)} aria-label={full ? 'Show less' : 'Read the whole note'} style={{ color: docked ? C.soft : ink, flexShrink: 0 }}>
-				{full ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-			</button>
-		</div>
-	);
-	const note = full && (
-		<div className="rd-fade mt-2 flex flex-wrap items-end justify-between gap-3">
-			<p style={{ fontFamily: SERIF, fontSize: docked ? 16 : 17, lineHeight: 1.5, color: docked ? C.text : ink, maxWidth: 820 }}>
-				{reason}
-				{!p.note && (
+				<span className="ml-auto flex items-center gap-1.5" style={{ flexShrink: 0 }}>
+					{items.length > 1 &&
+						!docked &&
+						items.map((q, i) => (
+							<button
+								key={i}
+								onClick={() => {
+									setIdx(i);
+									setPart(0);
+								}}
+								aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
+								title={`${short(S(q.a))} + ${short(S(q.b))}`}
+								style={{ width: i === idx ? 16 : 7, height: 7, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, border: docked ? 0 : '1.5px solid #0d0820', opacity: i === idx ? 1 : 0.5, transition: 'width .3s, opacity .3s' }}
+							/>
+						))}
+					{S(p.via) === 'TripSit' && !docked && (
+						<a href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" title="From TripSit's drug combinations chart" style={{ marginLeft: 6 }}>
+							<img src={TRIPSIT_ICON} alt="TripSit" width={18} height={18} style={{ borderRadius: 999, display: 'block' }} />
+						</a>
+					)}
+				</span>
+			</div>
+			<p key={`${idx}-${part}`} className="rd-fade mt-1.5" title={reason} style={{ fontFamily: SERIF, fontSize: docked ? 15 : 16.5, lineHeight: 1.4, color: inkSoft, minHeight: '1.4em' }}>
+				{phrases[part]}
+				{last && !p.note && (
 					<>
 						{' '}
-						<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>
+						<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ color: ink, textDecoration: 'underline', textUnderlineOffset: 3 }}>
 							Read why ↗
 						</a>
 					</>
 				)}
+				{phrases.length > 1 && (
+					<span style={{ marginLeft: 8, fontFamily: SANS, fontSize: 11, color: inkSoft, opacity: 0.7, whiteSpace: 'nowrap' }}>
+						{part + 1}/{phrases.length}
+					</span>
+				)}
 			</p>
-			{S(p.via) === 'TripSit' && <TripSitBadge />}
-		</div>
+		</>
 	);
 
 	// On phones it's the top row of the timeline dock, so nothing stacks on top of anything.
 	if (docked)
 		return (
-			<div className="mb-2 rounded-2xl px-3 py-2" style={{ background: look.bg, border: `1px solid ${look.fg}77` }} aria-live="polite">
-				{row}
-				{note}
+			<div className="mb-2 rounded-2xl px-3 py-2" style={{ background: look.bg, border: `1px solid ${look.fg}77` }} aria-live="polite" onClick={() => setPaused(!paused)}>
+				{body}
 			</div>
 		);
 
@@ -2481,19 +2510,18 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 	return (
 		<div style={{ position: 'fixed', left: 0, right: 0, bottom: 14, zIndex: 32, display: 'flex', justifyContent: 'flex-end', padding: '0 18px', pointerEvents: 'none' }}>
 			<style>{SPUNION_CSS}</style>
-			<div className="rd-in flex items-end gap-3" style={{ width: 'min(640px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+			<div className="rd-in flex items-end gap-3" style={{ width: 'min(600px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
 				<div
 					key={`b${idx}`}
 					className="sp-bubble-pop"
 					aria-live="polite"
-					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 14, padding: '11px 16px', borderRadius: 24, border: '3px solid #0d0820', background: '#fffaf1', color: ink, boxShadow: `6px 6px 0 ${look.fg}` }}
+					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 14, padding: '11px 16px 12px', borderRadius: 24, border: '3px solid #0d0820', background: '#fffaf1', color: ink, boxShadow: `6px 6px 0 ${look.fg}` }}
 				>
 					<svg aria-hidden width="30" height="26" viewBox="0 0 30 26" style={{ position: 'absolute', right: -25, bottom: 6, overflow: 'visible' }}>
 						<path d="M0 2 C10 6 18 12 27 22 C18 21 9 18 0 16 Z" fill="#fffaf1" stroke="#0d0820" strokeWidth="3" strokeLinejoin="round" />
 						<path d="M-2.5 4.5 L-2.5 13.5" stroke="#fffaf1" strokeWidth="5" />
 					</svg>
-					{row}
-					{note}
+					{body}
 				</div>
 				<span className={`sp-me ${hop ? 'hop' : ''}`} aria-hidden style={{ width: 66, height: 66, flexShrink: 0, cursor: 'default' }}>
 					<SpunionSvg worried={sev >= 2} />
@@ -3830,9 +3858,6 @@ function SpunionSvg({ worried }: { worried?: boolean }) {
 					strokeWidth="18"
 					strokeLinejoin="round"
 				/>
-				{/* blush */}
-				<ellipse cx="120" cy="392" rx="30" ry="15" fill="#ff5c93" opacity="0.6" />
-				<ellipse cx="405" cy="350" rx="24" ry="12" fill="#ff5c93" opacity="0.6" />
 				{/* worried brows, for risky mixes */}
 				{worried && (
 					<g stroke="#000" strokeWidth="17" strokeLinecap="round">
@@ -3844,15 +3869,11 @@ function SpunionSvg({ worried }: { worried?: boolean }) {
 				<g className="sp-eye">
 					<circle cx="185" cy="300" r="86" fill="#000" />
 					<circle cx="185" cy="300" r="70" fill="none" stroke="#fff" strokeWidth="5" />
-					<circle cx="160" cy="272" r="17" fill="#fff" />
-					<circle cx="205" cy="322" r="7" fill="#fff" />
 				</g>
 				{/* right eye */}
 				<g className="sp-eye r">
 					<circle cx="357" cy="268" r="64" fill="#000" />
 					<circle cx="357" cy="268" r="49" fill="none" stroke="#fff" strokeWidth="5" />
-					<circle cx="339" cy="248" r="12" fill="#fff" />
-					<circle cx="372" cy="284" r="5" fill="#fff" />
 				</g>
 			</g>
 		</svg>
