@@ -2290,13 +2290,13 @@ function SubstanceOverview({ name }: { name: string }) {
 				</p>
 			)}
 			<StreetNames name={name} known={[name, ...aka]} />
-			{warning && (
-				<div className="rd-in mt-5 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.13)', border: '1px solid rgba(255,125,142,.45)', lineHeight: 1.5 }}>
-					<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
-					<span>{warning}</span>
-				</div>
-			)}
-			<div className="rd-card rd-in mt-5 p-6 sm:p-7">
+			<div className="rd-card rd-in mt-6 p-6 sm:p-7">
+				{warning && (
+					<div className="mb-6 flex items-start gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
+						<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
+						<span>{warning}</span>
+					</div>
+				)}
 				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
 					<div className="min-w-0">{about}</div>
 					<div className="min-w-0">
@@ -2363,7 +2363,7 @@ function StreetNames({ name, known }: { name: string; known: string[] }) {
 	const shown = all ? names : names.slice(0, 40);
 	const anyAi = names.some((r) => r.ai);
 	return (
-		<div className="mt-3 max-w-5xl text-sm" style={{ color: C.soft, lineHeight: 1.85 }}>
+		<div className="mt-1.5 max-w-5xl text-sm" style={{ color: C.soft, lineHeight: 1.8 }}>
 			<span className="rd-label mr-2">Street names</span>
 			{shown.map((r, i) => (
 				<Fragment key={S(r.term)}>
@@ -2379,14 +2379,15 @@ function StreetNames({ name, known }: { name: string; known: string[] }) {
 				</button>
 			)}
 			{mixes.length > 0 && (
-				<div className="mt-1">
-					<span className="rd-label mr-2">For mixes</span>
+				<>
+					<span style={{ color: C.faint }}> · </span>
+					<span className="rd-label mx-1">mixes</span>
 					{mixes.join(' · ')}
-				</div>
+				</>
 			)}
-			<div className="mt-1 text-xs" style={{ color: C.faint }}>
-				From Dope Lookup, NoSlang and the DEA’s slang list{anyAi ? '; names in italics were matched to this substance by AI' : ''}. Street names change fast and vary from place to place.
-			</div>
+			<span className="ml-2 text-xs" style={{ color: C.faint }} title={`Street names change fast and vary from place to place.${anyAi ? ' Names in italics were matched to this substance by AI.' : ''}`}>
+				(Dope Lookup, NoSlang, DEA{anyAi ? '; italics matched by AI' : ''})
+			</span>
 		</div>
 	);
 }
