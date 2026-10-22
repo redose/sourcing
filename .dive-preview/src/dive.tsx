@@ -748,8 +748,8 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-newfx { 0% { box-shadow: 0 0 0 0 rgba(166,242,228,.55); } 70% { box-shadow: 0 0 0 10px rgba(166,242,228,0); } 100% { box-shadow: 0 0 0 0 rgba(166,242,228,0); } }
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
-@keyframes rd-watermark { 0%, 100% { opacity: .18; } 50% { opacity: .3; } }
-.rd-watermark { filter: brightness(0); opacity: .24; animation: rd-watermark 2.8s ease-in-out infinite; pointer-events: none; }
+@keyframes rd-watermark { 0%, 100% { opacity: .22; } 50% { opacity: .35; } }
+.rd-watermark { opacity: .28; animation: rd-watermark 2.8s ease-in-out infinite; pointer-events: none; }
 @keyframes rd-fill { from { width: 0; } to { width: 100%; } }
 @keyframes rd-new { 0% { background: rgba(217,207,255,.35); } 100% { background: rgba(217,207,255,.12); } }
 .rd-new { border-color: rgba(217,207,255,.7) !important; animation: rd-new 1.6s ease-out both; }
