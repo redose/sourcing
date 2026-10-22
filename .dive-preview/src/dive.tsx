@@ -308,7 +308,14 @@ px AS (
 ),
 oldsev AS (
   SELECT px.a, px.b,
-    max(CASE i.severity WHEN 'dangerous' THEN 3 WHEN 'unsafe' THEN 2 WHEN 'uncertain' THEN 1 END) AS sev,
+    -- A match on a broad class word ("Depressants", "Stimulants"…) is too blunt to call a pair dangerous
+    -- (it once flagged alcohol + nicotine), so it caps at caution; name and specific-class matches keep theirs.
+    max(CASE
+      WHEN NOT ((i.substance_id = px.a_id AND (list_contains(px.b_names, lower(i.interacts_with)) OR list_contains(px.b_names, rtrim(lower(i.interacts_with), 's'))))
+             OR (i.substance_id = px.b_id AND (list_contains(px.a_names, lower(i.interacts_with)) OR list_contains(px.a_names, rtrim(lower(i.interacts_with), 's')))))
+        AND rtrim(lower(i.interacts_with), 's') IN ('stimulant', 'depressant', 'psychedelic', 'dissociative', 'deliriant', 'entactogen', 'hallucinogen', 'cannabinoid')
+      THEN least(CASE i.severity WHEN 'dangerous' THEN 3 WHEN 'unsafe' THEN 2 WHEN 'uncertain' THEN 1 END, 1)
+      ELSE CASE i.severity WHEN 'dangerous' THEN 3 WHEN 'unsafe' THEN 2 WHEN 'uncertain' THEN 1 END END) AS sev,
     string_agg(DISTINCT i.interacts_with, ', ') AS via
   FROM px
   LEFT JOIN ${DB}."interactions" i ON
@@ -719,7 +726,8 @@ const CSS = `
 .rd h1, .rd h2 { letter-spacing: -0.02em; }
 .rd svg, .rd svg text { user-select: none; -webkit-user-select: none; }
 .rd-tl { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 56px; align-items: start; }
-.rd-story { font-family: ${SERIF}; font-size: 21px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; }
+.rd-story { font-family: ${SERIF}; font-size: 21px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; transition: color .6s; }
+.rd-story.focus { color: rgba(255,255,255,.42); }
 .rd-side > * { min-width: 0; }
 .rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }
 .rd-bar { position: sticky; top: 8px; z-index: 10; border-radius: 20px; border: 1px solid ${C.line}; background: rgba(62,50,124,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
@@ -2105,13 +2113,9 @@ function CrossTol({ name }: { name: string }) {
 	const q = useSQLQuery(crossTolSQL(name));
 	const list = rows(q);
 	if (!list.length) return null;
-	const fams = [...new Set(list.flatMap((r) => L(r.shared)))];
 	return (
 		<div className="mt-2">
-			<span className="rd-label">Shares tolerance with</span>
-			<p className="mt-1" style={{ color: C.soft }}>
-				Same tolerance family ({fams.join(', ')}). If you've had any of these lately, {short(name)} will likely feel weaker, and the other way round.
-			</p>
+			<span className="rd-label" title={`Recent use of any of these makes ${short(name)} feel weaker, and the other way round`}>Shares tolerance with</span>
 			<div className="mt-2 flex flex-wrap gap-2">
 				{list.slice(0, 8).map((r) => (
 					<SubstanceTag key={S(r.name)} name={S(r.name)} />
@@ -2631,7 +2635,7 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 				<p className="rd-in mt-3 flex items-start gap-2 text-sm" style={{ color: C.soft }}>
 					<Repeat size={15} color={C.lav} style={{ flexShrink: 0, marginTop: 2 }} />
 					<span>
-						<b style={{ color: C.lav, fontWeight: 600 }}>They share tolerance</b> ({L(tolShared.shared).join(', ')}). If you've had one lately, the other will likely feel weaker, which can tempt people into taking more.
+						Shared tolerance: one taken lately makes the other feel weaker.
 					</span>
 				</p>
 			)}
@@ -2744,6 +2748,17 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	const expected = useMemo(() => expectedCurves(doses, rows(timingQ)), [dosesQ.data, timingQ.data]);
 	const doseSubs = [...new Set(doses.map((d) => d.sub))];
 	const tolQ = useSQLQuery(tolPairsSQL(doseSubs), { enabled: doseSubs.length > 1 });
+	// Every effect in the story, most mentioned first, with when it first shows up.
+	const allEffects = useMemo(() => {
+		const m = new Map<string, { n: number; first: number }>();
+		for (const o of obs) for (const e of L(o.effects)) {
+			const cur = m.get(e);
+			m.set(e, { n: (cur?.n ?? 0) + 1, first: Math.min(cur?.first ?? Infinity, N(o.hrs)) });
+		}
+		return [...m.entries()].sort((a, b) => b[1].n - a[1].n || a[1].first - b[1].first);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [obsQ.data]);
+	const [allTags, setAllTags] = useState(false);
 	// Effects that show up for the first time at each moment: where each one "became a thing".
 	const newEffects = useMemo(() => {
 		const seen = new Set<string>();
@@ -3193,6 +3208,21 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 										</span>
 									)}
 								</p>
+								{allEffects.length > 0 && (
+									<div className="mt-5 flex flex-wrap items-center gap-2">
+										<span className="rd-label mr-1">What happened</span>
+										{(allTags ? allEffects : allEffects.slice(0, 12)).map(([e, v]) => (
+											<span key={e} style={{ opacity: v.first <= t + 1e-9 ? 1 : 0.4, transition: 'opacity .6s' }} title={`First at ${fmtT(v.first)} · mentioned ${v.n}×`}>
+												<EffectTag name={e} />
+											</span>
+										))}
+										{allEffects.length > 12 && (
+											<button className="text-sm" style={{ color: C.faint }} onClick={() => setAllTags(!allTags)}>
+												{allTags ? 'Show fewer' : `+${allEffects.length - 12} more`}
+											</button>
+										)}
+									</div>
+								)}
 						</>
 					);
 				})()}
@@ -3208,7 +3238,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
-				<article ref={bodyRef} className="rd-story">
+				<article ref={bodyRef} className={`rd-story ${active && (playing || t > 0) ? 'focus' : ''}`}>
 					{segments.map((s, i) =>
 						s.ms != null ? (
 							<span key={i} role="button" tabIndex={0} className={`rd-ms ${s.ms === msIdx ? 'now' : s.ms < msIdx ? 'past' : 'future'}`} onClick={() => jump(milestones[s.ms!].t)} onKeyDown={(e) => e.key === 'Enter' && jump(milestones[s.ms!].t)}>
@@ -3324,17 +3354,17 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 												style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}
 											>
 												{short(d.sub)}
+												{earlier && (
+													<span title={`Shares tolerance with ${short(earlier.sub)}, taken earlier, so this may feel weaker`} style={{ display: 'inline-flex', marginLeft: 6, verticalAlign: -1, color: C.lav, opacity: 0.8 }}>
+														<Repeat size={12} />
+													</span>
+												)}
 											</button>
 											<span className="flex justify-center">{d.route && <RouteIcon route={d.route} />}</span>
 											<span className="tabular-nums" style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'right' }} title={d.amount}>
 												{/\d/.test(d.amount) ? d.amount : ''}
 											</span>
-											{earlier && (
-												<span className="flex items-center gap-1.5 text-xs" style={{ gridColumn: '3 / -1', color: C.lav }} title={`${d.sub} and ${earlier.sub} share tolerance (${L(sharesTol(rows(tolQ), earlier.sub, d.sub)?.shared).join(', ')})`}>
-													<Repeat size={12} style={{ flexShrink: 0 }} />
-													Shares tolerance with {short(earlier.sub)}, may feel weaker
-												</span>
-											)}
+
 										</li>
 									);
 								})}
