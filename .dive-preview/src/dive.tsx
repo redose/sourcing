@@ -1525,7 +1525,13 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 				<div className="flex items-start justify-between gap-3">
 					<div>
 						<div className="rd-label">{item.kind === 'effect' ? 'Effect' : 'Substance'}</div>
-						<h2 className="mt-1 text-3xl font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.kind === 'substance' ? short(item.name) : item.name}</h2>
+						{/* Substance names are short and stay on one line; effect names can be long, so they wrap, balanced. */}
+						<h2
+							className={`mt-1 font-semibold ${item.kind === 'effect' && item.name.length > 22 ? 'text-2xl' : 'text-3xl'}`}
+							style={item.kind === 'substance' ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { lineHeight: 1.15, letterSpacing: '-0.01em', textWrap: 'balance' as never }}
+						>
+							{item.kind === 'substance' ? short(item.name) : item.name}
+						</h2>
 						{item.kind === 'substance' && short(item.name) !== item.name && <div className="mt-1 text-sm" style={{ color: C.faint }}>{item.name}</div>}
 					</div>
 					<button onClick={onClose} className="rd-btn" aria-label="Close" style={{ padding: 8 }}>
