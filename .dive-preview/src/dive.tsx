@@ -2742,12 +2742,17 @@ function TripSitBadge() {
 }
 
 // Loading: the little pill with electrons going round, in place of a grey placeholder of the same height.
-// Loading: the faint pill, and only ever one on screen. The first loader to appear owns it; any other loader at the
-// same time (or one marked quiet) just holds its space until its content arrives.
+// Loading: the faint pill, once per page visit. The first loader on a page owns it; every other loader on that page
+// (at the same time or later, or one marked quiet) just holds its space until its content arrives.
 let pillOwner: object | null = null;
+let pillPage = ''; // the page that has already had its pill
+let currentPage = ''; // set by the main view on every render
 function Loading({ height = 200, className = '', quiet }: { height?: number; className?: string; quiet?: boolean }) {
 	const me = useRef<object>({});
-	if (!quiet && pillOwner == null) pillOwner = me.current;
+	if (!quiet && pillOwner == null && pillPage !== currentPage) {
+		pillOwner = me.current;
+		pillPage = currentPage;
+	}
 	useEffect(
 		() => () => {
 			if (pillOwner === me.current) pillOwner = null;
@@ -4134,6 +4139,7 @@ export default function ReportTimelapse() {
 		return m;
 	}, [effectInfoQ.data, effectToneQ.data]);
 
+	currentPage = [view, sub, withSub, reportId].join('|');
 	const onSub = view === 'reports' && !!sub && !reportId;
 	const onReport = view === 'reports' && !!reportId;
 	const listQ = useSQLQuery(reportListSQL(sub ?? '', withSub, only), { enabled: onSub });
