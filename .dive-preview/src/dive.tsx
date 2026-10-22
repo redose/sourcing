@@ -2509,19 +2509,23 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 			</div>
 		);
 
-	// Wide screens: a slim, solid bar floating in the bottom-right corner.
+	// Wide screens: Spunion in the bottom-right corner with it in his usual bubble (same glass as the dock and his tips).
 	return (
-		<div style={{ position: 'fixed', left: 0, right: 0, bottom: 16, zIndex: 32, display: 'flex', justifyContent: 'flex-end', padding: '0 18px', pointerEvents: 'none' }}>
+		<div className="sp-wrap" style={{ bottom: 16 }}>
+			<style>{SPUNION_CSS}</style>
 			<div
 				key={`b${idx}`}
-				className="rd-fade"
+				className="sp-bubble rd-fade"
 				aria-live="polite"
 				onMouseEnter={() => setPaused(true)}
 				onMouseLeave={() => setPaused(false)}
-				style={{ pointerEvents: 'auto', width: 'min(600px, 100%)', padding: '9px 14px 9px 10px', borderRadius: 16, border: `1px solid ${look.fg}88`, background: 'rgba(26,18,60,.94)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 10px 30px rgba(10,4,40,.4)' }}
+				style={{ width: 'min(560px, calc(100vw - 110px))', maxWidth: 'none', padding: '9px 14px 9px 10px', marginBottom: 22, borderColor: `${look.fg}88` }}
 			>
 				{body}
 			</div>
+			<span className="sp-me" aria-hidden style={{ cursor: 'default' }}>
+				<SpunionSvg />
+			</span>
 		</div>
 	);
 }
