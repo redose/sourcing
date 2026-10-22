@@ -3280,8 +3280,8 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	// The timeline: a card at the top of the side column on wide screens, a floating dock at the bottom on phones.
 	const timeline = (side: boolean) => (
 		<div
-			className={side ? 'rd-card p-4' : 'rd-dock'}
-			style={{ borderColor: `${moodColor(moodNow)}55`, boxShadow: side ? undefined : `0 10px 40px rgba(10,4,40,.35), 0 0 0 1px ${moodColor(moodNow)}22`, transition: 'border-color 1.2s ease' }}
+			className={side ? 'px-1 pb-2' : 'rd-dock'}
+			style={side ? undefined : { borderColor: `${moodColor(moodNow)}55`, boxShadow: `0 10px 40px rgba(10,4,40,.35), 0 0 0 1px ${moodColor(moodNow)}22`, transition: 'border-color 1.2s ease' }}
 		>
 			<div className="flex items-center gap-3">
 				<button onClick={prevMark} className="rd-btn rd-hide-sm" aria-label="Previous mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
