@@ -1703,10 +1703,24 @@ function DoseChip({ d, latest, count = 1 }: { d: { sub: string; amount: string; 
 
 // ── Browse: effects ───────────────────────────────────────────────
 
+// What each category of effect means, in plain words.
+const EFFECT_CATEGORY: Record<string, string> = {
+	Cognitive: 'Changes to thinking, feeling and sense of self: mood, memory, focus, ego, and how time and meaning feel.',
+	Physical: 'What happens in the body: energy, temperature, nausea, heart rate, coordination and pain.',
+	Visual: 'Changes to what you see, from brighter colours and drifting surfaces to geometry and full hallucinations.',
+	Auditory: 'Changes to sound: distortion, enhancement, or hearing things that aren’t there.',
+	Tactile: 'Changes to touch and bodily sensation, like tingling or feelings that move across the skin.',
+	Multisensory: 'Effects that cross the senses at once, like synaesthesia or a scene that feels completely real.',
+	'Smell & Taste': 'Changes to smell and taste, including smells or tastes that aren’t really there.',
+	Other: 'Effects that don’t fit neatly anywhere else.',
+};
+
 function EffectsBrowse({ q }: { q: Q }) {
 	const searchRef = useRef<HTMLInputElement | null>(null);
 	useFindKey(searchRef);
+	const { open, effectInfo } = useContext(OpenCtx);
 	const [filter, setFilter] = useState('');
+	const [more, setMore] = useState<Record<string, boolean>>({});
 	const groups = useMemo(() => {
 		const g = new Map<string, { name: string; n: number }[]>();
 		for (const r of rows(q)) {
@@ -1715,13 +1729,24 @@ function EffectsBrowse({ q }: { q: Q }) {
 			if (!g.has(c)) g.set(c, []);
 			g.get(c)!.push({ name: S(r.name), n: N(r.n) });
 		}
-		return [...g.entries()].sort((a, b) => b[1].length - a[1].length);
+		return [...g.entries()].sort((a, b) => b[1].reduce((x, y) => x + y.n, 0) - a[1].reduce((x, y) => x + y.n, 0));
 	}, [q.data, filter]);
+	// The one-sentence description, without repeating the effect's own name at the start.
+	const blurbOf = (name: string) => {
+		const b = effectInfo.get(name.toLowerCase())?.blurb ?? '';
+		const t = b.replace(new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+(is|are|can be described as|refers to|describes)\\s+((medically\\s+)?(recognized|known|defined)\\s+as\\s+)?`, 'i'), '');
+		return t ? t[0].toUpperCase() + t.slice(1) : '';
+	};
+	const feltOf = (name: string) => {
+		const i = effectInfo.get(name.toLowerCase());
+		if (!i || i.neg == null) return null;
+		return (i.pos ?? 0) >= 0.6 ? { w: 'mostly good', c: C.mint } : i.neg >= 0.55 ? { w: 'mostly rough', c: C.coral } : { w: 'mixed', c: C.lav };
+	};
 	return (
 		<section className="rd-in">
 			<h1 className="text-4xl font-semibold">Effects</h1>
 			<p className="mt-2" style={{ color: C.soft }}>
-				Everything people described, grouped by type. Tap one to learn what it is.
+				Everything people described in their stories, grouped by kind. Each card says what the effect is, how many stories mention it, and how people usually felt about it.
 			</p>
 			<a href={SOURCES.sei.href} target="_blank" rel="noopener noreferrer" className="rd-card rd-hover mt-5 flex items-center gap-4 p-4" style={{ textDecoration: 'none', maxWidth: 760 }}>
 				<img src={SEI_ICON} alt="" width={36} height={36} style={{ borderRadius: 8, flexShrink: 0 }} />
@@ -1731,31 +1756,73 @@ function EffectsBrowse({ q }: { q: Q }) {
 				<span className="ml-auto text-sm font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>Visit ↗</span>
 			</a>
 			<input ref={searchRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search effects" className="rd-card mt-6 w-full px-5 py-3 text-base" style={{ borderRadius: 999, color: C.text, outline: 'none' }} />
+			{!q.isLoading && groups.length > 1 && (
+				<nav className="mt-4 flex flex-wrap gap-2" aria-label="Kinds of effect">
+					{groups.map(([cat, list]) => (
+						<button key={cat} className="rd-nav" style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }} onClick={() => document.getElementById(`fx-${cat}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+							{cat} <span style={{ color: C.faint }}>{list.length}</span>
+						</button>
+					))}
+				</nav>
+			)}
 			{q.isLoading ? (
 				<Loading height={240} className="mt-6" />
 			) : (
-				<div className="mt-8 grid gap-8">
-					{groups.map(([cat, list]) => (
-						<div key={cat}>
-							<div className="rd-label mb-3">
-								{cat} · {list.length}
-							</div>
-							<div className="flex flex-wrap gap-2">
-								{list.map((e) => (
-									<EffectTag key={e.name} name={e.name} />
-								))}
-							</div>
-						</div>
-					))}
+				<div className="mt-10 grid gap-14">
+					{groups.map(([cat, list]) => {
+						const shown = more[cat] || filter ? list : list.slice(0, 12);
+						return (
+							<section key={cat} id={`fx-${cat}`} style={{ scrollMarginTop: 16 }}>
+								<h2 className="text-2xl font-semibold">
+									{cat} <span className="text-base font-normal" style={{ color: C.faint }}>{list.length} effects</span>
+								</h2>
+								{EFFECT_CATEGORY[cat] && <p className="mt-1 max-w-3xl" style={{ color: C.soft }}>{EFFECT_CATEGORY[cat]}</p>}
+								<div className="mt-5 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))' }}>
+									{shown.map((e) => {
+										const felt = feltOf(e.name);
+										const blurb = blurbOf(e.name);
+										return (
+											<button key={e.name} onClick={() => open({ kind: 'effect', name: e.name })} className="rd-card rd-hover grid content-start gap-2 p-4 text-left">
+												<span className="flex items-center gap-2 font-semibold">
+													<span className="rd-dot" style={{ background: TONE_DOT[effectTone(effectInfo.get(e.name.toLowerCase()))] }} />
+													{e.name}
+												</span>
+												{blurb && (
+													<span className="text-sm" style={{ color: C.soft, lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+														{blurb}
+													</span>
+												)}
+												<span className="flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+													{e.n.toLocaleString()} {e.n === 1 ? 'story' : 'stories'}
+													{felt && (
+														<>
+															<span>·</span>
+															<span style={{ color: felt.c }}>{felt.w}</span>
+														</>
+													)}
+												</span>
+											</button>
+										);
+									})}
+								</div>
+								{!filter && list.length > 12 && (
+									<button className="mt-3 text-sm font-semibold" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 4 }} onClick={() => setMore({ ...more, [cat]: !more[cat] })}>
+										{more[cat] ? 'Show fewer' : `Show all ${list.length} ${cat.toLowerCase()} effects`}
+									</button>
+								)}
+							</section>
+						);
+					})}
 				</div>
 			)}
 			{!q.isLoading && (
-				<p className="mt-10 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+				<p className="mt-12 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
 					<img src={SEI_ICON} alt="" width={14} height={14} style={{ borderRadius: 3 }} />
 					Effect names, categories and descriptions:{' '}
 					<a href={SOURCES.sei.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
 						Subjective Effect Index
 					</a>
+					. “Mostly good / rough” is how the moments describing it felt in closely read stories.
 				</p>
 			)}
 			<Err q={q} />
