@@ -638,6 +638,17 @@ SELECT
   (SELECT list(sub ORDER BY n DESC, sub) FROM subs) AS sub_names,
   (SELECT list(n ORDER BY n DESC, sub) FROM subs) AS sub_counts`;
 
+// Names in the data that are really groups of drugs (Erowid files some reports under a category, and some
+// specific drugs, like ether under inhalants, were folded into one). One timing curve can't describe a group.
+const GROUPS = new Set(['Inhalants', 'Antidepressants', 'Opioids', 'Stimulants', 'Sedative', 'Barbiturates', 'Benzodiazepines', 'Substituted amphetamines', 'Selective serotonin reuptake inhibitor', 'Serotonin-norepinephrine reuptake inhibitor', 'Monoamine oxidase inhibitor']);
+const isGroup = (name: string) => GROUPS.has(name);
+// What reports filed under a group actually name.
+const groupMembersSQL = (name: string) => `
+SELECT substance AS name, count(DISTINCT report_id) AS n
+FROM ${DB}."report_doses"
+WHERE canonical_substance = '${esc(name)}' AND lower(substance) <> lower('${esc(name)}')
+GROUP BY 1 ORDER BY n DESC, 1 LIMIT 8`;
+
 const substanceDetailSQL = (name: string) => `
 WITH fd AS (
   SELECT report_id FROM ${DB}."llm_extractions" WHERE extraction->>'$.doses[0].substance' = '${esc(name)}'
@@ -1906,6 +1917,7 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 									<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
 										{short(name)}
 									</span>
+									{isGroup(name) && <GroupBadge />}
 									<span className="ml-auto text-xs tabular-nums" style={{ color: C.faint, whiteSpace: 'nowrap' }}>
 										{focus && !isFocus && together != null ? `${together} together` : `${N(r.n)} reports`}
 									</span>
@@ -2040,6 +2052,14 @@ function MiniTimeline({
 	);
 }
 
+function GroupBadge() {
+	return (
+		<span className="rd-tag" title="A group of drugs, not one specific drug" style={{ cursor: 'default', fontSize: 11, padding: '2px 9px', letterSpacing: '.08em', textTransform: 'uppercase', color: C.soft, background: 'transparent', borderStyle: 'dashed' }}>
+			group
+		</span>
+	);
+}
+
 // A plain description built from the structured fields and the reports. PsychonautWiki "summaries" are mostly
 // page furniture ("Summary sheet: …", "Not to be confused with …"); what's left of them is usually a safety note.
 function describeSubstance(name: string, r: Record<string, unknown>, timing: Record<string, unknown>[]) {
@@ -2048,10 +2068,11 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 	const chem = L(r.chem).filter((c) => !/^substituted /i.test(c) || L(r.chem).length === 1);
 	const kind = [cls.join(' and '), chem[0] ? `from the ${chem[0].toLowerCase()} family` : ''].filter(Boolean).join(' ');
 	const article = /^[aeiou]/i.test(kind) ? 'An' : 'A';
-	const kindLine = kind ? `${article} ${kind}.` : '';
+	const group = isGroup(name);
+	const kindLine = group ? 'A group of drugs, not a single one, so effects and timing vary a lot between them.' : kind ? `${article} ${kind}.` : '';
 	const desc = [
 		kindLine,
-		t ? `In reports, people usually notice it within ${fmtDur(N(t.on_m))}, feel it most around ${fmtDur(N(t.pk_m))}, and it fades by about ${fmtDur(N(t.end_m))}.` : '',
+		t && !group ? `In reports, people usually notice it within ${fmtDur(N(t.on_m))}, feel it most around ${fmtDur(N(t.pk_m))}, and it fades by about ${fmtDur(N(t.end_m))}.` : '',
 	].filter(Boolean).join(' ');
 	// The safety note: MAOIs first (TripSit's grouping), then a summary that actually reads as one, then toxicity.
 	const summary = sentences(S(r.summary).replace(/\[\d+\]/g, '').replace(/Summary sheet:.*$/i, '').replace(/Not to be confused with[^.]*\./gi, '').trim(), 2);
@@ -2064,7 +2085,7 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 				? `${tox[0].toUpperCase()}${tox.slice(1)}.`
 				: '';
 	const aka = L(r.aka).filter((a) => a.toLowerCase() !== name.toLowerCase()).slice(0, 6);
-	return { desc, kindLine, warning, aka, timing: t };
+	return { desc, kindLine, warning, aka, timing: group ? undefined : t, group };
 }
 
 // How one dose usually plays out, as a shape: nothing → first effects → strongest → fading. The three moments are
@@ -2135,10 +2156,12 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
 	const detailQ = useSQLQuery(substanceDetailSQL(name));
 	const timingQ = useSQLQuery(timingSQL([name]));
+	const membersQ = useSQLQuery(groupMembersSQL(name), { enabled: isGroup(name) });
 	const r = rows(detailQ)[0];
 	if (detailQ.isLoading || timingQ.isLoading) return <div className="rd-card mt-6 animate-pulse" style={{ height: 360 }} />;
 	if (!r) return null;
-	const { kindLine, warning, aka, timing: t } = describeSubstance(name, r, rows(timingQ));
+	const { kindLine, warning, aka, timing: t, group } = describeSubstance(name, r, rows(timingQ));
+	const members = rows(membersQ).map((m) => S(m.name)).filter((m) => m.toLowerCase() !== name.toLowerCase());
 	return (
 		<>
 			{aka.length > 0 && (
@@ -2156,7 +2179,20 @@ function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: strin
 				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
 					<div className="min-w-0">
 						{kindLine && <p style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.45 }}>{kindLine}</p>}
-						{t ? (
+						{group ? (
+							members.length > 0 && (
+								<p className="mt-4" style={{ color: C.soft, lineHeight: 1.5 }}>
+									Reports filed here sometimes name the drug:{' '}
+									{members.map((m, i) => (
+										<span key={m}>
+											{i > 0 && ', '}
+											<b style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{m}</b>
+										</span>
+									))}
+									. Others just say “{short(name).toLowerCase()}”.
+								</p>
+							)
+						) : t ? (
 							<div className="mt-5">
 								<div className="rd-label mb-2">How a dose usually plays out</div>
 								<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} />
@@ -2766,6 +2802,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 							<SubstanceIcon name={n} />
 							{short(n)}
 						</button>
+						{isGroup(n) && <GroupBadge />}
 					</span>
 				))}
 			</h1>
@@ -3329,6 +3366,37 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 					)}
 				</div>
 			)}
+			{side && doses.length > 0 && (
+				<div className="mt-3 border-t pt-3" style={{ borderColor: C.line }}>
+					<div className="flex items-baseline justify-between">
+						<span className="rd-label">Doses</span>
+						<span className="text-xs" style={{ color: C.faint }}>
+							{takenSoFar.length} of {doses.length} taken
+						</span>
+					</div>
+					<div className="mt-2 flex flex-wrap gap-1.5">
+						{[...doses].sort((p, q) => p.t - q.t).map((d, i, all) => {
+							const taken = d.t <= t + 1e-9;
+							const earlier = d.assumed ? undefined : all.find((e) => !e.assumed && e.sub !== d.sub && e.t < d.t - 0.25 && sharesTol(rows(tolQ), e.sub, d.sub));
+							return (
+								<button
+									key={i}
+									onClick={() => jump(d.t)}
+									className="rd-tag"
+									title={[d.assumed ? 'Time not given' : `Jump to ${fmtT(d.t)}`, d.sub, d.amount, earlier ? `Shares tolerance with ${short(earlier.sub)}, taken earlier` : ''].filter(Boolean).join(' · ')}
+									style={{ padding: '4px 10px', fontSize: 12, gap: 6, opacity: taken ? 1 : 0.42, transition: 'opacity .3s' }}
+								>
+									<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{d.assumed ? '—' : fmtT(d.t)}</span>
+									<ClassIcon cls={classOf(d.sub)} size={12} color={C.coral} />
+									{short(d.sub)}
+									{/\d/.test(d.amount) && <span style={{ color: C.soft, fontWeight: 500, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.amount}</span>}
+									{earlier && <Repeat size={11} color={C.lav} />}
+								</button>
+							);
+						})}
+					</div>
+				</div>
+			)}
 		</div>
 	);
 
@@ -3519,6 +3587,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 						)}
 					</div>
 
+					{!wide && (
 					<div className="rd-card p-4">
 						<div className="flex items-baseline justify-between">
 							<span className="rd-label">Doses</span>
@@ -3578,6 +3647,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 							</ol>
 						)}
 					</div>
+					)}
 				</aside>
 			</div>
 
