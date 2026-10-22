@@ -649,7 +649,8 @@ eff AS (
 )
 SELECT s.name, s.summary, s.url, coalesce(s.psychoactive_class, []) AS cls, coalesce(s.chemical_class, []) AS chem,
   coalesce(s.common_names, []) AS aka, coalesce(s.cross_tolerances, []) AS cross_tol,
-  s.tolerance_full, s.tolerance_zero, s.addiction_potential AS addiction,
+  s.tolerance_full, s.tolerance_zero, s.addiction_potential AS addiction, coalesce(s.toxicity, []) AS tox,
+  EXISTS (SELECT 1 FROM ${DB}."tripsit_group_members" WHERE group_key = 'maois' AND substance = q.q) AS maoi,
   (SELECT count(*) FROM fd) AS n_read,
   (SELECT count(DISTINCT report_id) FROM ${DB}."report_doses" WHERE canonical_substance = '${esc(name)}') AS n_reports,
   (SELECT list(effect_name ORDER BY n DESC, effect_name) FROM eff) AS effects
@@ -1517,26 +1518,7 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 				) : (
 					<div className="rd-in mt-5 grid gap-6">
 						{(() => {
-							// PsychonautWiki "summaries" are mostly page furniture ("Summary sheet: …", "Not to be confused with …");
-							// build a plain description from the structured fields and the reports instead.
-							const t = rows(timingQ).find((x) => S(x.sub) === item.name && S(x.route) === '*');
-							const cls = L(r.cls).map((c) => c.toLowerCase().replace(/s$/, ''));
-							const chem = L(r.chem).filter((c) => !/^substituted /i.test(c) || L(r.chem).length === 1);
-							const kind = [cls.join(' and '), chem[0] ? `from the ${chem[0].toLowerCase()} family` : ''].filter(Boolean).join(' ');
-							const article = /^[aeiou]/i.test(kind) ? 'An' : 'A';
-							const desc = [
-								kind ? `${article} ${kind}.` : '',
-								t ? `In reports, people usually notice it within ${fmtDur(N(t.on_m))}, feel it most around ${fmtDur(N(t.pk_m))}, and it fades by about ${fmtDur(N(t.end_m))}.` : '',
-							].filter(Boolean).join(' ');
-							const warning = sentences(
-								S(r.summary)
-									.replace(/\[\d+\]/g, '')
-									.replace(/Summary sheet:.*$/i, '')
-									.replace(/Not to be confused with[^.]*\./gi, '')
-									.trim(),
-								2,
-							);
-							const aka = L(r.aka).filter((a) => a.toLowerCase() !== item.name.toLowerCase()).slice(0, 6);
+							const { desc, warning, aka } = describeSubstance(item.name, r, rows(timingQ));
 							return (
 								<>
 									{desc && <p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.55 }}>{desc}</p>}
@@ -1546,7 +1528,7 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 											{aka.join(', ')}
 										</div>
 									)}
-									{warning.length > 20 && (
+									{warning && (
 										<div className="flex items-start gap-2 rounded-2xl p-3 text-sm" style={{ background: 'rgba(255,163,182,.12)', border: '1px solid rgba(255,163,182,.4)', color: C.text }}>
 											<AlertTriangle size={16} color={C.coral} style={{ flexShrink: 0, marginTop: 2 }} />
 											<span>{warning}</span>
@@ -1605,7 +1587,7 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 							<Sources className="mt-3" list={[S(r.url) ? ['pw', S(r.url)] : 'pw', 'erowid']} />
 						</div>
 						<button className="rd-btn" style={{ background: '#fff', color: C.deep, justifySelf: 'start' }} onClick={() => onReplay(item.name)}>
-							Replay its reports
+							Open full page
 						</button>
 					</div>
 				)}
@@ -1737,14 +1719,69 @@ function OutcomeBar({ pos, neg, n }: { pos: unknown; neg: unknown; n: number }) 
 	);
 }
 
+// What people most often took it with, whether the mix carries a warning, and how it went.
+function CombosList({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
+	const { classOf } = useContext(OpenCtx);
+	const combosQ = useSQLQuery(focusCombosSQL(name));
+	const SEV: Record<number, { w: string; c: string }> = { 3: { w: 'dangerous', c: C.coral }, 2: { w: 'unsafe', c: C.amber }, 1: { w: 'caution', c: C.lav } };
+	return (
+		<>
+			<span className="rd-label">Most often combined with</span>
+			{combosQ.isLoading ? (
+				<div className="mt-3 animate-pulse" style={{ height: 180 }} />
+			) : rows(combosQ).length === 0 ? (
+				<p className="mt-2 text-sm" style={{ color: C.faint }}>No combinations on record.</p>
+			) : (
+				<div className="mt-2 grid">
+					{rows(combosQ).map((r) => {
+						const other = S(r.s);
+						const sev = SEV[N(r.sev)];
+						return (
+							<button
+								key={other}
+								onClick={() => onCombo(name, other)}
+								className="rd-hover grid items-center gap-3 rounded-xl px-2 py-2.5 text-left"
+								style={{ gridTemplateColumns: 'minmax(0, 1.2fr) auto minmax(0, 1.6fr) 16px', borderTop: `1px solid ${C.line}` }}
+							>
+								<span className="flex items-center gap-2 font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={other}>
+									<ClassIcon cls={classOf(other)} size={16} color={C.coral} />
+									{short(other)}
+									<span className="text-xs font-normal" style={{ color: C.faint }}>{N(r.n)} together</span>
+								</span>
+								<span className="text-xs font-semibold" style={{ color: sev?.c ?? C.faint, whiteSpace: 'nowrap' }}>
+									{sev ? (
+										<span className="inline-flex items-center gap-1" title={S(r.note)}>
+											<AlertTriangle size={12} /> {sev.w}
+										</span>
+									) : r.status ? (
+										<span style={{ color: C.mint }} title={S(r.note)}>low risk</span>
+									) : (
+										'no note'
+									)}
+								</span>
+								<OutcomeBar pos={r.pos} neg={r.neg} n={N(r.n_llm)} />
+								<ChevronRight size={14} color={C.faint} />
+							</button>
+						);
+					})}
+				</div>
+			)}
+			<p className="mt-3 text-xs" style={{ color: C.faint }}>
+				Good / rough from closely read reports. “No note” isn’t the same as safe.
+				<span className="ml-2 inline-block align-middle">
+					<TripSitBadge />
+				</span>
+			</p>
+		</>
+	);
+}
+
 function FocusPanel({ name, onPick, onCombo, onClose }: { name: string; onPick: (s: string) => void; onCombo: (a: string, b: string) => void; onClose: () => void }) {
 	const { open, classOf } = useContext(OpenCtx);
-	const combosQ = useSQLQuery(focusCombosSQL(name));
 	const aloneQ = useSQLQuery(aloneSQL(name));
 	const timingQ = useSQLQuery(timingSQL([name]));
 	const t = rows(timingQ).find((r) => S(r.route) === '*');
 	const al = rows(aloneQ)[0];
-	const SEV: Record<number, { w: string; c: string }> = { 3: { w: 'dangerous', c: C.coral }, 2: { w: 'unsafe', c: C.amber }, 1: { w: 'caution', c: C.lav } };
 	return (
 		<div className="rd-card rd-in mt-6 p-5 sm:p-6" onClick={(e) => e.stopPropagation()}>
 			<div className="flex flex-wrap items-center justify-between gap-3">
@@ -1754,10 +1791,7 @@ function FocusPanel({ name, onPick, onCombo, onClose }: { name: string; onPick: 
 				</h2>
 				<div className="flex items-center gap-2">
 					<button className="rd-btn" style={{ background: '#fff', color: C.deep, padding: '5px 12px', fontSize: 13 }} onClick={() => onPick(name)}>
-						Replay its reports
-					</button>
-					<button className="rd-btn" style={{ padding: '5px 12px', fontSize: 13 }} onClick={() => open({ kind: 'substance', name })}>
-						About
+						Open page
 					</button>
 					<button className="rd-btn" aria-label="Close" style={{ padding: 7 }} onClick={onClose}>
 						<X size={14} />
@@ -1780,52 +1814,7 @@ function FocusPanel({ name, onPick, onCombo, onClose }: { name: string; onPick: 
 			</div>
 
 			<div className="mt-6">
-				<span className="rd-label">Most often combined with</span>
-				{combosQ.isLoading ? (
-					<div className="mt-3 animate-pulse" style={{ height: 180 }} />
-				) : rows(combosQ).length === 0 ? (
-					<p className="mt-2 text-sm" style={{ color: C.faint }}>No combinations on record.</p>
-				) : (
-					<div className="mt-2 grid">
-						{rows(combosQ).map((r) => {
-							const other = S(r.s);
-							const sev = SEV[N(r.sev)];
-							return (
-								<button
-									key={other}
-									onClick={() => onCombo(name, other)}
-									className="rd-hover grid items-center gap-3 rounded-xl px-2 py-2.5 text-left"
-									style={{ gridTemplateColumns: 'minmax(0, 1.2fr) auto minmax(0, 1.6fr) 16px', borderTop: `1px solid ${C.line}` }}
-								>
-									<span className="flex items-center gap-2 font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={other}>
-										<ClassIcon cls={classOf(other)} size={16} color={C.coral} />
-										{short(other)}
-										<span className="text-xs font-normal" style={{ color: C.faint }}>{N(r.n)} together</span>
-									</span>
-									<span className="text-xs font-semibold" style={{ color: sev?.c ?? C.faint, whiteSpace: 'nowrap' }}>
-										{sev ? (
-											<span className="inline-flex items-center gap-1" title={S(r.note)}>
-												<AlertTriangle size={12} /> {sev.w}
-											</span>
-										) : r.status ? (
-											<span style={{ color: C.mint }} title={S(r.note)}>low risk</span>
-										) : (
-											'no note'
-										)}
-									</span>
-									<OutcomeBar pos={r.pos} neg={r.neg} n={N(r.n_llm)} />
-									<ChevronRight size={14} color={C.faint} />
-								</button>
-							);
-						})}
-					</div>
-				)}
-				<p className="mt-3 text-xs" style={{ color: C.faint }}>
-					Good / rough from closely read reports. “No note” isn’t the same as safe.
-					<span className="ml-2 inline-block align-middle">
-						<TripSitBadge />
-					</span>
-				</p>
+				<CombosList name={name} onCombo={onCombo} />
 			</div>
 		</div>
 	);
@@ -2040,6 +2029,106 @@ function MiniTimeline({
 				<line x1={sx(x)} x2={sx(x)} y1={2} y2={stripY} stroke="#fff" strokeOpacity="0.55" strokeWidth="1.5" />
 				<circle cx={sx(x)} cy={stripY + 5} r={8.5} fill="#fff" stroke={moodColor(knobV)} strokeWidth={3} />
 			</svg>
+		</div>
+	);
+}
+
+// A plain description built from the structured fields and the reports. PsychonautWiki "summaries" are mostly
+// page furniture ("Summary sheet: …", "Not to be confused with …"); what's left of them is usually a safety note.
+function describeSubstance(name: string, r: Record<string, unknown>, timing: Record<string, unknown>[]) {
+	const t = timing.find((x) => S(x.sub) === name && S(x.route) === '*');
+	const cls = L(r.cls).map((c) => c.toLowerCase().replace(/s$/, ''));
+	const chem = L(r.chem).filter((c) => !/^substituted /i.test(c) || L(r.chem).length === 1);
+	const kind = [cls.join(' and '), chem[0] ? `from the ${chem[0].toLowerCase()} family` : ''].filter(Boolean).join(' ');
+	const article = /^[aeiou]/i.test(kind) ? 'An' : 'A';
+	const desc = [
+		kind ? `${article} ${kind}.` : '',
+		t ? `In reports, people usually notice it within ${fmtDur(N(t.on_m))}, feel it most around ${fmtDur(N(t.pk_m))}, and it fades by about ${fmtDur(N(t.end_m))}.` : '',
+	].filter(Boolean).join(' ');
+	// The safety note: MAOIs first (TripSit's grouping), then a summary that actually reads as one, then toxicity.
+	const summary = sentences(S(r.summary).replace(/\[\d+\]/g, '').replace(/Summary sheet:.*$/i, '').replace(/Not to be confused with[^.]*\./gi, '').trim(), 2);
+	const tox = L(r.tox).find((x) => /lethal|danger|mixed|combined/i.test(x));
+	const warning = r.maoi
+		? 'It’s an MAOI, which makes it dangerous with many other drugs, including MDMA, many stimulants and antidepressants. Always check a combination before mixing.'
+		: summary.length > 20 && /fatal|overdose|lethal|danger|risk|caution|poison|toxic|serotonin|avoid|death|combin/i.test(summary)
+			? summary
+			: tox
+				? `${tox[0].toUpperCase()}${tox.slice(1)}.`
+				: '';
+	const aka = L(r.aka).filter((a) => a.toLowerCase() !== name.toLowerCase()).slice(0, 6);
+	return { desc, warning, aka, timing: t };
+}
+
+// The top of a substance's own page: what it is, how it usually goes, what to watch for, what it's mixed with.
+function SubstanceOverview({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
+	const detailQ = useSQLQuery(substanceDetailSQL(name));
+	const timingQ = useSQLQuery(timingSQL([name]));
+	const r = rows(detailQ)[0];
+	if (detailQ.isLoading || timingQ.isLoading) return <div className="rd-card mt-6 animate-pulse" style={{ height: 260 }} />;
+	if (!r) return null;
+	const { desc, warning, aka, timing: t } = describeSubstance(name, r, rows(timingQ));
+	return (
+		<div className="rd-in mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+			<div className="grid content-start gap-5">
+				{aka.length > 0 && (
+					<div className="text-sm" style={{ color: C.soft }}>
+						<span className="rd-label mr-2">Also known as</span>
+						{aka.join(', ')}
+					</div>
+				)}
+				{desc && <p style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.55 }}>{desc}</p>}
+				{t && (
+					<div className="flex flex-wrap gap-10">
+						{[
+							['First effects', N(t.on_m)],
+							['Strongest', N(t.pk_m)],
+							['Last effects', N(t.end_m)],
+						].map(([l, v]) => (
+							<div key={l as string}>
+								<div className="text-3xl font-light" style={{ letterSpacing: '-0.02em' }}>{fmtDur(v as number)}</div>
+								<div className="rd-label mt-1">{l}</div>
+							</div>
+						))}
+					</div>
+				)}
+				{warning && (
+					<div className="flex items-start gap-2 rounded-2xl p-4 text-sm" style={{ background: 'rgba(255,163,182,.12)', border: '1px solid rgba(255,163,182,.4)', color: C.text, lineHeight: 1.5 }}>
+						<AlertTriangle size={16} color={C.coral} style={{ flexShrink: 0, marginTop: 2 }} />
+						<span>{warning}</span>
+					</div>
+				)}
+				{L(r.effects).length > 0 && (
+					<div>
+						<div className="rd-label mb-2">Most reported effects</div>
+						<div className="flex flex-wrap gap-2">
+							{L(r.effects).map((e) => (
+								<EffectTag key={e} name={e} />
+							))}
+						</div>
+					</div>
+				)}
+				{(S(r.tolerance_full) || S(r.addiction)) && (
+					<div className="grid gap-2 text-sm" style={{ color: C.soft }}>
+						{S(r.tolerance_full) && (
+							<div>
+								<span className="rd-label mr-2">Tolerance</span>
+								builds {S(r.tolerance_full).replace(/^with\s+/i, '')}
+								{S(r.tolerance_zero) ? `, back to baseline ${S(r.tolerance_zero).replace(/^after\s+/i, 'after ')}` : ''}
+							</div>
+						)}
+						{S(r.addiction) && (
+							<div>
+								<span className="rd-label mr-2">Habit-forming</span>
+								{S(r.addiction)}
+							</div>
+						)}
+					</div>
+				)}
+				{L(r.cross_tol).length > 0 && <CrossTol name={name} />}
+			</div>
+			<div className="rd-card content-start p-5">
+				<CombosList name={name} onCombo={onCombo} />
+			</div>
 		</div>
 	);
 }
@@ -2530,7 +2619,7 @@ const niceTicks = (h: number) => {
 };
 const tickLabel = (h: number) => (h === 0 ? '0' : h < 1 ? `${Math.round(h * 60)}m` : `${Math.round(h * 10) / 10}h`);
 
-function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMoodQ, pairSummaryQ, pairEffectsQ, pairSeqQ, q, kq, curveQ, denQ, horizon, onOpen }: { sub: string; withSub: string | null; only: boolean; setOnly: (v: boolean) => void; pairQ: Q; pairTimingQ: Q; pairMoodQ: Q; pairSummaryQ: Q; pairEffectsQ: Q; pairSeqQ: Q; q: Q; kq: Q; curveQ: Q; denQ: Q; horizon: number; onOpen: (id: string) => void }) {
+function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ, pairMoodQ, pairSummaryQ, pairEffectsQ, pairSeqQ, q, kq, curveQ, denQ, horizon, onOpen }: { sub: string; withSub: string | null; only: boolean; setOnly: (v: boolean) => void; onCombo: (a: string, b: string) => void; pairQ: Q; pairTimingQ: Q; pairMoodQ: Q; pairSummaryQ: Q; pairEffectsQ: Q; pairSeqQ: Q; q: Q; kq: Q; curveQ: Q; denQ: Q; horizon: number; onOpen: (id: string) => void }) {
 	const list = rows(q);
 	const k = rows(kq)[0];
 	const [x, setX] = useState<number | null>(null);
@@ -2639,20 +2728,7 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 					</span>
 				</p>
 			)}
-			{!withSub && k && N(k.n_llm) >= 5 && (
-				<div className="mt-5 flex flex-wrap gap-10">
-					{[
-						['First effects', N(k.onset_h)],
-						['Strongest', N(k.peak_h)],
-						['Last effects', N(k.last_h)],
-					].map(([label, v]) => (
-						<div key={label as string}>
-							<div className="text-3xl font-light" style={{ letterSpacing: '-0.02em' }}>{fmtDur(v as number)}</div>
-							<div className="rd-label mt-1">{label}</div>
-						</div>
-					))}
-				</div>
-			)}
+			{!withSub && <SubstanceOverview name={sub} onCombo={onCombo} />}
 			{curveQ.isLoading || kq.isLoading ? (
 				<div className="rd-card mt-6 animate-pulse" style={{ height: 320 }} />
 			) : withSub ? (
@@ -2697,8 +2773,8 @@ function ReportsStep({ sub, withSub, only, setOnly, pairQ, pairTimingQ, pairMood
 
 			<div className="mt-10 flex flex-wrap items-end justify-between gap-3">
 				<div>
-					<h2 className="text-2xl font-semibold">{withSub ? 'Reports with both' : 'Replay a report'}</h2>
-					<p className="mt-1 text-sm" style={{ color: C.faint }}>Closely read reports first.</p>
+					<h2 className="text-2xl font-semibold">{withSub ? 'Stories with both' : 'Stories'}</h2>
+					<p className="mt-1 text-sm" style={{ color: C.faint }}>What people went through, in their own words. Closely read ones first.</p>
 				</div>
 				<button onClick={shuffle} className="rd-btn flex items-center gap-2">
 					<Shuffle size={15} /> Random
@@ -3507,7 +3583,7 @@ export default function ReportTimelapse() {
 					)}
 
 					{view === 'reports' && !sub && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
-					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
+					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} onCombo={goCombo} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
 					{onReport && <TimelapseStep id={reportId!} reportQ={reportQ} marksQ={marksQ} dosesQ={dosesQ} obsQ={obsQ} timingQ={timingQ} pairsQ={pairsQ} frozen={!!openItem} />}
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
 					{view === 'effects' && <EffectsBrowse q={effectsQ} />}
