@@ -746,7 +746,7 @@ const CSS = `
 .rd-story { font-family: ${SERIF}; font-size: 21px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; transition: color .6s; }
 .rd-story.focus { color: rgba(255,255,255,.42); }
 .rd-side > * { min-width: 0; }
-.rd-side { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: none; }
+.rd-side { position: sticky; top: 84px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; max-height: calc(100vh - 96px); overflow-y: auto; scrollbar-width: none; }
 .rd-bar { position: sticky; top: 8px; z-index: 10; border-radius: 20px; border: 1px solid ${C.line}; background: rgba(62,50,124,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .rd-range { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 999px; background: rgba(255,255,255,.18); outline: none; }
 .rd-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; cursor: pointer; }
@@ -2345,76 +2345,90 @@ function CrossTol({ name }: { name: string }) {
 	);
 }
 
-// What's known about the pairs active right now, one at a time: worst first, cycling every few seconds
-// (paused while pointed at or focused), with dots to step through. Each shows the actual note, not a count.
-function MixNotes({ items, pwPage }: { items: Record<string, unknown>[]; pwPage: (p: Record<string, unknown>) => string }) {
+// The flag sits on the PsychonautWiki page of the substance whose interaction list names the other one.
+const pwInteractions = (p: Record<string, unknown>) => {
+	const via = S(p.via).toLowerCase();
+	const page = [S(p.a), S(p.b)].find((n) => !via.includes(n.toLowerCase())) ?? S(p.a);
+	return `https://psychonautwiki.org/wiki/${encodeURIComponent(page.replace(/ /g, '_'))}#Dangerous_interactions`;
+};
+
+// Risky pairs in this story, as a banner that stays at the top while reading: one pair at a time (worst and
+// "mixing now" first), cycling every few seconds unless pointed at, with the reason on one line. Tap to read it all.
+function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean })[] }) {
 	const [idx, setIdx] = useState(0);
 	const [paused, setPaused] = useState(false);
-	const key = items.map((p) => `${S(p.a)}|${S(p.b)}`).join(',');
+	const [full, setFull] = useState(false);
+	const key = items.map((p) => `${S(p.a)}|${S(p.b)}|${p.now ? 1 : 0}`).join(',');
 	useEffect(() => setIdx(0), [key]);
 	useEffect(() => {
-		if (items.length < 2 || paused) return;
+		if (items.length < 2 || paused || full) return;
 		const timer = setInterval(() => setIdx((i) => (i + 1) % items.length), 7000);
 		return () => clearInterval(timer);
-	}, [items.length, paused, key]);
+	}, [items.length, paused, full, key]);
 	const p = items[Math.min(idx, items.length - 1)];
 	if (!p) return null;
-	const sev = p.sev == null ? 0 : N(p.sev);
+	const sev = N(p.sev);
 	const look =
-		sev === 3 ? { fg: C.coral, bg: 'rgba(255,140,165,.14)', t: 'dangerous together' }
-		: sev === 2 ? { fg: C.amber, bg: 'rgba(255,200,130,.11)', t: 'unsafe together' }
-		: sev === 1 ? { fg: C.lav, bg: 'rgba(217,207,255,.08)', t: 'use caution' }
-		: { fg: C.mint, bg: 'rgba(166,242,228,.07)', t: S(p.status).toLowerCase() || 'low risk' };
+		sev === 3 ? { fg: C.coral, bg: 'rgba(120,40,80,.55)', t: 'dangerous together' }
+		: sev === 2 ? { fg: C.amber, bg: 'rgba(110,70,40,.5)', t: 'unsafe together' }
+		: { fg: C.lav, bg: 'rgba(52,40,110,.7)', t: 'use caution' };
+	const reason = p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
 	return (
 		<div
-			className="mt-3 rounded-2xl p-4"
-			style={{ background: look.bg, border: `1px solid ${look.fg}55`, transition: 'background .4s, border-color .4s' }}
+			className="rd-in mt-6"
+			style={{ position: 'sticky', top: 10, zIndex: 20, borderRadius: 18, border: `1px solid ${look.fg}66`, background: look.bg, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 10px 30px rgba(10,4,40,.25)', transition: 'background .4s, border-color .4s' }}
 			onMouseEnter={() => setPaused(true)}
 			onMouseLeave={() => setPaused(false)}
-			onFocus={() => setPaused(true)}
-			onBlur={() => setPaused(false)}
 			aria-live="polite"
 		>
-			<div key={idx} className="rd-fade">
-				<div className="flex items-center gap-2 font-semibold" style={{ color: look.fg }}>
-					{sev > 0 ? <AlertTriangle size={15} style={{ flexShrink: 0 }} /> : <Check size={15} style={{ flexShrink: 0 }} />}
-					<span>
+			<div className="flex items-center gap-3 px-4 py-2.5">
+				<AlertTriangle size={17} color={look.fg} style={{ flexShrink: 0 }} />
+				<button key={idx} className="rd-fade flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setFull(!full)} title={full ? 'Show less' : 'Read the whole note'}>
+					<b className="font-semibold" style={{ color: look.fg, whiteSpace: 'nowrap' }}>
 						{short(S(p.a))} + {short(S(p.b))}: {look.t}
-					</span>
-				</div>
-				{p.note ? (
-					<p className="mt-2" style={{ fontFamily: SERIF, fontSize: 16, lineHeight: 1.5, color: C.text }}>{S(p.note)}</p>
-				) : sev > 0 ? (
-					<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
-						Flagged {sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on {S(p.via).toLowerCase()}), with no explanation on file.{' '}
-						<a href={pwPage(p)} target="_blank" rel="noopener noreferrer" style={{ color: C.text, textDecoration: 'underline', textUnderlineOffset: 3 }}>
-							Read why ↗
-						</a>
-					</p>
-				) : null}
-			</div>
-			{items.length > 1 && (
-				<div className="mt-3 flex items-center gap-3">
-					<div className="flex items-center gap-1.5">
-						{items.map((q, i) => {
-							const c = q.sev == null ? C.mint : N(q.sev) === 3 ? C.coral : N(q.sev) === 2 ? C.amber : C.lav;
-							return (
-								<button
-									key={i}
-									onClick={() => setIdx(i)}
-									aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
-									title={`${short(S(q.a))} + ${short(S(q.b))}`}
-									style={{ width: i === idx ? 18 : 7, height: 7, borderRadius: 999, background: c, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
-								/>
-							);
-						})}
+					</b>
+					{p.now && (
+						<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: look.fg, color: C.deep, whiteSpace: 'nowrap' }}>
+							mixing now
+						</span>
+					)}
+					{!full && (
+						<span className="rd-hide-sm min-w-0 text-sm" style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+							{reason}
+						</span>
+					)}
+				</button>
+				{items.length > 1 && (
+					<div className="flex items-center gap-1.5" style={{ flexShrink: 0 }}>
+						{items.map((q, i) => (
+							<button
+								key={i}
+								onClick={() => setIdx(i)}
+								aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
+								title={`${short(S(q.a))} + ${short(S(q.b))}`}
+								style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 999, background: N(q.sev) === 3 ? C.coral : N(q.sev) === 2 ? C.amber : C.lav, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
+							/>
+						))}
 					</div>
-					<span className="text-xs tabular-nums" style={{ color: C.faint }}>
-						{idx + 1} of {items.length}
-					</span>
-					<button className="ml-auto" onClick={() => setIdx((idx + 1) % items.length)} aria-label="Next note" style={{ color: C.soft }}>
-						<ChevronRight size={16} />
-					</button>
+				)}
+				<button onClick={() => setFull(!full)} aria-label={full ? 'Show less' : 'Read the whole note'} style={{ color: C.soft, flexShrink: 0 }}>
+					{full ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+				</button>
+			</div>
+			{full && (
+				<div className="rd-fade flex flex-wrap items-end justify-between gap-3 px-4 pb-4" style={{ paddingLeft: 46 }}>
+					<p style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.text, maxWidth: 820 }}>
+						{reason}
+						{!p.note && (
+							<>
+								{' '}
+								<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>
+									Read why ↗
+								</a>
+							</>
+						)}
+					</p>
+					{S(p.via) === 'TripSit' && <TripSitBadge />}
 				</div>
 			)}
 		</div>
@@ -3246,35 +3260,11 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	});
 	const activeNotes = activeSubs.length < 2 ? [] : rows(pairsQ).filter((p) => activeSubs.includes(S(p.a)) && activeSubs.includes(S(p.b)));
 	const riskNow = Math.max(0, ...activeNotes.map((p) => N(p.sev)));
-	const mixing = (() => {
-							if (activeSubs.length < 2) return null;
-							const notes = activeNotes;
-							const flagged = notes.filter((p) => p.sev != null).sort((a, b) => N(b.sev) - N(a.sev));
-							const low = notes.filter((p) => p.sev == null && p.status);
-							const pwPage = (p: Record<string, unknown>) => {
-								// The flag sits on the page of the substance whose interaction list names the other one.
-								const via = S(p.via).toLowerCase();
-								const page = [S(p.a), S(p.b)].find((n) => !via.includes(n.toLowerCase())) ?? S(p.a);
-								return `https://psychonautwiki.org/wiki/${encodeURIComponent(page.replace(/ /g, '_'))}#Dangerous_interactions`;
-							};
-							return (
-								<div>
-									<div className="flex flex-wrap items-center gap-2">
-										<span className="rd-label pr-1">Mixing now</span>
-										<span className="text-sm" style={{ color: C.soft }}>
-											{activeSubs.map(short).join(' + ')}
-											{!notes.length && <span style={{ color: C.faint }}> · no note on file, which isn't the same as safe</span>}
-										</span>
-									</div>
-									{notes.length > 0 && <MixNotes items={[...flagged, ...low]} pwPage={pwPage} />}
-									{notes.some((p) => S(p.via) === 'TripSit') && (
-										<div className="mt-3">
-											<TripSitBadge />
-										</div>
-									)}
-								</div>
-							);
-						})();
+	// Every risky pair in the story, for the banner: the ones mixing right now first, then the worst.
+	const bannerItems = rows(pairsQ)
+		.filter((p) => p.sev != null && N(p.sev) >= 1)
+		.map((p) => ({ ...p, now: activeSubs.includes(S(p.a)) && activeSubs.includes(S(p.b)) }))
+		.sort((x, y) => Number(y.now) - Number(x.now) || N(y.sev) - N(x.sev));
 	const moodScale = obs.length >= 2 ? 1 : 3;
 	const moodLine = moodPts.map((p) => ({ x: p.x, y: clamp(p.y * moodScale, -1, 1) }));
 	const moodNow = momentObs ? (MOMENT[S(momentObs.sentiment)] ?? MOMENT.neutral).y : clamp((interp(moodPts, t) ?? 0) * moodScale, -1, 1);
@@ -3505,6 +3495,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 			))}
 			{!wide && <div aria-hidden className="rd-fadebar" />}
 
+			{bannerItems.length > 0 && <MixBanner items={bannerItems} />}
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
 				<article ref={bodyRef} className={`rd-story ${active && playing ? 'focus' : ''}`}>
@@ -3538,8 +3529,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				</article>
 
 				{/* Alongside the story: the moment, and the doses */}
-				<aside className="rd-side">
-					{mixing && <div className="rd-card rd-in p-4">{mixing}</div>}
+				<aside className="rd-side" style={bannerItems.length ? undefined : { top: 12, maxHeight: 'calc(100vh - 24px)' }}>
 					{wide && timeline(true)}
 					<div key={heroKey} className="rd-in px-1 pb-2 pt-3">
 						<div className="flex flex-wrap items-center gap-3">
@@ -3835,17 +3825,28 @@ export default function ReportTimelapse() {
 		clearReport();
 		setOpenItem(null);
 	};
-	// What Spunion says on this page, before the general tips.
+	// Spunion only speaks up when it matters: a risky pair, a story with a risky mix, or a first hello.
+	const [greeted] = useState(() => {
+		try {
+			return window.localStorage.getItem('rd-spunion-hi') === '1';
+		} catch {
+			return true;
+		}
+	});
+	useEffect(() => {
+		try {
+			window.localStorage.setItem('rd-spunion-hi', '1');
+		} catch {
+			/* private mode: he'll just say hi again next time */
+		}
+	}, []);
 	const spunionTips = (() => {
-		const pairSev = withSub ? N(rows(comboPairQ)[0]?.sev) : 0;
-		const own =
-			onReport ? ['Scroll through the story and the timeline follows along. Or press play and I’ll walk you through it.']
-			: onSub && withSub && pairSev >= 2 ? [`${short(sub!)} with ${short(withSub)} is a risky mix. If you go ahead anyway: go low, go slow, and don’t do it alone.`]
-			: onSub && withSub ? [`Here’s how ${short(sub!)} and ${short(withSub)} tend to go together, from people who tried it.`]
-			: onSub ? [`New to ${short(sub!)}? The curve up top shows when people usually feel it. Give it that long before taking more.`]
-			: view === 'effects' ? ['Tap an effect to see what it is, and what people had taken when they felt it.']
-			: ['Hi, I’m Spunion! Tap a substance to see how it usually goes, or tap two to see how they mix.'];
-		return [...own, ...SPUNION_TIPS];
+		const pairSev = onSub && withSub ? N(rows(comboPairQ)[0]?.sev) : 0;
+		const storySev = onReport ? Math.max(0, ...rows(pairsQ).map((p) => N(p.sev))) : 0;
+		if (pairSev >= 2) return [`${short(sub!)} with ${short(withSub!)} is a risky mix. If you go ahead anyway: go low, go slow, and don’t do it alone.`, SPUNION_TIPS[1]];
+		if (storySev >= 2) return ['This story includes a risky mix. The banner up top says why, and lights up while it’s happening.', 'If you’re mixing anything yourself: go low, go slow, and don’t do it alone.'];
+		if (!greeted && !onSub && !onReport) return ['Hi, I’m Spunion! Tap a substance to see how it usually goes, or tap two to see how they mix.', ...SPUNION_TIPS];
+		return [];
 	})();
 	const goCombo = (a: string, b: string) => {
 		setView('reports');
