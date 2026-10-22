@@ -2408,7 +2408,6 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 	const [idx, setIdx] = useState(0);
 	const [part, setPart] = useState(0);
 	const [paused, setPaused] = useState(false);
-	const [hop, setHop] = useState(false);
 	const key = items.map((p) => `${S(p.a)}|${S(p.b)}|${p.now ? 1 : 0}`).join(',');
 	const p = items[Math.min(idx, items.length - 1)];
 	const sev = p ? N(p.sev) : 0;
@@ -2432,17 +2431,10 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 		}, Math.max(3500, words * 250));
 		return () => clearTimeout(timer);
 	}, [part, phrases, paused, items.length]);
-	// Spunion hops for attention when he moves on to another pair or a mix starts happening.
-	useEffect(() => {
-		setHop(true);
-		const timer = setTimeout(() => setHop(false), 600);
-		return () => clearTimeout(timer);
-	}, [idx, p?.now]);
 	if (!p) return null;
 	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
-	// Spunion's speech bubble is a cartoon one: warm white, his own thick black outline, a hard shadow in the risk colour.
-	const ink = docked ? '#fff' : '#1d1440';
-	const inkSoft = docked ? C.soft : '#4a3f78';
+	const ink = '#fff';
+	const inkSoft = C.soft;
 	const last = part === phrases.length - 1;
 
 	const phrase = (
@@ -2460,12 +2452,12 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 	);
 	const head = (
 		<>
-			<RiskPill sev={sev} small solid={!docked} />
+			<RiskPill sev={sev} small />
 			<b className="font-semibold" style={{ color: ink, whiteSpace: 'nowrap', fontSize: 13.5 }}>
 				{short(S(p.a))} + {short(S(p.b))}
 			</b>
 			{p.now && (
-				<span className="rounded-full px-1.5 text-xs font-semibold" style={{ border: `1.5px solid ${docked ? 'rgba(255,255,255,.6)' : ink}`, color: ink, whiteSpace: 'nowrap', lineHeight: '16px' }}>
+				<span className="rounded-full px-1.5 text-xs font-semibold" style={{ border: '1.5px solid rgba(255,255,255,.6)', color: ink, whiteSpace: 'nowrap', lineHeight: '16px' }}>
 					now
 				</span>
 			)}
@@ -2517,26 +2509,18 @@ function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now:
 			</div>
 		);
 
-	// Wide screens: Spunion in the bottom-right corner, saying it in a speech bubble.
+	// Wide screens: a slim, solid bar floating in the bottom-right corner.
 	return (
-		<div style={{ position: 'fixed', left: 0, right: 0, bottom: 14, zIndex: 32, display: 'flex', justifyContent: 'flex-end', padding: '0 18px', pointerEvents: 'none' }}>
-			<style>{SPUNION_CSS}</style>
-			<div className="rd-in flex items-end gap-2.5" style={{ width: 'min(620px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-				<div
-					key={`b${idx}`}
-					className="sp-bubble-pop"
-					aria-live="polite"
-					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 10, padding: '7px 14px 7px 8px', borderRadius: 999, border: '2px solid #0d0820', background: '#fffaf1', color: ink, boxShadow: `3px 3px 0 ${look.fg}` }}
-				>
-					<svg aria-hidden width="18" height="14" viewBox="0 0 18 14" style={{ position: 'absolute', right: -14, bottom: 6, overflow: 'visible' }}>
-						<path d="M0 1 C6 3 11 7 16 12 C10 12 5 10 0 9 Z" fill="#fffaf1" stroke="#0d0820" strokeWidth="2" strokeLinejoin="round" />
-						<path d="M-1.6 2.5 L-1.6 7.5" stroke="#fffaf1" strokeWidth="3.4" />
-					</svg>
-					{body}
-				</div>
-				<span className={`sp-me ${hop ? 'hop' : ''}`} aria-hidden style={{ width: 54, height: 54, flexShrink: 0, cursor: 'default' }}>
-					<SpunionSvg worried={sev >= 2} />
-				</span>
+		<div style={{ position: 'fixed', left: 0, right: 0, bottom: 16, zIndex: 32, display: 'flex', justifyContent: 'flex-end', padding: '0 18px', pointerEvents: 'none' }}>
+			<div
+				key={`b${idx}`}
+				className="rd-fade"
+				aria-live="polite"
+				onMouseEnter={() => setPaused(true)}
+				onMouseLeave={() => setPaused(false)}
+				style={{ pointerEvents: 'auto', width: 'min(600px, 100%)', padding: '9px 14px 9px 10px', borderRadius: 16, border: `1px solid ${look.fg}88`, background: 'rgba(26,18,60,.94)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 10px 30px rgba(10,4,40,.4)' }}
+			>
+				{body}
 			</div>
 		</div>
 	);
@@ -3839,8 +3823,6 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 const SPUNION_CSS = `
 @keyframes sp-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
 @keyframes sp-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
-@keyframes sp-bubble-pop { 0% { opacity: 0; transform: scale(.82) translateY(8px); } 60% { opacity: 1; transform: scale(1.03); } 100% { transform: scale(1); } }
-.sp-bubble-pop { animation: sp-bubble-pop .42s cubic-bezier(.2,.9,.3,1.3) both; transform-origin: 95% 100%; }
 @keyframes sp-hop { 0% { transform: translateY(0) scale(1, 1); } 30% { transform: translateY(2px) scale(1.08, .9); } 60% { transform: translateY(-12px) scale(.94, 1.06); } 100% { transform: translateY(0) scale(1, 1); } }
 .sp-wrap { position: fixed; right: 18px; bottom: 18px; z-index: 35; display: flex; align-items: flex-end; gap: 10px; pointer-events: none; }
 .sp-wrap > * { pointer-events: auto; }
@@ -3855,10 +3837,10 @@ const SPUNION_CSS = `
   box-shadow: 0 12px 34px rgba(10,4,40,.35); font-size: 14px; line-height: 1.45; color: #fff; }
 .sp-bubble b { color: #8ff4c8; }
 @media (max-width: 960px) { .sp-wrap.lift { bottom: 104px; } .sp-me { width: 54px; height: 54px; } }
-@media (prefers-reduced-motion: reduce) { .sp-body, .sp-eye, .sp-me.hop .sp-body, .sp-bubble-pop { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .sp-body, .sp-eye, .sp-me.hop .sp-body { animation: none !important; } }
 `;
 
-function SpunionSvg({ worried }: { worried?: boolean }) {
+function SpunionSvg() {
 	return (
 		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden>
 			<g className="sp-body">
@@ -3869,13 +3851,6 @@ function SpunionSvg({ worried }: { worried?: boolean }) {
 					strokeWidth="18"
 					strokeLinejoin="round"
 				/>
-				{/* worried brows, for risky mixes */}
-				{worried && (
-					<g stroke="#000" strokeWidth="17" strokeLinecap="round">
-						<path d="M118 196 L208 168" />
-						<path d="M310 168 L398 190" />
-					</g>
-				)}
 				{/* left eye */}
 				<g className="sp-eye">
 					<circle cx="185" cy="300" r="86" fill="#000" />
