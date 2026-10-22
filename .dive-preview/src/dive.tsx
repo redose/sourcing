@@ -1802,7 +1802,7 @@ function CombosList({ name, onCombo, bare }: { name: string; onCombo: (a: string
 		<>
 			{!bare && <span className="rd-label">Most often combined with</span>}
 			{combosQ.isLoading ? (
-				<div className="mt-3 flex items-center justify-center" style={{ height: 180 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
+				<div className="mt-3 flex items-center justify-center" style={{ height: 180 }} aria-busy="true" />
 			) : rows(combosQ).length === 0 ? (
 				<p className="mt-2 text-sm" style={{ color: C.faint }}>No combinations on record.</p>
 			) : (
@@ -2435,7 +2435,7 @@ function StreetNames({ name, known }: { name: string; known: string[] }) {
 function SubstanceNumbers({ name }: { name: string }) {
 	const q = useSQLQuery(substanceStatsSQL(name));
 	const r = rows(q)[0];
-	if (q.isLoading) return <Loading height={180} className="mt-6" />;
+	if (q.isLoading) return <Loading height={180} className="mt-6" quiet />;
 	if (!r || !N(r.n)) return null;
 	// Lists arrive as plain arrays locally and as Arrow vectors from MotherDuck; L() reads both.
 	const routeK = L(r.route_k), routeN = L(r.route_n).map(Number);
@@ -2742,7 +2742,10 @@ function TripSitBadge() {
 }
 
 // Loading: the little pill with electrons going round, in place of a grey placeholder of the same height.
-function Loading({ height = 200, className = '' }: { height?: number; className?: string }) {
+// Loading: the faint pill, once per page for the main content. Secondary sections pass quiet and just hold
+// their space until they arrive.
+function Loading({ height = 200, className = '', quiet }: { height?: number; className?: string; quiet?: boolean }) {
+	if (quiet) return <div className={className} style={{ height }} aria-busy="true" />;
 	return (
 		<div className={`flex items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
 			<img src={LOADING_PILL} alt="" className="rd-watermark" width={Math.min(72, Math.round(height * 0.5))} height={Math.min(72, Math.round(height * 0.5))} />
@@ -2873,7 +2876,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 		<div className="mt-6 grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))' }}>
 			<AnswerCard q="How long does it last?">
 				{timingQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 80 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
+					<div className="flex items-center justify-center" style={{ height: 80 }} aria-busy="true" />
 				) : (
 					<>
 						<p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.5 }}>
@@ -2887,7 +2890,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="How did it go?">
 				{summaryQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 120 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
+					<div className="flex items-center justify-center" style={{ height: 120 }} aria-busy="true" />
 				) : (
 					<div className="grid gap-4">
 						{groups.map((g) => {
@@ -2928,7 +2931,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="What's different together?">
 				{effectsQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 100 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
+					<div className="flex items-center justify-center" style={{ height: 100 }} aria-busy="true" />
 				) : togN < 3 ? (
 					<p className="text-sm" style={{ color: C.soft }}>Too few closely read reports with both to compare.</p>
 				) : more.length + less.length === 0 ? (
@@ -2968,7 +2971,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 
 			<AnswerCard q="What did people take first?">
 				{seqQ.isLoading ? (
-					<div className="flex items-center justify-center" style={{ height: 60 }} role="status" aria-label="Loading"><img src={LOADING_PILL} alt="" className="rd-watermark" width={44} height={44} /></div>
+					<div className="flex items-center justify-center" style={{ height: 60 }} aria-busy="true" />
 				) : !seq || N(seq.n) < 3 ? (
 					<p className="text-sm" style={{ color: C.soft }}>Not enough reports say when each one was taken.</p>
 				) : (
@@ -3017,7 +3020,7 @@ function PairTypical({ a, b, timingQ, moodQ, bare }: { a: string; b: string; tim
 		...(mood.length >= 3 ? [{ label: 'Mood (from the wording)', height: 60, min: -1.05, max: 1.05, diverging: true, linear: true, series: [{ key: 'm', label: 'Mood', color: C.lav, points: mood }] }] : []),
 		...exp.series.map((s) => ({ label: short(s.label), sub: s.sub, color: s.color, height: 44, min: 0, max: 1.15, series: [s] })),
 	];
-	if (timingQ.isLoading || moodQ.isLoading) return <Loading height={260} className="mt-6" />;
+	if (timingQ.isLoading || moodQ.isLoading) return <Loading height={260} className="mt-6" quiet />;
 	if (!lanes.length) return <p className="rd-card mt-6 p-5 text-sm" style={{ color: C.soft }}>Not enough data on this pair yet to sketch a timeline.</p>;
 	const both = exp.series.filter((s) => (interp(s.points, x) ?? 0) > 0.05 && x >= s.points[0].x && x <= s.points[s.points.length - 1].x).map((s) => short(s.label));
 	if (bare)
@@ -3173,7 +3176,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				</p>
 			)}
 			{(curveQ.isLoading || kq.isLoading ? (
-				<Loading height={320} className="mt-6" />
+				<Loading height={320} className="mt-6" quiet />
 			) : withSub ? (
 				<>
 					<PairAnswers a={sub} b={withSub} timingQ={pairTimingQ} moodQ={pairMoodQ} summaryQ={pairSummaryQ} effectsQ={pairEffectsQ} seqQ={pairSeqQ} />
@@ -3226,7 +3229,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				</button>
 			</div>
 			{q.isLoading ? (
-				<Loading height={260} className="mt-4" />
+				<Loading height={260} className="mt-4" quiet />
 			) : (
 				<div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
 					{list.map((r) => (
