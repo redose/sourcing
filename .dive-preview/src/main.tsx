@@ -1,14 +1,14 @@
 import { createRoot } from 'react-dom/client';
 import { MotherDuckSDKProvider, useConnectionStatus } from './md-sdk';
 import { AlertCircle } from 'lucide-react';
-import Dive, { LOADING_PILL } from './dive';
+import Dive, { BouncingSpunion } from './dive';
 
 function ConnectionGate({ children }: { children: React.ReactNode }) {
 	const { isConnected, isConnecting, error } = useConnectionStatus();
 	if (isConnecting)
 		return (
 			<div className="flex items-center justify-center h-screen gap-2" style={{ color: '#aba3c7' }}>
-				<img src={LOADING_PILL} alt="Loading" width={88} height={88} style={{ opacity: 0.3 }} />
+				<BouncingSpunion size={88} />
 			</div>
 		);
 	if (error)
