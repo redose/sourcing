@@ -868,7 +868,7 @@ const TONE_DOT: Record<string, string> = { negative: C.coral, positive: C.mint, 
 const RISK: Record<number, { c: string; t: string; word: string; bg: string; banner: string }> = {
 	3: { c: C.coral, t: 'Dangerous combination', word: 'Dangerous', bg: 'rgba(255,140,165,.16)', banner: 'rgba(120,36,78,.74)' },
 	2: { c: C.amber, t: 'Unsafe combination', word: 'Unsafe', bg: 'rgba(255,200,130,.12)', banner: 'rgba(108,68,36,.68)' },
-	1: { c: C.lav, t: 'Use caution', word: 'Caution', bg: 'rgba(217,207,255,.07)', banner: 'rgba(52,40,110,.74)' },
+	1: { c: C.lav, t: 'Use caution', word: 'Caution', bg: 'rgba(217,207,255,.07)', banner: 'rgba(70,56,140,.82)' },
 };
 function RiskPill({ sev, small }: { sev: number; small?: boolean }) {
 	const r = RISK[sev];
@@ -2373,16 +2373,11 @@ function MixBanner({ items }: { items: (Record<string, unknown> & { now: boolean
 	if (!p) return null;
 	const sev = N(p.sev);
 	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
-	const loud = Math.max(...items.map((q) => N(q.sev))) >= 2;
 	const reason = p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
 	return (
 		<div
 			className="rd-in mt-6"
-			style={
-				loud
-					? { position: 'sticky', top: 10, zIndex: 20, borderRadius: 18, border: `1px solid ${look.fg}66`, background: look.bg, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 10px 30px rgba(10,4,40,.25)', transition: 'background .4s, border-color .4s' }
-					: { borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}` }
-			}
+			style={{ position: 'sticky', top: 10, zIndex: 20, borderRadius: 18, border: `1px solid ${look.fg}${sev >= 2 ? '88' : '66'}`, background: look.bg, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 10px 30px rgba(10,4,40,.3)', transition: 'background .4s, border-color .4s' }}
 			onMouseEnter={() => setPaused(true)}
 			onMouseLeave={() => setPaused(false)}
 			aria-live="polite"
@@ -3563,7 +3558,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 				</article>
 
 				{/* Alongside the story: the moment, and the doses */}
-				<aside className="rd-side" style={bannerItems.some((p) => N(p.sev) >= 2) ? undefined : { top: 12, maxHeight: 'calc(100vh - 24px)' }}>
+				<aside className="rd-side" style={bannerItems.length ? undefined : { top: 12, maxHeight: 'calc(100vh - 24px)' }}>
 					{wide && timeline(true)}
 					<div key={heroKey} className="rd-in px-1 pb-2 pt-3">
 						<div className="flex flex-wrap items-center gap-3">
