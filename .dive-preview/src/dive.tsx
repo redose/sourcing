@@ -2380,10 +2380,11 @@ const pwInteractions = (p: Record<string, unknown>) => {
 
 // Risky pairs in this story, as a banner that stays at the top while reading: one pair at a time (worst and
 // "mixing now" first), cycling every few seconds unless pointed at, with the reason on one line. Tap to read it all.
-function MixBanner({ items, bottom }: { items: (Record<string, unknown> & { now: boolean })[]; bottom: number }) {
+function MixBanner({ items, docked }: { items: (Record<string, unknown> & { now: boolean })[]; docked?: boolean }) {
 	const [idx, setIdx] = useState(0);
 	const [paused, setPaused] = useState(false);
 	const [full, setFull] = useState(false);
+	const [hop, setHop] = useState(false);
 	const key = items.map((p) => `${S(p.a)}|${S(p.b)}|${p.now ? 1 : 0}`).join(',');
 	useEffect(() => setIdx(0), [key]);
 	useEffect(() => {
@@ -2392,74 +2393,96 @@ function MixBanner({ items, bottom }: { items: (Record<string, unknown> & { now:
 		return () => clearInterval(timer);
 	}, [items.length, paused, full, key]);
 	const p = items[Math.min(idx, items.length - 1)];
+	// Spunion hops for attention when he moves on to another pair or a mix starts happening.
+	useEffect(() => {
+		setHop(true);
+		const timer = setTimeout(() => setHop(false), 600);
+		return () => clearTimeout(timer);
+	}, [idx, p?.now]);
 	if (!p) return null;
 	const sev = N(p.sev);
 	const look = { fg: RISK[sev].c, bg: RISK[sev].banner };
 	const reason = p.note ? S(p.note) : `Flagged ${sev === 1 ? 'as uncertain ' : ''}in PsychonautWiki's interaction lists (matched on ${S(p.via).toLowerCase()}), with no explanation on file.`;
-	return (
-		<div style={{ position: 'fixed', left: 0, right: 0, bottom, zIndex: 32, display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none', transition: 'bottom .3s' }}>
-		<style>{SPUNION_CSS}</style>
-		<div
-			className="rd-in"
-			style={{ pointerEvents: 'auto', width: 'min(900px, 100%)', borderRadius: 22, border: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, background: look.bg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 14px 40px rgba(10,4,40,.45)', transition: 'background .4s, border-color .4s' }}
-			onMouseEnter={() => setPaused(true)}
-			onMouseLeave={() => setPaused(false)}
-			aria-live="polite"
-		>
-			<div className="flex items-center gap-3 py-2.5 pl-2 pr-4">
-				<span aria-hidden style={{ width: 46, height: 46, flexShrink: 0, marginTop: -14, filter: 'drop-shadow(0 6px 10px rgba(10,4,40,.35))' }}>
-					<SpunionSvg />
-				</span>
-				<button key={idx} className="rd-fade flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setFull(!full)} title={full ? 'Show less' : 'Read the whole note'}>
-					<RiskPill sev={sev} />
-					<b className="font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>
-						{short(S(p.a))} + {short(S(p.b))}
-					</b>
-					{p.now && (
-						<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ border: '1px solid rgba(255,255,255,.6)', color: '#fff', whiteSpace: 'nowrap' }}>
-							mixing now
-						</span>
-					)}
-					{!full && (
-						<span className="rd-hide-sm min-w-0 text-sm" style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-							{reason}
-						</span>
-					)}
-				</button>
-				{items.length > 1 && (
-					<div className="flex items-center gap-1.5" style={{ flexShrink: 0 }}>
-						{items.map((q, i) => (
-							<button
-								key={i}
-								onClick={() => setIdx(i)}
-								aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
-								title={`${short(S(q.a))} + ${short(S(q.b))}`}
-								style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
-							/>
-						))}
-					</div>
+
+	const row = (
+		<div className="flex items-center gap-3">
+			<button key={idx} className="rd-fade flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setFull(!full)} title={full ? 'Show less' : 'Read the whole note'}>
+				<RiskPill sev={sev} small={docked} />
+				<b className="font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap', fontSize: docked ? 13 : undefined }}>
+					{short(S(p.a))} + {short(S(p.b))}
+				</b>
+				{p.now && (
+					<span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ border: '1px solid rgba(255,255,255,.6)', color: '#fff', whiteSpace: 'nowrap' }}>
+						mixing now
+					</span>
 				)}
-				<button onClick={() => setFull(!full)} aria-label={full ? 'Show less' : 'Read the whole note'} style={{ color: C.soft, flexShrink: 0 }}>
-					{full ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-				</button>
-			</div>
-			{full && (
-				<div className="rd-fade flex flex-wrap items-end justify-between gap-3 px-4 pb-4">
-					<p style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.text, maxWidth: 820 }}>
+				{!full && !docked && (
+					<span className="min-w-0 text-sm" style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
 						{reason}
-						{!p.note && (
-							<>
-								{' '}
-								<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>
-									Read why ↗
-								</a>
-							</>
-						)}
-					</p>
-					{S(p.via) === 'TripSit' && <TripSitBadge />}
+					</span>
+				)}
+			</button>
+			{items.length > 1 && (
+				<div className="flex items-center gap-1.5" style={{ flexShrink: 0 }}>
+					{items.map((q, i) => (
+						<button
+							key={i}
+							onClick={() => setIdx(i)}
+							aria-label={`${short(S(q.a))} + ${short(S(q.b))}`}
+							title={`${short(S(q.a))} + ${short(S(q.b))}`}
+							style={{ width: i === idx ? 16 : 6, height: 6, borderRadius: 999, background: RISK[N(q.sev)]?.c ?? C.lav, opacity: i === idx ? 1 : 0.45, transition: 'width .3s, opacity .3s' }}
+						/>
+					))}
 				</div>
 			)}
+			<button onClick={() => setFull(!full)} aria-label={full ? 'Show less' : 'Read the whole note'} style={{ color: C.soft, flexShrink: 0 }}>
+				{full ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+			</button>
 		</div>
+	);
+	const note = full && (
+		<div className="rd-fade mt-2 flex flex-wrap items-end justify-between gap-3">
+			<p style={{ fontFamily: SERIF, fontSize: docked ? 16 : 17, lineHeight: 1.5, color: C.text, maxWidth: 820 }}>
+				{reason}
+				{!p.note && (
+					<>
+						{' '}
+						<a href={pwInteractions(p)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>
+							Read why ↗
+						</a>
+					</>
+				)}
+			</p>
+			{S(p.via) === 'TripSit' && <TripSitBadge />}
+		</div>
+	);
+
+	// On phones it's the top row of the timeline dock, so nothing stacks on top of anything.
+	if (docked)
+		return (
+			<div className="mb-2 rounded-2xl px-3 py-2" style={{ background: look.bg, border: `1px solid ${look.fg}77` }} aria-live="polite">
+				{row}
+				{note}
+			</div>
+		);
+
+	// Wide screens: Spunion at the bottom-left, saying it in a speech bubble.
+	return (
+		<div style={{ position: 'fixed', left: 0, right: 0, bottom: 14, zIndex: 32, display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none' }}>
+			<style>{SPUNION_CSS}</style>
+			<div className="rd-in flex items-end gap-3" style={{ width: 'min(960px, 100%)', pointerEvents: 'auto' }} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+				<span className={`sp-me ${hop ? 'hop' : ''}`} aria-hidden style={{ width: 66, height: 66, flexShrink: 0, cursor: 'default' }}>
+					<SpunionSvg worried={sev >= 2} />
+				</span>
+				<div
+					aria-live="polite"
+					style={{ position: 'relative', flex: 1, minWidth: 0, marginBottom: 8, padding: '10px 14px', borderRadius: '20px 20px 20px 6px', border: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, background: look.bg, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 14px 40px rgba(10,4,40,.45)', transition: 'background .4s, border-color .4s' }}
+				>
+					<span aria-hidden style={{ position: 'absolute', left: -7, bottom: 10, width: 13, height: 13, background: look.bg, borderLeft: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, borderBottom: `1px solid ${look.fg}${sev >= 2 ? '99' : '77'}`, transform: 'rotate(45deg)', borderRadius: '0 0 0 3px' }} />
+					{row}
+					{note}
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -3327,6 +3350,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 			className={side ? 'px-1 pb-2' : 'rd-dock'}
 			style={side ? undefined : { borderColor: `${moodColor(moodNow)}55`, boxShadow: `0 10px 40px rgba(10,4,40,.35), 0 0 0 1px ${moodColor(moodNow)}22`, transition: 'border-color 1.2s ease' }}
 		>
+			{!side && bannerItems.length > 0 && <MixBanner items={bannerItems} docked />}
 			<div className="flex items-center gap-3">
 				<button onClick={prevMark} className="rd-btn rd-hide-sm" aria-label="Previous mark" style={{ padding: 7, background: 'transparent', border: 0 }}>
 					<SkipBack size={15} />
@@ -3445,7 +3469,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 	);
 
 	return (
-		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: (wide ? 0 : dockOpen ? 340 : 120) + (bannerItems.length ? 90 : 0) }}>
+		<section className="rd-fade" style={{ position: 'relative', zIndex: 0, paddingBottom: (wide ? 0 : dockOpen ? 340 : 120) + (bannerItems.length ? (wide ? 100 : 60) : 0) }}>
 			<header>
 				{(() => {
 					const taken = [...new Set([...doses].sort((a, b) => a.t - b.t).map((d) => d.sub))];
@@ -3555,7 +3579,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 			))}
 			{!wide && <div aria-hidden className="rd-fadebar" />}
 
-			{bannerItems.length > 0 && <MixBanner items={bannerItems} bottom={wide ? 16 : dockOpen ? 360 : 104} />}
+			{wide && bannerItems.length > 0 && <MixBanner items={bannerItems} />}
 			<div className="rd-tl mt-8">
 				{/* The story: the main column */}
 				<article ref={bodyRef} className={`rd-story ${active && playing ? 'focus' : ''}`}>
@@ -3732,7 +3756,7 @@ const SPUNION_CSS = `
 @media (prefers-reduced-motion: reduce) { .sp-body, .sp-eye, .sp-me.hop .sp-body { animation: none !important; } }
 `;
 
-function SpunionSvg() {
+function SpunionSvg({ worried }: { worried?: boolean }) {
 	return (
 		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden>
 			<g className="sp-body">
@@ -3746,6 +3770,13 @@ function SpunionSvg() {
 				{/* blush */}
 				<ellipse cx="120" cy="392" rx="30" ry="15" fill="#ff5c93" opacity="0.6" />
 				<ellipse cx="405" cy="350" rx="24" ry="12" fill="#ff5c93" opacity="0.6" />
+				{/* worried brows, for risky mixes */}
+				{worried && (
+					<g stroke="#000" strokeWidth="17" strokeLinecap="round">
+						<path d="M118 196 L208 168" />
+						<path d="M310 168 L398 190" />
+					</g>
+				)}
 				{/* left eye */}
 				<g className="sp-eye">
 					<circle cx="185" cy="300" r="86" fill="#000" />
