@@ -1,14 +1,14 @@
 import { createRoot } from 'react-dom/client';
 import { MotherDuckSDKProvider, useConnectionStatus } from './md-sdk';
-import { Loader2, AlertCircle } from 'lucide-react';
-import Dive from './dive';
+import { AlertCircle } from 'lucide-react';
+import Dive, { LOADING_PILL } from './dive';
 
 function ConnectionGate({ children }: { children: React.ReactNode }) {
 	const { isConnected, isConnecting, error } = useConnectionStatus();
 	if (isConnecting)
 		return (
 			<div className="flex items-center justify-center h-screen gap-2" style={{ color: '#aba3c7' }}>
-				<Loader2 className="animate-spin" size={20} />
+				<img src={LOADING_PILL} alt="" width={56} height={56} style={{ borderRadius: 14 }} />
 				Connecting to MotherDuck…
 			</div>
 		);
