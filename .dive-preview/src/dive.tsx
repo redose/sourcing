@@ -2213,8 +2213,8 @@ function SubstanceOverview({ name }: { name: string }) {
 	const { kindLine, warning, aka, timing: t, group } = describeSubstance(name, r, rows(timingQ), true);
 	const members = rows(membersQ).map((m) => S(m.name)).filter((m) => m.toLowerCase() !== name.toLowerCase());
 	const about = (
-		<div className="max-w-3xl">
-			{kindLine && <p style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1.45 }}>{kindLine}</p>}
+		<div>
+			{kindLine && <p style={{ fontFamily: SERIF, fontSize: 21, lineHeight: 1.45 }}>{kindLine}</p>}
 			{group ? (
 				members.length > 0 && (
 					<p className="mt-4" style={{ color: C.soft, lineHeight: 1.5 }}>
@@ -2239,7 +2239,7 @@ function SubstanceOverview({ name }: { name: string }) {
 		</div>
 	);
 	const glance = (
-		<ul className="grid max-w-3xl gap-3.5" style={{ lineHeight: 1.45 }}>
+		<ul className="grid gap-3 text-sm" style={{ lineHeight: 1.5 }}>
 			{S(r.addiction) && (
 				<li className="flex items-start gap-3">
 					{/high|very|extreme|moderate|addictive/i.test(S(r.addiction)) && !/^non|not /i.test(S(r.addiction)) ? (
@@ -2291,7 +2291,7 @@ function SubstanceOverview({ name }: { name: string }) {
 			)}
 			<StreetNames name={name} known={[name, ...aka]} />
 			{warning && (
-				<div className="rd-in mt-5 flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: 'rgba(255,110,130,.13)', border: '1px solid rgba(255,125,142,.45)', lineHeight: 1.5, maxWidth: 900 }}>
+				<div className="rd-in mt-5 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.13)', border: '1px solid rgba(255,125,142,.45)', lineHeight: 1.5 }}>
 					<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
 					<span>{warning}</span>
 				</div>
