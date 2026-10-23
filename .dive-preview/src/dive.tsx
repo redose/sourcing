@@ -7324,7 +7324,7 @@ const BOUNCE_CSS = `
 @media (prefers-reduced-motion: reduce) { .rd-ghost-body { animation: none; } .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5cdfe4; opacity: .4; } }
 `;
 
-// The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
+// The loader: Spunion bouncing over a shadow; his landings send waves through the start screen's molecules. Exported for the
 // preview's startup screen.
 export function BouncingSpunion({ size = 96, style }: { size?: number; style?: React.CSSProperties }) {
 	const ref = useRef<HTMLSpanElement | null>(null);
@@ -7332,7 +7332,6 @@ export function BouncingSpunion({ size = 96, style }: { size?: number; style?: R
 		<span ref={ref} className="rd-loader" style={{ width: size, height: size, ...style }}>
 			<style>{BOUNCE_CSS}</style>
 			<span className="rd-floor" />
-			<span className="rd-ring" />
 			<span className="rd-bounce">
 				<SpunionGhost />
 			</span>
