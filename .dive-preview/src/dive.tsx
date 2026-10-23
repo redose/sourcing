@@ -736,6 +736,8 @@ const SERIF = '"Iowan Old Style", "Charter", "Palatino Linotype", Palatino, Geor
 const BG = 'linear-gradient(170deg, #3a2e74 0%, #4f42a0 55%, #6152b4 100%)';
 
 const CSS = `
+/* Links take the colour around them; hosts (the Dive frame) otherwise paint visited links blue. Inline colours still win. */
+.rd a:link, .rd a:visited { color: inherit; }
 @keyframes rd-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes rd-mark { 0%,100% { box-shadow: 0 0 0 1.5px rgba(143,244,247,.7); } 50% { box-shadow: 0 0 0 1.5px rgba(143,244,247,1), 0 0 18px 2px rgba(143,244,247,.35); } }
 /* Opacity-only entrance: a transform here would stop position: fixed children (the dock, the mood tint) from fixing to the viewport. */
