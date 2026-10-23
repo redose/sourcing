@@ -783,7 +783,7 @@ const CSS = `
 @keyframes rd-mol-hue { from { filter: sepia(1) saturate(3.2) hue-rotate(0deg); } to { filter: sepia(1) saturate(3.2) hue-rotate(360deg); } }
 .rd-tripping .rd-molecules { opacity: .11; animation: rd-drift 240s linear infinite, rd-mol-hue 16s linear infinite; }
 .rd-tripping .rd-molecules.b { opacity: .07; animation: rd-drift 340s linear infinite reverse, rd-mol-hue 22s linear infinite reverse; }
-.rd-tripping :is(h1, h2, h3, p, li):not([data-rd-letters]) { animation: rd-wave 5.5s ease-in-out infinite, rd-tint 17s linear infinite; }
+.rd-tripping :is(h1, h2, h3, p, li):not([data-rd-letters]):not([data-rd-safe] *) { animation: rd-wave 5.5s ease-in-out infinite, rd-tint 17s linear infinite; }
 /* Different lengths and starting points per element, so the text seems to drift at random rather than in step. */
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 6.7s, 23s; animation-delay: -1.3s, -9s; }
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-duration: 4.9s, 19s; animation-delay: -2.9s, -4s; animation-direction: reverse, normal; }
@@ -805,9 +805,11 @@ const CSS = `
 @keyframes rd-fade { from { opacity: 0; } to { opacity: 1; } }
 .rd-fade { animation: rd-fade .4s ease-out both; }
 @keyframes rd-drift { from { transform: translate(0, 0); } to { transform: translate(260px, 130px); } }
-.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 260px; opacity: .045; animation: rd-drift 240s linear infinite;
+.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 260px; opacity: .05; animation: rd-drift 240s linear infinite, rd-mol-hue-soft 60s linear infinite;
   -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); }
-.rd-molecules.b { background-size: 430px; opacity: .028; animation-duration: 340s; animation-direction: reverse; }
+.rd-molecules.b { background-size: 430px; opacity: .032; animation-duration: 340s, 80s; animation-direction: reverse; }
+/* Every day: the molecules drift through a soft rainbow, slowly. */
+@keyframes rd-mol-hue-soft { from { filter: sepia(1) saturate(1.8) hue-rotate(0deg); } to { filter: sepia(1) saturate(1.8) hue-rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-newfx { 0% { box-shadow: 0 0 0 0 rgba(166,242,228,.55); } 70% { box-shadow: 0 0 0 10px rgba(166,242,228,0); } 100% { box-shadow: 0 0 0 0 rgba(166,242,228,0); } }
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
@@ -2240,7 +2242,7 @@ type Mix = { key: string; label: string; lane: number; n: number; status: string
 
 // Mixing: what people actually mix it with, grouped by TripSit's rating (most dangerous first), most mixed first in each
 // group. Each row: the name, TripSit's note, how it went when there's enough to say, and a link to the stories.
-// Pairs TripSit warns about that people rarely mix are in Known Risks.
+// Pairs TripSit warns about that people rarely mix are in Health Risks.
 const MIX_GROUPS = [
 	{ sev: 3, label: 'Dangerous', c: RISK[3].c },
 	{ sev: 2, label: 'Unsafe', c: RISK[2].c },
@@ -2257,10 +2259,10 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 		const sev = r.sev != null ? N(r.sev) : r.status ? 0 : -1;
 		return { key: S(r.s), label: short(S(r.s)), sev, n: N(r.n), status: S(r.status) || g?.status || '', note: S(r.note) || (sev >= 0 ? g?.note ?? '' : ''), r };
 	});
-	const head = <ArticleH2 icon={Link2} sub="What people mix it with, and how risky TripSit rates each mix.">Mixing</ArticleH2>;
+	const head = <ArticleH2 icon={Link2} sub="What people mix it with, and how risky TripSit rates each mix.">Combinations</ArticleH2>;
 	if (commonQ.isLoading || knownQ.isLoading)
 		return (
-			<section id="mixes" className="mt-24" style={{ scrollMarginTop: 16 }}>
+			<section id="mixes" data-rd-safe="" className="mt-24" style={{ scrollMarginTop: 16 }}>
 				{head}
 				<Loading height={300} className="mt-5" quiet />
 			</section>
@@ -2269,7 +2271,7 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 	const risky = mixes.filter((m) => m.sev >= 2);
 	const top = [...mixes].sort((a, b) => b.n - a.n).slice(0, 3).map((m) => m.label);
 	return (
-		<section id="mixes" className="mt-24" style={{ scrollMarginTop: 16 }}>
+		<section id="mixes" data-rd-safe="" className="mt-24" style={{ scrollMarginTop: 16 }}>
 		{head}
 		<div className="mt-5">
 			<p style={{ color: C.soft, lineHeight: 1.6 }}>
@@ -2310,7 +2312,7 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 				})}
 			</div>
 			<p className="mt-6 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint }}>
-				Ratings from TripSit; numbers from our stories. Pairs TripSit warns about that people rarely mix are under Known Risks.
+				Ratings from TripSit; numbers from our stories. Pairs TripSit warns about that people rarely mix are under Health Risks.
 				<TripSitBadge />
 			</p>
 		</div>
@@ -2342,8 +2344,8 @@ function KnownRisks({ name }: { name: string }) {
 		</div>
 	);
 	return (
-		<section id="risks" className="mt-24" style={{ scrollMarginTop: 16 }}>
-			<ArticleH2 icon={AlertTriangle} sub="What’s known to go badly, mostly from TripSit’s combination chart. Not medical advice.">Known Risks</ArticleH2>
+		<section id="risks" data-rd-safe="" className="mt-24" style={{ scrollMarginTop: 16 }}>
+			<ArticleH2 icon={AlertTriangle} sub="What’s known to go badly, mostly from TripSit’s combination chart. Not medical advice.">Health Risks</ArticleH2>
 			<ul className="mt-6 grid gap-3 text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
 				{[
 					'Mixing is where most of the danger is. Two things that are fine alone can be risky together.',
@@ -3069,7 +3071,7 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 				{!molecule && N(r.n_reports) > 0 && <div className="mt-12">{glance}</div>}
 				{N(r.n_reports) === 0 && (S(r.name) || N(r.n_read) > 0 ? <EmptyNote className="mt-10" suggest={name} /> : <NotFound what="substance" name={name} />)}
 				{warning && (
-					<div className="mt-12 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
+					<div data-rd-safe="" className="mt-12 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
 						<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
 						<span>{warning}</span>
 					</div>
@@ -3327,7 +3329,7 @@ function SubstanceNumbers({ name }: { name: string }) {
 	const tile = 'rd-card p-5 grid content-start gap-3';
 	return (
 		<section id="numbers" className="mt-24" style={{ scrollMarginTop: 16 }}>
-			<ArticleH2 icon={BarChart3} sub={`Across all ${N(r.n).toLocaleString()} reports that mention it.`}>By the Numbers</ArticleH2>
+			<ArticleH2 icon={BarChart3} sub={`Across all ${N(r.n).toLocaleString()} reports that mention it.`}>How It Went</ArticleH2>
 			<div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<div className={tile}>
 					<span className="rd-label">How it went</span>
@@ -4974,7 +4976,7 @@ function RiskCard({ p, heading, aside }: { p: Record<string, unknown>; heading?:
 	if (!look) return null;
 	const loud = sev >= 2;
 	return (
-		<div className="rd-card rd-in p-5" style={{ background: look.bg, borderColor: loud ? look.c : `${look.c}88`, padding: loud ? 26 : undefined }}>
+		<div data-rd-safe="" className="rd-card rd-in p-5" style={{ background: look.bg, borderColor: loud ? look.c : `${look.c}88`, padding: loud ? 26 : undefined }}>
 			<div className="flex items-start gap-4">
 				{loud ? (
 					<span className="flex items-center justify-center" style={{ width: 44, height: 44, borderRadius: 999, background: `${look.c}26`, flexShrink: 0 }}>
@@ -5663,9 +5665,9 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 								{ id: 'overview', label: 'Overview', icon: FileText },
 								{ id: 'dosage', label: 'Dosage & Duration', icon: Clock },
 								{ id: 'effects', label: 'Effects', icon: Sparkles },
-								{ id: 'numbers', label: 'By the Numbers', icon: BarChart3 },
-								{ id: 'mixes', label: 'Mixing', icon: Link2 },
-								{ id: 'risks', label: 'Known Risks', icon: AlertTriangle },
+								{ id: 'numbers', label: 'How It Went', icon: BarChart3 },
+								{ id: 'mixes', label: 'Combinations', icon: Link2 },
+								{ id: 'risks', label: 'Health Risks', icon: AlertTriangle },
 								{ id: 'legal', label: 'Legal Status', icon: Scale },
 								{ id: 'slang', label: 'Aliases', icon: MessageCircle },
 								{ id: 'stories', label: 'Experiences', icon: BookOpen },
@@ -5690,7 +5692,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						<RiskCard p={pairNote} />
 					</div>
 				) : (
-					<div className="rd-in mt-6 rounded-2xl p-5" style={pairNote?.status ? { background: 'rgba(166,242,228,.12)', border: '1px solid rgba(166,242,228,.38)' } : { background: C.card, border: `1px solid ${C.line}` }}>
+					<div data-rd-safe="" className="rd-in mt-6 rounded-2xl p-5" style={pairNote?.status ? { background: 'rgba(166,242,228,.12)', border: '1px solid rgba(166,242,228,.38)' } : { background: C.card, border: `1px solid ${C.line}` }}>
 						{pairNote?.status ? (
 							<>
 								<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -6666,7 +6668,7 @@ function TripLetters({ scope }: { scope: React.RefObject<HTMLElement | null> }) 
 			let count = 0;
 			for (const el of root.querySelectorAll('h1, h2, h3, p, li')) {
 				if (count > 2200) break;
-				if (el.querySelector('p, li, h1, h2, h3')) continue; // innermost blocks only
+				if (el.querySelector('p, li, h1, h2, h3') || el.closest('[data-rd-safe]')) continue; // innermost blocks; never warnings
 				const r = el.getBoundingClientRect();
 				if (r.bottom < -80 || r.top > window.innerHeight + 80 || !r.width) continue;
 				const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -6684,9 +6686,9 @@ function TripLetters({ scope }: { scope: React.RefObject<HTMLElement | null> }) 
 						if (!b || !b.width) continue;
 						const sp = document.createElement('span');
 						sp.textContent = ch;
-						const far = Math.random() < 0.05;
-						const amp = far ? 6 : 1 + Math.random() * 2;
-						sp.style.cssText = `left:${b.left - origin.left}px;top:${b.top - origin.top}px;font:${cs.font};letter-spacing:${cs.letterSpacing};color:${cs.color};--dx:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--dy:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--r:${((Math.random() - 0.5) * (far ? 16 : 6)).toFixed(1)}deg;animation-duration:${(2.6 + Math.random() * 3.6).toFixed(2)}s,${(14 + Math.random() * 20).toFixed(1)}s;animation-delay:-${(Math.random() * 6).toFixed(2)}s,-${(Math.random() * 30).toFixed(1)}s`;
+						const far = Math.random() < 0.03;
+						const amp = far ? 3 : 0.4 + Math.random() * 1.1;
+						sp.style.cssText = `left:${b.left - origin.left}px;top:${b.top - origin.top}px;font:${cs.font};letter-spacing:${cs.letterSpacing};color:${cs.color};--dx:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--dy:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--r:${((Math.random() - 0.5) * (far ? 8 : 3)).toFixed(1)}deg;animation-duration:${(3.2 + Math.random() * 4).toFixed(2)}s,${(14 + Math.random() * 20).toFixed(1)}s;animation-delay:-${(Math.random() * 6).toFixed(2)}s,-${(Math.random() * 30).toFixed(1)}s`;
 						frag.appendChild(sp);
 						count++;
 					}
