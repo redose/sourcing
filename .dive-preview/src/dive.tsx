@@ -5407,9 +5407,9 @@ function useTypedPlaceholder(on: boolean) {
 
 function HomePage({ q, onSubstance, onEffect, onReport, onCombo, onView }: { q: Q; onSubstance: (s: string) => void; onEffect: (e: string) => void; onReport: (id: string, s: string) => void; onCombo: (a: string, b: string) => void; onView: (v: 'substances' | 'reports' | 'effects' | 'resources') => void }) {
 	return (
-		<section className="rd-fade flex w-full min-w-0 flex-col items-center justify-center text-center" style={{ minHeight: 'calc(100vh - 150px)', paddingBottom: 90, position: 'relative', zIndex: 2 }}>
+		<section className="rd-fade flex w-full min-w-0 flex-col items-center justify-center text-center" style={{ minHeight: 'calc(100vh - 150px)', paddingBottom: 90, position: 'relative', zIndex: 2, pointerEvents: 'none' }}>
 			<h1 className="sr-only">re:dose</h1>
-			<div className="relative w-full">
+			<div className="relative w-full" style={{ pointerEvents: 'auto', maxWidth: 620 }}>
 				<GlobalSearch inline subs={rows(q)} onSubstance={onSubstance} onEffect={onEffect} onReport={onReport} onCombo={onCombo} />
 			</div>
 		</section>
