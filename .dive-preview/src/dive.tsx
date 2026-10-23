@@ -6725,9 +6725,9 @@ export default function ReportTimelapse() {
 							<button className="text-xs" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={() => goView('about')}>
 								About
 							</button>
-							<a className="rd-thanks" href={SOURCES.motherduck.href} target="_blank" rel="noopener noreferrer" title="MotherDuck runs the database behind re:dose. Not affiliated." style={{ color: C.soft }}>
+							<a className="rd-thanks" href={SOURCES.motherduck.href} target="_blank" rel="noopener noreferrer" title="MotherDuck runs the database behind re:dose. Not affiliated with re:dose." style={{ color: C.soft }}>
 								<img src={SOURCES.motherduck.logo} alt="" width={15} height={15} />
-								Runs on MotherDuck <span style={{ color: C.faint }}>· not affiliated</span>
+								Powered by MotherDuck
 							</a>
 							<span className="text-xs" style={{ color: C.faint }}>Not medical advice.</span>
 						</div>
