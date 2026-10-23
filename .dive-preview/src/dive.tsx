@@ -914,7 +914,7 @@ const CSS = `
 .rd-start .rd-molecules { animation: rd-mol-hue-soft 60s linear infinite; }
 .rd-start .rd-loader { margin-top: 0; }
 .rd-start .rd-bounce { animation-duration: .7s; }
-.rd-start .rd-ghost-body { animation: none; fill: var(--sp-fill, #fff); fill-opacity: 1; transition: fill .1s; }
+.rd-start .rd-ghost-body { animation: none; fill: #5cdfe4; fill-opacity: 1; transition: fill .1s; }
 .rd-start-sp { position: fixed; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2; }
 
 .rd-start .rd-ripple { animation-duration: 1.8s; }
@@ -7867,7 +7867,7 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 
 type Q = ReturnType<typeof useSQLQuery>;
 
-// The preview's connecting screen: white Spunion bouncing on the spot. Each landing (the bounce animation's own loop event, so it stays in step) rolls a ring of
+// The preview's connecting screen: Spunion, in his own cyan, bouncing on the spot. Each landing (the bounce animation's own loop event, so it stays in step) rolls a ring of
 // colour out through the molecules from his feet.
 const START_RINGS = ['#fc6c84', '#5cdfe4', '#b3a8f0'];
 export function StartScreen() {
