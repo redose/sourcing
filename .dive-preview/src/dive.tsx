@@ -3626,7 +3626,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 	useEffect(() => {
 		const key = (e: KeyboardEvent) => {
 			const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-			if (!inline && (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing))) {
+			if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing)) {
 				e.preventDefault();
 				input.current?.focus();
 				setOpen(true);
@@ -7930,13 +7930,15 @@ export default function ReportTimelapse() {
 							<img src={LOGO_RE_WHITE} alt="re:dose" style={{ height: 24, width: 'auto', display: 'block' }} />
 						</button>
 						<div className="flex flex-wrap items-center gap-3">
-						<GlobalSearch
-							subs={rows(pickQ)}
-							onSubstance={goSubstance}
-							onEffect={goEffect}
-							onReport={goReport}
-							onCombo={goCombo}
-						/>
+						{view !== 'home' && (
+							<GlobalSearch
+								subs={rows(pickQ)}
+								onSubstance={goSubstance}
+								onEffect={goEffect}
+								onReport={goReport}
+								onCombo={goCombo}
+							/>
+						)}
 						<nav className="flex items-center gap-1">
 							{(
 								[
