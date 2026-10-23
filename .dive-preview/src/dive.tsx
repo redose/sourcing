@@ -5150,7 +5150,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 		return spans
 			.map((sp, i) => {
 				const own = scored.filter((e) => e.m[i] != null && e.m.every((v) => v == null || (v as number) <= (e.m[i] as number)));
-				const extra = scored.filter((e) => e.m[i] != null && !own.includes(e));
+				const extra = scored.filter((e) => e.m[i] != null && (e.m[i] as number) >= 1 && !own.includes(e));
 				const list = [...own, ...extra]
 					.sort((a, b) => (own.includes(b) ? 1 : 0) - (own.includes(a) ? 1 : 0) || (b.m[i] as number) - (a.m[i] as number))
 					.slice(0, 4)
