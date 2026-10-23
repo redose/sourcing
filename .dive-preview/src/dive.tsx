@@ -915,35 +915,8 @@ const CSS = `
 .rd-start .rd-loader { margin-top: 0; }
 .rd-start .rd-bounce { animation-duration: .7s; }
 .rd-start .rd-ghost-body { animation: none; fill: var(--sp-fill, #fff); fill-opacity: 1; transition: fill .1s; }
-.rd-start-sp { position: fixed; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2; left: -60px; top: 34%;
-  animation: rd-journey 4s cubic-bezier(.3,.1,.45,1) forwards; }
-/* From off the left edge, across and down to the corner: three full bounces, then the three shrinking hops. */
-@keyframes rd-journey {
-  0% { left: -60px; top: 34%; transform: scale(1); }
-  52% { left: 50%; top: 52%; transform: scale(1); }
-  100% { left: calc(100% - 52px); top: calc(100% - 52px); transform: scale(.773); }
-}
-@keyframes rd-journey-sm {
-  0% { left: -60px; top: 34%; transform: scale(1); }
-  52% { left: 50%; top: 52%; transform: scale(1); }
-  100% { left: calc(100% - 45px); top: calc(100% - 45px); transform: scale(.614); }
-}
-/* On his way to the corner he bounces down there: three hops, each lower, then he settles. */
-.rd-start-sp.corner .rd-bounce { animation: rd-hop-down 1.9s linear 1 both; }
-@keyframes rd-hop-down {
-  0% { transform: translateY(0) scale(1.15, .82); }
-  7% { transform: translateY(0) scale(.95, 1.06); animation-timing-function: cubic-bezier(.25,.6,.45,1); }
-  21% { transform: translateY(-60%) scale(1, 1); animation-timing-function: cubic-bezier(.55,0,.75,.4); }
-  36% { transform: translateY(0) scale(1.12, .86); }
-  42% { transform: translateY(0) scale(.97, 1.04); animation-timing-function: cubic-bezier(.25,.6,.45,1); }
-  54% { transform: translateY(-34%) scale(1, 1); animation-timing-function: cubic-bezier(.55,0,.75,.4); }
-  66% { transform: translateY(0) scale(1.08, .9); }
-  71% { transform: translateY(0) scale(.98, 1.02); animation-timing-function: cubic-bezier(.25,.6,.45,1); }
-  80% { transform: translateY(-14%) scale(1, 1); animation-timing-function: cubic-bezier(.55,0,.75,.4); }
-  90% { transform: translateY(0) scale(1.04, .96); }
-  100% { transform: translateY(0) scale(1, 1); }
-}
-@media (max-width: 960px) { .rd-start-sp { animation-name: rd-journey-sm; } }
+.rd-start-sp { position: fixed; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2; }
+
 .rd-start .rd-ripple { animation-duration: 1.8s; }
 .rd-ripples { position: fixed; inset: -280px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
 .rd-ripple { position: absolute; left: 50%; top: calc(50% + 44px); width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; border-radius: 50%;
@@ -7894,10 +7867,9 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 
 type Q = ReturnType<typeof useSQLQuery>;
 
-// The preview's connecting screen, a little intro: Spunion bounces in from the left, white; he turns coral on his first
-// landing and his own cyan on the second, then bounces his way down into the bottom-right corner, where the site's
-// Spunion lives. Each landing (the bounce animation's own loop event, so it stays in step) rolls a ring of colour out
-// through the molecules from wherever he touched down.
+// The preview's connecting screen: Spunion bounces on the spot, white at first, coral after his first landing and his
+// own cyan after the second. Each landing (the bounce animation's own loop event, so it stays in step) rolls a ring of
+// colour out through the molecules from his feet.
 const START_FILLS = ['#ffffff', '#fc6c84', '#5cdfe4'];
 const START_RINGS = ['#fc6c84', '#5cdfe4', '#b3a8f0'];
 export function StartScreen() {
@@ -7906,20 +7878,21 @@ export function StartScreen() {
 	const land = (e: React.AnimationEvent) => {
 		if (e.animationName !== 'rd-bounce') return;
 		const b = me.current?.getBoundingClientRect();
-		if (b) setLands((l) => (l.length >= 3 ? l : [...l, { x: b.left + b.width / 2, y: b.bottom }]));
+		if (b) setLands((l) => [...l.slice(-3), { x: b.left + b.width / 2, y: b.bottom }]);
 	};
-	const corner = lands.length >= 3;
+	const n = useRef(0);
 	return (
 		<main className="rd rd-fx-rainbow rd-start" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden' }}>
 			<style>{CSS}</style>
 			<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 			<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
 			<div aria-hidden className="rd-ripples" style={{ WebkitMaskImage: MOLECULES, maskImage: MOLECULES }}>
-				{lands.map((p, i) => (
-					<div key={i} className="rd-ripple" style={{ color: START_RINGS[i % 3], left: p.x + 280, top: p.y + 280 }} />
-				))}
+				{lands.map((p, i) => {
+					const k = n.current - lands.length + i;
+					return <div key={k} className="rd-ripple" style={{ color: START_RINGS[((k % 3) + 3) % 3], left: p.x + 280, top: p.y + 280 }} />;
+				})}
 			</div>
-			<div ref={me} className={`rd-start-sp ${corner ? 'corner' : ''}`} onAnimationIteration={land} style={{ '--sp-fill': START_FILLS[Math.min(lands.length, 2)] } as React.CSSProperties}>
+			<div ref={me} className="rd-start-sp" onAnimationIteration={(e) => (e.animationName === 'rd-bounce' && n.current++, land(e))} style={{ '--sp-fill': START_FILLS[Math.min(n.current, 2)] } as React.CSSProperties}>
 				<BouncingSpunion size={88} />
 			</div>
 		</main>
