@@ -3687,6 +3687,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 		else onReport(it.id!, it.first || '');
 	};
 	const searching = open && needle && dq.toLowerCase() !== needle;
+	const typed = useTypedPlaceholder(!!inline && !q);
 	const group = (label: string, list: Item[], offset: number) =>
 		list.length > 0 && (
 			<div className="py-1.5">
@@ -3746,7 +3747,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 							input.current?.blur();
 						}
 					}}
-					placeholder={inline ? 'Search anything' : 'Search substances, street names, effects or experiences'}
+					placeholder={inline ? (typed ? `Search “${typed}”` : 'Search anything') : 'Search substances, street names, effects or experiences'}
 					aria-label="Search substances, effects and stories"
 					className="flex-1 bg-transparent text-lg outline-none"
 					style={{ color: C.text, minWidth: 0 }}
@@ -5216,33 +5217,27 @@ let spunionGreeted = false;
 
 // ── Home ─────────────────────────────────────────────────────────
 // Search first: type anything (a substance, slang, an effect, a phrase from an experience); a few ways in underneath.
-// A molecule from a well-known substance, turning slowly; tap the name to open its page, drag to turn it.
-const HOME_MOLECULES = ['MDMA', 'LSD', 'Psilocybin mushrooms', 'DMT', 'Mescaline', 'Ketamine', 'Cocaine', 'Caffeine', 'Cannabis'];
-function HomeMolecule({ onSubstance }: { onSubstance: (s: string) => void }) {
-	const [pick] = useState(() => HOME_MOLECULES[Math.floor(Math.random() * HOME_MOLECULES.length)]);
-	const q = useSQLQuery(structureSQL(pick));
-	const r = rows(q)[0];
-	let atoms: [string, number, number, number][] = [], bonds: [number, number, number][] = [];
-	try {
-		atoms = r ? JSON.parse(S(r.atoms)) : [];
-		bonds = r ? JSON.parse(S(r.bonds)) : [];
-	} catch {
-		atoms = [];
-	}
-	return (
-		<div className="flex flex-col items-center" style={{ position: 'absolute', left: '50%', bottom: 'calc(100% + 18px)', transform: 'translateX(-50%)' }}>
-			{atoms.length > 1 && (
-				<>
-					<div style={{ background: 'radial-gradient(closest-side, rgba(217,207,255,.16), transparent)' }}>
-						<Molecule3D atoms={atoms} bonds={bonds} size={210} />
-					</div>
-					<button onClick={() => onSubstance(pick)} className="text-xs" style={{ color: C.faint }}>
-						{S(r!.compound) || short(pick)} · drag to turn
-					</button>
-				</>
-			)}
-		</div>
-	);
+// The homepage search types out example searches by itself until you start typing.
+const TYPED_EXAMPLES = ['molly', 'candy flip', 'first time on shrooms', 'anxiety', 'ketamine and alcohol', 'time distortion', 'weed edibles'];
+function useTypedPlaceholder(on: boolean) {
+	const [text, setText] = useState('');
+	useEffect(() => {
+		if (!on) return;
+		let i = 0, n = 0, back = false;
+		let timer: ReturnType<typeof setTimeout>;
+		const tick = () => {
+			const word = TYPED_EXAMPLES[i % TYPED_EXAMPLES.length];
+			n += back ? -1 : 1;
+			setText(word.slice(0, n));
+			let wait = back ? 35 : 85;
+			if (!back && n >= word.length) (back = true), (wait = 1800);
+			else if (back && n <= 0) (back = false), i++, (wait = 400);
+			timer = setTimeout(tick, wait);
+		};
+		timer = setTimeout(tick, 900);
+		return () => clearTimeout(timer);
+	}, [on]);
+	return text;
 }
 
 function HomePage({ q, onSubstance, onEffect, onReport, onCombo, onView }: { q: Q; onSubstance: (s: string) => void; onEffect: (e: string) => void; onReport: (id: string, s: string) => void; onCombo: (a: string, b: string) => void; onView: (v: 'substances' | 'reports' | 'effects' | 'resources') => void }) {
@@ -5250,7 +5245,6 @@ function HomePage({ q, onSubstance, onEffect, onReport, onCombo, onView }: { q: 
 		<section className="rd-fade flex w-full min-w-0 flex-col items-center justify-center text-center" style={{ minHeight: 'calc(100vh - 150px)', paddingBottom: 90, position: 'relative', zIndex: 2 }}>
 			<h1 className="sr-only">re:dose</h1>
 			<div className="relative w-full">
-				<HomeMolecule onSubstance={onSubstance} />
 				<GlobalSearch inline subs={rows(q)} onSubstance={onSubstance} onEffect={onEffect} onReport={onReport} onCombo={onCombo} />
 			</div>
 		</section>
