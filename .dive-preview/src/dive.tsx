@@ -935,17 +935,13 @@ const CSS = `
 }
 .rd-start-sp.corner .rd-ghost-body { stroke: #000; stroke-width: 18; stroke-linejoin: round; }
 @media (max-width: 960px) { .rd-start-sp.corner { left: calc(100% - 45px); top: calc(100% - 45px); transform: scale(.614); } }
-.rd-wash { position: fixed; left: 50%; top: calc(50% + 44px); width: 300vmax; height: 300vmax; margin: -150vmax 0 0 -150vmax; border-radius: 50%; background-attachment: fixed !important;
-  z-index: -2; pointer-events: none; animation: rd-wash .6s cubic-bezier(.15,.7,.3,1) both; }
-@keyframes rd-wash { from { transform: scale(0); } to { transform: scale(1); } }
-.rd-start .rd-wash { animation-duration: .7s; }
 .rd-start .rd-ripple { animation-duration: 1.8s; }
 .rd-ripples { position: fixed; inset: -280px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
 .rd-ripple { position: absolute; left: 50%; top: calc(50% + 44px); width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; border-radius: 50%;
   background: radial-gradient(closest-side, transparent 50%, currentColor 72%, currentColor 86%, transparent 100%);
   animation: rd-ripple 1.7s cubic-bezier(.2,.6,.35,1) both; }
 @keyframes rd-ripple { from { transform: scale(.03); opacity: 1; } 65% { opacity: .95; } to { transform: scale(1); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .rd-wash, .rd-ripple { animation: none; display: none; } }
+@media (prefers-reduced-motion: reduce) { .rd-ripple { animation: none; display: none; } }
 .rd-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .rd-board { grid-template-columns: 1fr; } }
 /* Homepage molecules: faint until you hover, then they light up and say what they are. */
@@ -2312,7 +2308,7 @@ type Mix = { key: string; label: string; lane: number; n: number; status: string
 
 // Mixing: what people actually mix it with, grouped by TripSit's rating (most dangerous first), most mixed first in each
 // group. Each row: the name, TripSit's note, how it went when there's enough to say, and a link to the stories.
-// Pairs TripSit warns about that people rarely mix are in Health Risks.
+// TripSit's warnings for pairs nobody mixed join the same list.
 const MIX_GROUPS = [
 	{ sev: 3, label: 'Dangerous', c: RISK[3].c },
 	{ sev: 2, label: 'Unsafe', c: RISK[2].c },
@@ -2323,12 +2319,18 @@ const MIX_GROUPS = [
 function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
 	const commonQ = useSQLQuery(focusCombosSQL(name, 12));
 	const knownQ = useSQLQuery(knownMixSQL(name));
-	const known = rows(knownQ).map((r) => ({ rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
+	const known = rows(knownQ).map((r) => ({ grp: S(r.grp), rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
 	const mixes = rows(commonQ).map((r) => {
 		const g = known.find((k) => k.members.includes(S(r.s)));
 		const sev = r.sev != null ? N(r.sev) : r.status ? 0 : -1;
 		return { key: S(r.s), label: short(S(r.s)), sev, n: N(r.n), status: S(r.status) || g?.status || '', note: S(r.note) || (sev >= 0 ? g?.note ?? '' : ''), r };
 	});
+	// TripSit's warnings (caution and worse) for pairs nobody in our reports mixed, so everything sits in one list.
+	const storyKeys = new Set(mixes.map((m) => m.key));
+	const extra = known
+		.filter((k) => k.rank >= 1 && !k.members.some((x) => storyKeys.has(x)))
+		.map((k) => ({ key: k.members.length === 1 ? k.members[0] : '', label: k.members.length === 1 ? short(k.members[0]) : tsGroup(k.grp), sev: k.rank, n: 0, status: k.status, note: k.note, members: k.members, r: {} as Record<string, unknown> }));
+	const all = [...mixes.map((m) => ({ ...m, members: [] as string[] })), ...extra];
 	const head = <ArticleH2 icon={Link2} sub="What it’s mixed with and how risky each mix is, including pairs nobody has written about yet. Not medical advice.">Combos</ArticleH2>;
 	if (commonQ.isLoading || knownQ.isLoading)
 		return (
@@ -2337,11 +2339,11 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 				<Loading height={300} className="mt-5" quiet />
 			</section>
 		);
-	if (!mixes.length)
+	if (!all.length)
 		return (
 			<section id="combos" data-rd-safe="" className="mt-24" style={{ scrollMarginTop: 16 }}>
 				{head}
-				<p className="mt-4 text-sm" style={{ color: C.soft }}>Nobody in our reports mixed {short(name)} with anything else yet. What TripSit knows about mixing it is below.</p>
+				<p className="mt-4 text-sm" style={{ color: C.soft }}>Nobody in our reports mixed {short(name)} with anything else yet, and it isn’t on TripSit’s chart, so check each mix carefully before trying it.</p>
 			</section>
 		);
 	const risky = mixes.filter((m) => m.sev >= 2);
@@ -2351,12 +2353,19 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 		{head}
 		<div className="mt-5">
 			<p style={{ color: C.soft, lineHeight: 1.6 }}>
-				People most often mix it with <b style={{ color: '#fff' }}>{top.slice(0, -1).join(', ')}{top.length > 1 ? ' and ' : ''}{top[top.length - 1]}</b>.{' '}
-				{risky.length ? `TripSit rates ${risky.map((m) => m.label).join(' and ')} as ${risky.some((m) => m.sev === 3) ? 'dangerous or unsafe' : 'unsafe'} with it.` : 'None of these common mixes is rated unsafe by TripSit.'}
+				{top.length > 0 ? (
+					<>
+						People most often mix it with <b style={{ color: '#fff' }}>{top.slice(0, -1).join(', ')}{top.length > 1 ? ' and ' : ''}{top[top.length - 1]}</b>.{' '}
+						{risky.length ? `TripSit rates ${risky.map((m) => m.label).join(' and ')} as ${risky.some((m) => m.sev === 3) ? 'dangerous or unsafe' : 'unsafe'} with it.` : 'None of these common mixes is rated unsafe by TripSit.'}{' '}
+					</>
+				) : (
+					<>Nobody in our reports mixed it with anything else yet. </>
+				)}
+				Mixing is where most of the danger is, and a pair missing here isn’t automatically safe.
 			</p>
 			<div className="mt-8 grid gap-8">
 				{MIX_GROUPS.map((g) => {
-					const list = mixes.filter((m) => m.sev === g.sev).sort((a, b) => b.n - a.n);
+					const list = all.filter((m) => m.sev === g.sev).sort((a, b) => b.n - a.n);
 					if (!list.length) return null;
 					return (
 						<div key={g.sev}>
@@ -2372,15 +2381,25 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 										<p className="mt-0.5 text-sm" style={{ color: C.soft, lineHeight: 1.55, maxWidth: 680 }}>
 											{m.sev >= 0 ? m.note || TS_FALLBACK[m.sev] || TS_PHRASE[m.status] || '' : 'TripSit’s chart doesn’t rate this pair. That doesn’t make it safe.'}
 										</p>
+										{m.members.length > 1 && (
+											<p className="mt-1 text-xs" style={{ color: C.faint }}>
+												Includes {m.members.slice(0, 5).map(short).join(', ')}
+												{m.members.length > 5 ? ` and ${m.members.length - 5} more` : ''}
+											</p>
+										)}
 										{N(m.r.n_llm) >= 3 && (
 											<p className="mt-1 text-xs tabular-nums" style={{ color: C.faint }}>
 												In the stories: <span style={{ color: C.mint }}>{Math.round(100 * N(m.r.pos))}% went well</span>, <span style={{ color: C.coral }}>{Math.round(100 * N(m.r.neg))}% rough</span>
 											</p>
 										)}
 									</div>
+									{m.n === 0 ? (
+										<span className="text-xs" style={{ color: C.faint, whiteSpace: 'nowrap' }}>No reports yet</span>
+									) : (
 									<button onClick={() => onCombo(name, m.key)} className="text-sm tabular-nums" style={{ color: '#fff', whiteSpace: 'nowrap', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.3)', textUnderlineOffset: 4 }} title={`Read the stories with both ${m.label} and ${short(name)}`}>
 										{m.n.toLocaleString()} {m.n === 1 ? 'story' : 'stories'} →
 									</button>
+									)}
 								</div>
 							))}
 						</div>
@@ -2388,7 +2407,7 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 				})}
 			</div>
 			<p className="mt-6 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint }}>
-				Ratings from TripSit; numbers from our stories. Pairs TripSit warns about that people rarely mix are listed below.
+				Ratings and notes from TripSit; numbers from our stories.
 				<TripSitBadge />
 			</p>
 		</div>
@@ -2397,60 +2416,6 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 }
 
 // Known risks: everything TripSit's chart warns about for this substance, worst first, in plain words, all shown.
-function KnownRisks({ name }: { name: string }) {
-	const q = useSQLQuery(knownMixSQL(name));
-	const list = rows(q).map((r) => ({ grp: S(r.grp), rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
-	const bad = list.filter((k) => k.rank >= 2), care = list.filter((k) => k.rank === 1);
-	if (q.isLoading) return null;
-	const row = (k: (typeof list)[number]) => (
-		<div key={k.grp} className="grid gap-x-5 gap-y-1.5 py-4 rd-g-risk" style={{ borderTop: `1px solid ${C.line}` }}>
-			<div className="rd-risk-head">
-				<div className="font-semibold" style={{ whiteSpace: 'nowrap' }}>{tsGroup(k.grp)}</div>
-				<RiskPill sev={k.rank} small />
-			</div>
-			<div className="min-w-0">
-				<p style={{ color: C.soft, lineHeight: 1.6 }}>{k.note || TS_FALLBACK[k.rank]}</p>
-				{k.members.length > 1 && (
-					<p className="mt-1 text-xs" style={{ color: C.faint }}>
-						Includes {k.members.slice(0, 5).map(short).join(', ')}
-						{k.members.length > 5 ? ` and ${k.members.length - 5} more` : ''}
-					</p>
-				)}
-			</div>
-		</div>
-	);
-	return (
-		<section id="risks-more" data-rd-safe="" className="mt-14" style={{ scrollMarginTop: 16 }}>
-			<h3 className="text-xl font-semibold">Other pairs to watch</h3>
-			<p className="mt-1 text-sm" style={{ color: C.faint }}>Mostly from TripSit’s combination chart.</p>
-			<ul className="mt-6 grid gap-3 text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
-				{[
-					'Mixing is where most of the danger is. Two things that are fine alone can be risky together.',
-					'If a mix isn’t listed, that doesn’t mean it’s safe. It may just not be studied.',
-					'Effects can stack for longer than you expect, so leave plenty of time between doses and between substances.',
-				].map((t) => (
-					<li key={t} className="flex gap-3">
-						<span className="rd-dot mt-2" style={{ width: 6, height: 6, background: C.lav, flexShrink: 0 }} />
-						{t}
-					</li>
-				))}
-			</ul>
-			{list.length > 0 ? (
-				<div className="mt-8">
-					{bad.length > 0 ? bad.map(row) : <p className="py-4 text-sm" style={{ color: C.faint, borderTop: `1px solid ${C.line}` }}>TripSit doesn’t mark any combination with {short(name)} as unsafe or dangerous.</p>}
-					{care.map(row)}
-				</div>
-			) : (
-				<p className="mt-6 text-sm" style={{ color: C.faint }}>{short(name)} isn’t on TripSit’s combination chart, so check each mix carefully before trying it.</p>
-			)}
-			<p className="mt-5 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint }}>
-				Notes are TripSit’s own words.
-				<TripSitBadge />
-			</p>
-			<OtherHarms name={name} />
-		</section>
-	);
-}
 
 function FocusPanel({ name, onPick, onCombo, onClose }: { name: string; onPick: (s: string) => void; onCombo: (a: string, b: string) => void; onClose: () => void }) {
 	const { open, classOf } = useContext(OpenCtx);
@@ -5732,7 +5697,7 @@ function OtherHarms({ name }: { name: string }) {
 	if (!list.length) return null;
 	const title = (a: string) => ({ psychosis: 'Psychosis', seizure: 'Seizures' } as Record<string, string>)[a] ?? a.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 	return (
-		<div className="mt-10">
+		<div data-rd-safe="" className="mt-10">
 			<h3 className="text-lg font-semibold">Other risks</h3>
 			{list.map((r) => (
 				<div key={S(r.area)} className="grid gap-x-5 gap-y-1.5 py-4 rd-g-risk" style={{ borderTop: `1px solid ${C.line}` }}>
@@ -6604,7 +6569,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				<div className="min-w-0">
 			{!withSub && <SubstanceOverview name={sub} afterDosage={curveQ.isLoading || kq.isLoading ? <Loading height={320} className="mt-24" quiet /> : enoughToChart || rows(effectsListQ).length > 0 ? unfoldSection : null} />}
 			{!withSub && <MixingBoard name={sub} onCombo={onCombo} />}
-			{!withSub && <KnownRisks name={sub} />}
+			{!withSub && <OtherHarms name={sub} />}
 			{!withSub && <SubstanceAddiction name={sub} />}
 			{!withSub && <SubstanceLegality name={sub} />}
 			{!withSub && <SlangSection name={sub} />}
@@ -7924,13 +7889,10 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 
 type Q = ReturnType<typeof useSQLQuery>;
 
-// The preview's connecting screen, a little intro: Spunion bounces in white; on his first landing he turns coral and
-// the background washes green; on his second he turns his own cyan and it washes back to purple; on the third he hops
-// down into the bottom-right corner, where the site's Spunion lives. Each landing (the bounce animation's own loop
+// The preview's connecting screen, a little intro: Spunion bounces in white, turns coral on his first landing and his
+// own cyan on the second, then bounces his way down into the bottom-right corner, where the site's Spunion lives. Each landing (the bounce animation's own loop
 // event, so it stays in step) also rolls a ring of colour out through the molecules.
 const START_FILLS = ['#ffffff', '#fc6c84', '#5cdfe4'];
-// A calm deep teal (a quiet echo of Spunion's green), then the site's exact background.
-const START_WASHES = ['linear-gradient(170deg, #24506e 0%, #2b6a80 55%, #34808e 100%)', BG];
 const START_RINGS = ['#fc6c84', '#5cdfe4', '#b3a8f0'];
 export function StartScreen() {
 	const [lands, setLands] = useState(0);
@@ -7942,9 +7904,6 @@ export function StartScreen() {
 	return (
 		<main className="rd rd-fx-rainbow rd-start" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden' }}>
 			<style>{CSS}</style>
-			{seen.filter((i) => i < START_WASHES.length).map((i) => (
-				<div key={`w${i}`} aria-hidden className="rd-wash" style={{ background: START_WASHES[i] }} />
-			))}
 			<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 			<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
 			<div aria-hidden className="rd-ripples" style={{ WebkitMaskImage: MOLECULES, maskImage: MOLECULES }}>
