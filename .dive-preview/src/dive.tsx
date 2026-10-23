@@ -912,11 +912,22 @@ const CSS = `
 /* Start screen: the wallpaper holds still. Each landing adds a circle of the next background colour that grows from
    his feet (newest on top), and a ring that grows the same way, seen only through the molecules' shapes. */
 .rd-start .rd-molecules { animation: rd-mol-hue-soft 60s linear infinite; }
-.rd-wash { position: fixed; left: 50%; top: calc(50% + 74px); width: 300vmax; height: 300vmax; margin: -150vmax 0 0 -150vmax; border-radius: 50%;
+.rd-start .rd-loader { margin-top: 0; }
+.rd-start .rd-bounce { animation-duration: .42s; }
+.rd-start .rd-ghost-body { animation: none; fill: var(--sp-fill, #fff); fill-opacity: 1; transition: fill .1s; }
+.rd-start-sp { position: fixed; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2;
+  transition: left .75s cubic-bezier(.45,0,.25,1), top .75s cubic-bezier(.55,-0.45,.35,1), transform .75s ease; }
+.rd-start-sp.corner { left: calc(100% - 52px); top: calc(100% - 52px); transform: scale(.773); }
+.rd-start-sp.corner .rd-bounce { animation: none; }
+.rd-start-sp.corner .rd-ghost-body { stroke: #000; stroke-width: 18; stroke-linejoin: round; }
+@media (max-width: 960px) { .rd-start-sp.corner { left: calc(100% - 45px); top: calc(100% - 45px); transform: scale(.614); } }
+.rd-wash { position: fixed; left: 50%; top: calc(50% + 44px); width: 300vmax; height: 300vmax; margin: -150vmax 0 0 -150vmax; border-radius: 50%;
   z-index: -2; pointer-events: none; animation: rd-wash .6s cubic-bezier(.15,.7,.3,1) both; }
 @keyframes rd-wash { from { transform: scale(0); } to { transform: scale(1); } }
+.rd-start .rd-wash { animation-duration: .45s; }
+.rd-start .rd-ripple { animation-duration: 1.2s; }
 .rd-ripples { position: fixed; inset: -280px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
-.rd-ripple { position: absolute; left: 50%; top: calc(50% + 74px); width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; border-radius: 50%;
+.rd-ripple { position: absolute; left: 50%; top: calc(50% + 44px); width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; border-radius: 50%;
   background: radial-gradient(closest-side, transparent 50%, currentColor 72%, currentColor 86%, transparent 100%);
   animation: rd-ripple 1.7s cubic-bezier(.2,.6,.35,1) both; }
 @keyframes rd-ripple { from { transform: scale(.03); opacity: 1; } 65% { opacity: .95; } to { transform: scale(1); opacity: 0; } }
@@ -7815,31 +7826,36 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 
 type Q = ReturnType<typeof useSQLQuery>;
 
-// The preview's connecting screen. Every time Spunion lands (the bounce animation's own loop event, so it stays in
-// step), a new background colour washes out from his feet and a ring of colour rolls out through the molecules.
-const START_WASHES = ['#5b2c74', '#22497f', '#4a3d9c'];
+// The preview's connecting screen, a little intro: Spunion bounces in white; on his first landing he turns coral and
+// the background washes green; on his second he turns his own cyan and it washes back to purple; on the third he hops
+// down into the bottom-right corner, where the site's Spunion lives. Each landing (the bounce animation's own loop
+// event, so it stays in step) also rolls a ring of colour out through the molecules.
+const START_FILLS = ['#ffffff', '#fc6c84', '#5cdfe4'];
+const START_WASHES = ['#1f6a58', '#4a3d9c'];
 const START_RINGS = ['#fc6c84', '#5cdfe4', '#b3a8f0'];
 export function StartScreen() {
-	const [lands, setLands] = useState<number[]>([]);
+	const [lands, setLands] = useState(0);
 	const land = (e: React.AnimationEvent) => {
-		if (e.animationName === 'rd-bounce') setLands((l) => [...l.slice(-3), (l[l.length - 1] ?? -1) + 1]);
+		if (e.animationName === 'rd-bounce') setLands((l) => Math.min(l + 1, 3));
 	};
+	const corner = lands >= 3;
+	const seen = Array.from({ length: lands }, (_, i) => i);
 	return (
-		<main className="rd rd-fx-rainbow rd-start" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+		<main className="rd rd-fx-rainbow rd-start" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden' }}>
 			<style>{CSS}</style>
-			{lands.map((n) => (
-				<div key={`w${n}`} aria-hidden className="rd-wash" style={{ background: START_WASHES[n % 3] }} />
+			{seen.filter((i) => i < START_WASHES.length).map((i) => (
+				<div key={`w${i}`} aria-hidden className="rd-wash" style={{ background: START_WASHES[i] }} />
 			))}
 			<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 			<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
 			<div aria-hidden className="rd-ripples" style={{ WebkitMaskImage: MOLECULES, maskImage: MOLECULES }}>
-				{lands.map((n) => (
-					<div key={`r${n}`} className="rd-ripple" style={{ color: START_RINGS[n % 3] }} />
+				{seen.map((i) => (
+					<div key={`r${i}`} className="rd-ripple" style={{ color: START_RINGS[i % 3] }} />
 				))}
 			</div>
-			<span onAnimationIteration={land} style={{ display: 'contents' }}>
+			<div className={`rd-start-sp ${corner ? 'corner' : ''}`} onAnimationIteration={land} style={{ '--sp-fill': START_FILLS[Math.min(lands, 2)] } as React.CSSProperties}>
 				<BouncingSpunion size={88} />
-			</span>
+			</div>
 		</main>
 	);
 }
