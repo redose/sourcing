@@ -4254,6 +4254,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 							</div>
 						)}
 					</div>
+					{stages.length === 0 && <EmptyNote className="mt-2" />}
 					{stages.length > 0 && (
 						<div className="mt-3 flex items-center gap-4">
 							<button
@@ -6535,7 +6536,7 @@ export function BouncingSpunion({ size = 96 }: { size?: number }) {
 	);
 }
 
-// Spunion for loading: white, eyes cut out, rings kept.
+// Spunion for loading: white, solid dark eyes with their rings.
 function SpunionGhost() {
 	return (
 		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden style={{ display: 'block', overflow: 'visible' }}>
@@ -6546,7 +6547,9 @@ function SpunionGhost() {
 					<circle cx="357" cy="268" r="64" fill="#000" />
 				</mask>
 			</defs>
-			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" fillOpacity="0.9" mask="url(#sp-ghost-eyes)" />
+			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" fillOpacity="0.92" />
+			<circle cx="185" cy="300" r="86" fill="#140d2e" />
+			<circle cx="357" cy="268" r="64" fill="#140d2e" />
 			<circle cx="185" cy="300" r="70" fill="none" stroke="#fff" strokeOpacity="0.9" strokeWidth="6" />
 			<circle cx="357" cy="268" r="49" fill="none" stroke="#fff" strokeOpacity="0.9" strokeWidth="6" />
 		</svg>
