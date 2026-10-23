@@ -4975,8 +4975,13 @@ function ResourcesPage() {
 // ── Small pieces ──────────────────────────────────────────────────
 
 const TRIPSIT_COMBOS = 'https://wiki.tripsit.me/wiki/Drug_combinations';
-// DuckDB's mark (their 32 px favicon, duckdb.org), for the "Powered by DuckDB" credit.
-const DUCKDB_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABDlBMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQAfHQBbVgCEfQCMhABxawA4NQAIBwAKCQBrZQDYzAD87wD/9QD/8wDv4gCjmgAoJgAHBwCIgAD57QD/9AD/8QD/8gDMwQAtKgBdWAD26gCyqQAODQAREADEuwD46wBSTQATEgBaVQBhWwBPSwAUEwA6NwDy5QCWjwAxLgDu4QD87gCupABYUwD98AC3rgADAwD57gBOSgD47QBMSADt4AD+8AD57ACmnQAQDwAREQBVUABJRQD///9zSTj0AAAAG3RSTlMAFEmGttThH3XI8v4MZtYeo/knvwtnINXH0+AUQiD4AAAAAWJLR0RZmrL0GAAAAAd0SU1FB+QGCg8JOr1uwzYAAAEjSURBVDjLhZPpVsIwEIXTBShla9khWnesokjiioq474C7vv+TkKQBCjZn7p+Zc+53kslkBqGJNN0wY/F4zDR0Df1XwkraKSyUspNWYs5OZ7LSlUw2kw77OcfFc3Kd3NTPF3CECvnJ9ZE+I2QhRQcr5BQFUHJVgFvifrmClaqUGWAF+cKit7S8sro2S1isf1WRrW80Nn1/a7u5MwNUNaTbPNlt7bUJE/X3D8KArSNDJIdHlATyj0/ChIFMHjqnbekTenaOuxe93uWVAExU4+H6ZnwAO+IW391T8vDY5U4N1Xl4eiZT4OWVA7Q/4E5dDQzfAiDyinfy8fn1HVwRVeTPr+f9dWSR4DPBRoGtBj8L/m5wYOCRA4cWHnt4ceDVg5dXvf4jk69mFjrEqsUAAAAldEVYdGRhdGU6Y3JlYXRlADIwMjAtMDYtMTBUMTU6MDk6NTgrMDI6MDC71VeFAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDIwLTA2LTEwVDE1OjA5OjU4KzAyOjAwyojvOQAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAABXelRYdFJhdyBwcm9maWxlIHR5cGUgaXB0YwAAeJzj8gwIcVYoKMpPy8xJ5VIAAyMLLmMLEyMTS5MUAxMgRIA0w2QDI7NUIMvY1MjEzMQcxAfLgEigSi4A6hcRdPJCNZUAAAAASUVORK5CYII=';
+// The AJAr Foundation's GitHub (switch to the re:dose repository once it's public).
+const REDOSE_GITHUB = 'https://github.com/AJAr';
+const GitHubIcon = ({ size = 16 }: { size?: number }) => (
+	<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+		<path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z" />
+	</svg>
+);
 const REDOSE_DISCORD = 'https://discord.com/invite/WzWc5MQSnW';
 const DiscordIcon = ({ size = 16 }: { size?: number }) => (
 	<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -7376,13 +7381,22 @@ export default function ReportTimelapse() {
 								<DiscordIcon size={15} />
 								Join us on Discord
 							</a>
-							<a className="rd-thanks" href="https://duckdb.org" target="_blank" rel="noopener noreferrer" title="Every number here is a DuckDB query. Not affiliated with re:dose." style={{ color: C.soft }}>
-								<img src={DUCKDB_ICON} alt="" width={15} height={15} />
-								Powered by DuckDB
+							<a className="rd-thanks" href={REDOSE_GITHUB} target="_blank" rel="noopener noreferrer" title="The code behind re:dose" style={{ color: C.soft }}>
+								<GitHubIcon size={15} />
+								GitHub
+							</a>
+							<a className="rd-thanks" href={SOURCES.motherduck.href} target="_blank" rel="noopener noreferrer" title="MotherDuck hosts the database behind re:dose. Not affiliated with re:dose." style={{ color: C.soft }}>
+								<img src={SOURCES.motherduck.logo} alt="" width={15} height={15} />
+								Thanks to MotherDuck
 							</a>
 						</div>
 						<p className="w-full text-xs" style={{ color: C.faint, lineHeight: 1.6, maxWidth: 860 }}>
 							<b style={{ color: C.soft }}>Not medical advice.</b> re:dose is for information and harm reduction only. It can’t tell you whether a substance, dose or combination is safe for you: bodies, health conditions, medications and tolerance differ, and drugs bought on the street often aren’t what they’re sold as. Experiences here are self-reported and may be wrong. Talk to a doctor or pharmacist before combining anything with prescribed medication. If you or someone with you is in danger, call your local emergency number right away.
+						</p>
+						<p className="w-full text-xs" style={{ color: C.faint, lineHeight: 1.6, maxWidth: 860 }}>
+							Except where otherwise indicated, re:dose is dedicated to the public domain by the AJAr Foundation under{' '}
+							<a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>CC0 1.0</a>
+							. Material from our sources (experiences from Erowid, effect descriptions from the Subjective Effect Index, combination ratings from TripSit, replications by their artists) keeps its own terms.
 						</p>
 					</footer>
 				</div>
