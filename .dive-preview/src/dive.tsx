@@ -6578,42 +6578,22 @@ const BOUNCE_CSS = `
 
 // The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
 // preview's startup screen.
-// Where the last loader Spunion was (page coordinates, so scrolling doesn't matter), and when. A new one that
-// appears soon after hops over from there.
-let lastSpunionSpot: { x: number; y: number; at: number } | null = null;
-// One big arcing hop: from (dx, dy) away to where the element sits now, up and over, landing with a squash.
-function hopFrom(el: HTMLElement, dx: number, dy: number, duration = 470) {
-	if (Math.hypot(dx, dy) < 24 || typeof el.animate !== 'function') return;
-	const peak = Math.min(dy, 0) - Math.max(110, Math.abs(dx) * 0.3);
-	el.animate(
-		[
-			{ transform: `translate(${dx}px, ${dy}px) scale(1.18, .78)` },
-			{ transform: `translate(${dx * 0.92}px, ${dy - 18}px) scale(.88, 1.16)`, offset: 0.12 },
-			{ transform: `translate(${dx * 0.5}px, ${peak}px) scale(.96, 1.06)`, offset: 0.5 },
-			{ transform: 'translate(0, 0) scale(1.2, .78)', offset: 0.86 },
-			{ transform: 'translate(0, -6px) scale(.96, 1.05)', offset: 0.94 },
-			{ transform: 'translate(0, 0) scale(1, 1)' },
-		],
-		{ duration, easing: 'cubic-bezier(.25,.8,.35,1)' },
-	);
-}
 export function BouncingSpunion({ size = 96, style }: { size?: number; style?: React.CSSProperties }) {
 	const ref = useRef<HTMLSpanElement | null>(null);
+	// He drops in from above, lands with a squash, then gets bouncing.
 	useEffect(() => {
 		const el = ref.current;
-		if (!el) return;
-		const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-		const r = el.getBoundingClientRect();
-		const prev = lastSpunionSpot;
-		if (!still && prev && Date.now() - prev.at < 1500) hopFrom(el, prev.x - (r.left + window.scrollX), prev.y - (r.top + window.scrollY));
-		// Keep note of where he is while he's on screen (not after he's gone: his box is empty by then).
-		const note = () => {
-			const b = el.getBoundingClientRect();
-			if (b.width > 0) lastSpunionSpot = { x: b.left + window.scrollX, y: b.top + window.scrollY, at: Date.now() };
-		};
-		note();
-		const timer = setInterval(note, 120);
-		return () => clearInterval(timer);
+		if (!el || typeof el.animate !== 'function' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+		el.animate(
+			[
+				{ transform: 'translateY(-140px) scale(.92, 1.1)', opacity: 0 },
+				{ transform: 'translateY(-140px) scale(.92, 1.1)', opacity: 1, offset: 0.05 },
+				{ transform: 'translateY(0) scale(1.22, .76)', offset: 0.7 },
+				{ transform: 'translateY(-10px) scale(.96, 1.05)', offset: 0.86 },
+				{ transform: 'translateY(0) scale(1, 1)' },
+			],
+			{ duration: 520, easing: 'cubic-bezier(.5,0,.75,.45)' },
+		);
 	}, []);
 	return (
 		<span ref={ref} className="rd-loader" style={{ width: size, height: size, ...style }}>
