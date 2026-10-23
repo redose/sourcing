@@ -1001,6 +1001,7 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
 .rd-btn:hover { background: rgba(255,255,255,.14); }
 .rd-btn[aria-pressed="true"] { background: #fff; color: ${C.deep}; }
 .rd-nav { border-radius: 999px; padding: 7px 14px; font-size: 14px; font-weight: 600; color: ${C.soft}; }
+@media (max-width: 640px) { .rd-nav { padding: 6px 9px; font-size: 13.5px; } }
 .rd-nav[aria-current="page"] { background: rgba(255,255,255,.14); color: #fff; }
 .rd-sticky { position: sticky; top: 10px; z-index: 5; background: rgba(62,50,124,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .rd-sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); z-index: 40; background: ${C.panel}; border-left: 1px solid ${C.line};
@@ -5465,9 +5466,13 @@ function PrivacyPage() {
 					<a href="https://ajar.org" target="_blank" rel="noopener noreferrer" style={link}>AJAr Foundation</a>.
 				</p>
 			</div>
-			<a href="https://ajar.org" target="_blank" rel="noopener noreferrer" className="mx-auto mt-10 block" title="The AJAr Foundation" style={{ opacity: 0.9 }}>
-				<img src={AJAR_SIGNATURE} alt="Signed, the AJAr Foundation" style={{ width: 130, height: 'auto', display: 'block' }} />
-			</a>
+			<div className="mt-10 flex flex-col items-end text-right">
+				<span style={{ fontFamily: SERIF, fontStyle: 'italic', color: C.soft, fontSize: 17 }}>With care,</span>
+				<a href="https://ajar.org" target="_blank" rel="noopener noreferrer" title="The AJAr Foundation" className="mt-1 block">
+					<img src={AJAR_SIGNATURE} alt="Signed, the AJAr Foundation" style={{ width: 150, height: 'auto', display: 'block' }} />
+				</a>
+				<span className="rd-label mt-1">The AJAr Foundation</span>
+			</div>
 		</section>
 	);
 }
@@ -7974,6 +7979,15 @@ export default function ReportTimelapse() {
 	const [, setAtLink] = useDiveState<number | null>('at', null);
 
 	const pickQ = useSQLQuery(pickListSQL);
+	const [bootMin, setBootMin] = useState(false);
+	const [booted, setBooted] = useState(false);
+	useEffect(() => {
+		const t = setTimeout(() => setBootMin(true), 1400);
+		return () => clearTimeout(t);
+	}, []);
+	useEffect(() => {
+		if (bootMin && !pickQ.isLoading) setBooted(true);
+	}, [bootMin, pickQ.isLoading]);
 	const effectInfoQ = useSQLQuery(effectInfoSQL);
 	const effectToneQ = useSQLQuery(effectToneSQL);
 	const classesQ = useSQLQuery(classesSQL);
@@ -8137,6 +8151,11 @@ export default function ReportTimelapse() {
 		<OpenCtx.Provider value={{ open: setOpenItem, effectInfo, classOf: (n: string) => classMap.get(n) }}>
 			<main className={`rd ${onSub && !withSub && sub === 'Cannabis' ? 'rd-green' : ''}`} style={{ minHeight: '100vh', background: BG, color: C.text, position: 'relative' }}>
 				<style>{CSS}</style>
+				{!booted && (
+					<div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
+						<StartScreen />
+					</div>
+				)}
 				{fx.includes('letters') && <TripLetters scope={pageRef} gentle={!trip} />}
 				{synOn && !(view === 'effects' && effect?.toLowerCase() === 'synaesthesia') && (
 					<button className="rd-btn text-xs" onClick={() => setSynOn(false)} style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 50, padding: '6px 12px' }}>
