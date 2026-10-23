@@ -16,8 +16,8 @@ function IntroOnly() {
 
 function ConnectionGate({ children }: { children: React.ReactNode }) {
 	const { isConnected, isConnecting, error } = useConnectionStatus();
-	// The Dive itself keeps Spunion bouncing until its first data arrives, so here we only cover the connection.
-	if (isConnecting) return <StartScreen />;
+	// The Dive shows the start screen itself until its first data arrives (connecting included), so render it straight
+	// away: one start screen from first paint to first data, instead of two in a row (which made Spunion jump twice).
 	if (error)
 		return (
 			<div className="flex items-center justify-center h-screen gap-2 text-red-600">
@@ -25,7 +25,7 @@ function ConnectionGate({ children }: { children: React.ReactNode }) {
 				Connection failed: {error.message}
 			</div>
 		);
-	if (!isConnected) return null;
+	if (!isConnected && !isConnecting) return <StartScreen />;
 	return <>{children}</>;
 }
 

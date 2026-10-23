@@ -7968,6 +7968,11 @@ export default function ReportTimelapse() {
 	useEffect(() => {
 		if (bootMin && !pickQ.isLoading) setBooted(true);
 	}, [bootMin, pickQ.isLoading]);
+	// Never hold the page hostage: after a few seconds the start screen goes, data or not.
+	useEffect(() => {
+		const t = setTimeout(() => setBooted(true), 6000);
+		return () => clearTimeout(t);
+	}, []);
 	const effectInfoQ = useSQLQuery(effectInfoSQL);
 	const effectToneQ = useSQLQuery(effectToneSQL);
 	const classesQ = useSQLQuery(classesSQL);

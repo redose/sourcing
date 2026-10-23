@@ -42,13 +42,10 @@ export async function openStaticDatabase() {
 	const setup = await db.connect();
 	const base = new URL(`${import.meta.env.BASE_URL}data/`, window.location.href).href;
 	await setup.query(`ATTACH ':memory:' AS sourcing`);
-	await Promise.all(
-		IN_MEMORY.map(async (t) => {
-			const c = await db.connect();
-			await c.query(`CREATE TABLE sourcing.main.${t} AS SELECT * FROM read_parquet('${base}${t}.parquet')`);
-			await c.close();
-		}),
-	);
+	// Fetch the files side by side (so they're in the browser's cache), then create the tables one at a time, since
+	// DuckDB won't create tables in the same database from several connections at once.
+	await Promise.all(IN_MEMORY.map((t) => fetch(`${base}${t}.parquet`).then((r) => r.arrayBuffer()).catch(() => null)));
+	for (const t of IN_MEMORY) await setup.query(`CREATE TABLE sourcing.main.${t} AS SELECT * FROM read_parquet('${base}${t}.parquet')`);
 	for (const t of FROM_FILE) await setup.query(`CREATE VIEW sourcing.main.${t} AS SELECT * FROM read_parquet('${base}${t}.parquet')`);
 	await setup.query(`USE sourcing`);
 	// A few connections, so one slow query doesn't hold up the rest of the page.
