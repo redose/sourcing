@@ -5057,8 +5057,6 @@ function Loading({ height = 200, className = '', quiet }: { height?: number; cla
 				handoffUntil = Date.now() + 400;
 				// Let a loader that's still waiting take him; deferred so it doesn't update others mid-render.
 				setTimeout(() => pillListeners.forEach((l) => l()), 0);
-				// If none does, he hops home to the corner.
-				setTimeout(() => pillOwner == null && window.dispatchEvent(new Event('rd-spunion-home')), 450);
 			}
 		};
 	}, []);
@@ -6581,7 +6579,7 @@ const BOUNCE_CSS = `
 // The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
 // preview's startup screen.
 // Where the last loader Spunion was (page coordinates, so scrolling doesn't matter), and when. A new one that
-// appears soon after hops over from there; if none does, the corner Spunion hops home from there.
+// appears soon after hops over from there.
 let lastSpunionSpot: { x: number; y: number; at: number } | null = null;
 // One big arcing hop: from (dx, dy) away to where the element sits now, up and over, landing with a squash.
 function hopFrom(el: HTMLElement, dx: number, dy: number, duration = 470) {
@@ -6817,18 +6815,7 @@ function SpunionDizzy({ size = 64 }: { size?: number }) {
 function Spunion({ tips, lift, autoOpen }: { tips: string[]; lift: boolean; autoOpen: boolean }) {
 	const [i, setI] = useState(0);
 	const [open, setOpen] = useState(autoOpen);
-	// When the last loader finishes, the loader Spunion hops down here and settles in.
 	const meRef = useRef<HTMLButtonElement | null>(null);
-	useEffect(() => {
-		const home = () => {
-			const el = meRef.current, spot = lastSpunionSpot;
-			if (!el || !spot || Date.now() - spot.at > 2000 || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-			const r = el.getBoundingClientRect();
-			hopFrom(el, spot.x - window.scrollX - r.left, spot.y - window.scrollY - r.top, 620);
-		};
-		window.addEventListener('rd-spunion-home', home);
-		return () => window.removeEventListener('rd-spunion-home', home);
-	}, []);
 	const [hop, setHop] = useState(false);
 	const key = tips.join('|');
 	useEffect(() => {
