@@ -2872,7 +2872,7 @@ function PhaseStrip({ on, pk, end, span: shared, playhead }: { on: number; pk: n
 
 // The top of a substance's own page: what it is (and what people call it), how a dose usually plays out, what to
 // watch for, what people feel. Tolerance and what it's mixed with sit in their own cards below.
-function SubstanceOverview({ name }: { name: string }) {
+function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: React.ReactNode }) {
 	const structQ = useSQLQuery(structureSQL(name));
 	const detailQ = useSQLQuery(substanceDetailSQL(name));
 	const timingQ = useSQLQuery(timingSQL([name]));
@@ -3035,6 +3035,7 @@ function SubstanceOverview({ name }: { name: string }) {
 				<ArticleH2 icon={Clock}>Dosage &amp; Duration</ArticleH2>
 				<DosageDuration name={name} timing={rows(timingQ)} />
 			</section>
+			{afterDosage}
 			{L(r.effects).length > 0 && (
 				<section id="feel" className="mt-24" style={{ scrollMarginTop: 16 }}>
 					<ArticleH2 icon={Sparkles}>What People Feel</ArticleH2>
@@ -5063,6 +5064,119 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	const tolShared = withSub ? rows(tolQ)[0] : undefined;
 	const risk = pairNote ? N(pairNote.sev) : 0;
 
+	// How It Unfolds sits right under Dosage & Duration on a substance page.
+	const unfoldSection = (
+		<section id="unfold" className={withSub ? 'mt-10 border-t pt-7' : 'mt-24'} style={{ borderColor: C.line, scrollMarginTop: 16 }}>
+				{withSub ? (
+					<div className="flex flex-wrap items-baseline justify-between gap-2">
+						<h2 className="text-2xl font-semibold">How it tends to unfold together</h2>
+						<span className="text-sm" style={{ color: C.faint }}>From {N(rows(denQ)[0]?.total)} closely read reports · % mentioning each effect · drag across</span>
+					</div>
+				) : (
+					<>
+						<ArticleH2 icon={Activity} sub={enoughToChart ? `A typical dose in four stretches, from ${closeReads} closely read reports.` : undefined}>How It Unfolds</ArticleH2>
+						<div className="mt-4">{onlyToggle}</div>
+					</>
+				)}
+				{!enoughToChart ? (
+					<div className="mt-6 flex flex-col items-center py-6 text-center">
+						<SpunionPuzzle size={76} missing={closeReads <= 1 ? 5 : closeReads <= 3 ? 4 : closeReads <= 5 ? 3 : closeReads <= 7 ? 2 : 1} />
+						<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
+						<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
+							Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
+						</p>
+						<div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-2">
+							{series
+								.map((s) => ({ ...s, peak: Math.max(0, ...s.points.map((p) => p.y)) }))
+								.sort((a, b) => b.peak - a.peak)
+								.slice(0, 8)
+								.map((r) => (
+									<EffectTag key={r.label} name={r.label} />
+								))}
+						</div>
+					</div>
+				) : (
+				<>
+				<ol className="rd-story mt-8 grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+					{phases.map((ph, i) => {
+						const mood = moodWord(ph.mood);
+						const max = Math.max(...ph.list.map((e) => e.v), 1);
+						return (
+							<li key={ph.label} className="min-w-0">
+								<div className="rd-story-step flex items-center gap-3">
+									<span className="flex items-center justify-center rounded-full text-xs font-bold tabular-nums" style={{ width: 26, height: 26, background: '#fff', color: C.deep, flexShrink: 0 }}>{i + 1}</span>
+									<span className="h-px flex-1" style={{ background: i < phases.length - 1 ? 'rgba(255,255,255,.22)' : 'transparent' }} />
+								</div>
+								<div className="mt-3 font-semibold" style={{ whiteSpace: 'nowrap' }}>{ph.label}</div>
+								<div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs" style={{ color: C.faint }}>
+									<span className="tabular-nums">{span(ph.lo, ph.hi, i === phases.length - 1 && ph.label === 'After')}</span>
+									{mood && (
+										<span className="flex items-center gap-1.5" style={{ color: mood.c }}>
+											<span className="rd-dot" style={{ width: 7, height: 7, background: mood.c }} />
+											{mood.w}
+										</span>
+									)}
+								</div>
+								<div className="mt-4 grid gap-2.5">
+									{ph.list.map((e) => (
+										<button key={e.label} onClick={() => open({ kind: 'effect', name: e.label })} className="rd-hover min-w-0 rounded-lg px-2 py-1 text-left" style={{ marginLeft: -8 }} title={`${e.label}: ${Math.round(e.v)}% of stories mention it in this stretch`}>
+											<span className="flex items-baseline justify-between gap-2 text-sm">
+												<span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: e.peak ? 600 : 400, color: e.peak ? '#fff' : C.soft }}>{e.label}</span>
+												<span className="text-xs tabular-nums" style={{ color: C.faint }}>{Math.round(e.v)}%</span>
+											</span>
+											<span className="mt-1 block" style={{ height: 3, borderRadius: 3, background: 'rgba(255,255,255,.08)' }}>
+												<span className="block h-full" style={{ width: `${Math.max(6, (100 * e.v) / max)}%`, borderRadius: 3, background: e.peak ? C.cyan : 'rgba(143,244,247,.45)' }} />
+											</span>
+										</button>
+									))}
+								</div>
+							</li>
+						);
+					})}
+				</ol>
+				<p className="mt-6 text-xs" style={{ color: C.faint }}>
+					Bold effects are mentioned most in that stretch. Mood is how the moments in it felt, on average.
+				</p>
+				<button className="rd-btn mt-4 text-sm" onClick={() => setDetail(!detail)} aria-expanded={detail}>
+					{detail ? 'Hide the detailed chart' : 'Show the detailed chart'}
+				</button>
+				{detail && (
+				<>
+				<div className="mt-6">
+					<ScrubChart
+						id="sub"
+						lanes={[
+							...(moodPts.length >= 3 ? [{ label: 'Mood', height: 60, min: -1.05, max: 1.05, diverging: true, linear: true, series: [{ key: 'mood', label: 'Mood', color: C.lav, points: moodPts }] }] : []),
+							...series.map((s) => ({ label: s.label, color: s.color, height: 40, min: 0, max: Math.max(10, ...s.points.map((p) => p.y)) * 1.1, series: [s] })),
+						]}
+						xMax={chartMax}
+						x={Math.min(cursor, chartMax)}
+						onScrub={setX}
+						xLabels={niceTicks(chartMax).map((h) => ({ x: h, label: tickLabel(h) }))}
+					/>
+				</div>
+				<div className="mt-5">
+					<span className="rd-label">
+						{readout.length ? `Around ${fmtT(cursor)} · ${denom.get(slice) ?? 0} reports describe this` : `Around ${fmtT(cursor)} · nothing described yet`}
+					</span>
+					<div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+						{readout.map((r) => (
+							<span key={r.label} className="flex items-center gap-2">
+								<button className="rd-tag" onClick={() => open({ kind: 'effect', name: r.label })} title={`${r.label}: tap for what it is`}>
+									<span className="rd-dot" style={{ background: r.color }} />
+									{r.label}
+								</button>
+								<span className="text-sm tabular-nums" style={{ color: C.faint }}>{Math.round(r.v as number)}%</span>
+							</span>
+						))}
+					</div>
+				</div>
+				</>
+				)}
+				</>
+				)}
+			</section>
+	);
 	return (
 		<section className="rd-fade" style={{ position: 'relative', zIndex: 0 }}>
 			{risk >= 2 && <div aria-hidden className="rd-tint" style={{ background: RISK_TINT[risk] }} />}
@@ -5091,19 +5205,19 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 							items={[
 								{ id: 'overview', label: 'Overview', icon: FileText },
 								{ id: 'dosage', label: 'Dosage & Duration', icon: Clock },
+								{ id: 'unfold', label: 'How It Unfolds', icon: Activity },
 								{ id: 'feel', label: 'What People Feel', icon: Sparkles },
 								{ id: 'numbers', label: 'By the Numbers', icon: BarChart3 },
 								{ id: 'mixes', label: 'Mixing', icon: Link2 },
 								{ id: 'risks', label: 'Known Risks', icon: AlertTriangle },
 								{ id: 'slang', label: 'Slang', icon: MessageCircle },
-								{ id: 'unfold', label: 'How It Unfolds', icon: Activity },
 								{ id: 'stories', label: 'Stories', icon: BookOpen },
 							]}
 						/>
 					</div>
 				)}
 				<div className="min-w-0">
-			{!withSub && <SubstanceOverview name={sub} />}
+			{!withSub && <SubstanceOverview name={sub} afterDosage={curveQ.isLoading || kq.isLoading ? <Loading height={320} className="mt-24" quiet /> : series.length > 0 ? unfoldSection : null} />}
 			{!withSub && <SubstanceNumbers name={sub} />}
 			{!withSub && (
 				<section id="mixes" className="mt-24" style={{ scrollMarginTop: 16 }}>
@@ -5156,117 +5270,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					<PairAnswers a={sub} b={withSub} timingQ={pairTimingQ} moodQ={pairMoodQ} summaryQ={pairSummaryQ} effectsQ={pairEffectsQ} seqQ={pairSeqQ} />
 					{N(rows(denQ)[0]?.total) >= 20 && series.length > 0 && <div className="rd-card mt-4 p-5 text-sm" style={{ color: C.faint }}>Based on {N(rows(denQ)[0]?.total)} closely read reports with both.</div>}
 				</>
-			) : series.length > 0 ? (
-				<section id="unfold" className={withSub ? 'mt-10 border-t pt-7' : 'mt-24'} style={{ borderColor: C.line, scrollMarginTop: 16 }}>
-					{withSub ? (
-						<div className="flex flex-wrap items-baseline justify-between gap-2">
-							<h2 className="text-2xl font-semibold">How it tends to unfold together</h2>
-							<span className="text-sm" style={{ color: C.faint }}>From {N(rows(denQ)[0]?.total)} closely read reports · % mentioning each effect · drag across</span>
-						</div>
-					) : (
-						<>
-							<ArticleH2 icon={Activity} sub={enoughToChart ? `A typical dose in four stretches, from ${closeReads} closely read reports.` : undefined}>How It Unfolds</ArticleH2>
-							<div className="mt-4">{onlyToggle}</div>
-						</>
-					)}
-					{!enoughToChart ? (
-						<div className="mt-6 flex flex-col items-center py-6 text-center">
-							<SpunionPuzzle size={76} missing={closeReads <= 2 ? 3 : closeReads <= 5 ? 2 : 1} />
-							<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
-							<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
-								Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
-							</p>
-							<div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-2">
-								{series
-									.map((s) => ({ ...s, peak: Math.max(0, ...s.points.map((p) => p.y)) }))
-									.sort((a, b) => b.peak - a.peak)
-									.slice(0, 8)
-									.map((r) => (
-										<EffectTag key={r.label} name={r.label} />
-									))}
-							</div>
-						</div>
-					) : (
-					<>
-					<ol className="rd-story mt-8 grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-						{phases.map((ph, i) => {
-							const mood = moodWord(ph.mood);
-							const max = Math.max(...ph.list.map((e) => e.v), 1);
-							return (
-								<li key={ph.label} className="min-w-0">
-									<div className="rd-story-step flex items-center gap-3">
-										<span className="flex items-center justify-center rounded-full text-xs font-bold tabular-nums" style={{ width: 26, height: 26, background: '#fff', color: C.deep, flexShrink: 0 }}>{i + 1}</span>
-										<span className="h-px flex-1" style={{ background: i < phases.length - 1 ? 'rgba(255,255,255,.22)' : 'transparent' }} />
-									</div>
-									<div className="mt-3 font-semibold" style={{ whiteSpace: 'nowrap' }}>{ph.label}</div>
-									<div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs" style={{ color: C.faint }}>
-										<span className="tabular-nums">{span(ph.lo, ph.hi, i === phases.length - 1 && ph.label === 'After')}</span>
-										{mood && (
-											<span className="flex items-center gap-1.5" style={{ color: mood.c }}>
-												<span className="rd-dot" style={{ width: 7, height: 7, background: mood.c }} />
-												{mood.w}
-											</span>
-										)}
-									</div>
-									<div className="mt-4 grid gap-2.5">
-										{ph.list.map((e) => (
-											<button key={e.label} onClick={() => open({ kind: 'effect', name: e.label })} className="rd-hover min-w-0 rounded-lg px-2 py-1 text-left" style={{ marginLeft: -8 }} title={`${e.label}: ${Math.round(e.v)}% of stories mention it in this stretch`}>
-												<span className="flex items-baseline justify-between gap-2 text-sm">
-													<span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: e.peak ? 600 : 400, color: e.peak ? '#fff' : C.soft }}>{e.label}</span>
-													<span className="text-xs tabular-nums" style={{ color: C.faint }}>{Math.round(e.v)}%</span>
-												</span>
-												<span className="mt-1 block" style={{ height: 3, borderRadius: 3, background: 'rgba(255,255,255,.08)' }}>
-													<span className="block h-full" style={{ width: `${Math.max(6, (100 * e.v) / max)}%`, borderRadius: 3, background: e.peak ? C.cyan : 'rgba(143,244,247,.45)' }} />
-												</span>
-											</button>
-										))}
-									</div>
-								</li>
-							);
-						})}
-					</ol>
-					<p className="mt-6 text-xs" style={{ color: C.faint }}>
-						Bold effects are mentioned most in that stretch. Mood is how the moments in it felt, on average.
-					</p>
-					<button className="rd-btn mt-4 text-sm" onClick={() => setDetail(!detail)} aria-expanded={detail}>
-						{detail ? 'Hide the detailed chart' : 'Show the detailed chart'}
-					</button>
-					{detail && (
-					<>
-					<div className="mt-6">
-						<ScrubChart
-							id="sub"
-							lanes={[
-								...(moodPts.length >= 3 ? [{ label: 'Mood', height: 60, min: -1.05, max: 1.05, diverging: true, linear: true, series: [{ key: 'mood', label: 'Mood', color: C.lav, points: moodPts }] }] : []),
-								...series.map((s) => ({ label: s.label, color: s.color, height: 40, min: 0, max: Math.max(10, ...s.points.map((p) => p.y)) * 1.1, series: [s] })),
-							]}
-							xMax={chartMax}
-							x={Math.min(cursor, chartMax)}
-							onScrub={setX}
-							xLabels={niceTicks(chartMax).map((h) => ({ x: h, label: tickLabel(h) }))}
-						/>
-					</div>
-					<div className="mt-5">
-						<span className="rd-label">
-							{readout.length ? `Around ${fmtT(cursor)} · ${denom.get(slice) ?? 0} reports describe this` : `Around ${fmtT(cursor)} · nothing described yet`}
-						</span>
-						<div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-							{readout.map((r) => (
-								<span key={r.label} className="flex items-center gap-2">
-									<button className="rd-tag" onClick={() => open({ kind: 'effect', name: r.label })} title={`${r.label}: tap for what it is`}>
-										<span className="rd-dot" style={{ background: r.color }} />
-										{r.label}
-									</button>
-									<span className="text-sm tabular-nums" style={{ color: C.faint }}>{Math.round(r.v as number)}%</span>
-								</span>
-							))}
-						</div>
-					</div>
-					</>
-					)}
-					</>
-					)}
-				</section>
 			) : null)}
 
 			{(
@@ -6190,16 +6193,18 @@ function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boole
 		</span>
 	);
 }
-// Spunion with pieces missing, for "not enough data yet", drawn as line art: dashed outlines where the pieces belong,
-// the pieces themselves bobbing around him. The thinner the data, the more pieces are missing (1 to 3).
+// Spunion with pieces missing, for "not enough data yet", drawn as line art: dashed outlines where pieces are gone,
+// one loose piece bobbing beside him. The thinner the data, the more pieces are missing (1 to 5).
 const PUZZLE_PIECE = 'M0 0 h30 a15 15 0 1 1 30 0 h30 v30 a15 15 0 1 1 0 30 v30 h-90 Z';
 const PUZZLE_SPOTS = [
-	{ hole: 'translate(395 285) rotate(8)', piece: 'translate(540 230) rotate(24)' },
-	{ hole: 'translate(185 70) rotate(-8)', piece: 'translate(70 -60) rotate(-18)' },
-	{ hole: 'translate(55 350) rotate(-10)', piece: 'translate(-95 420) rotate(-22)' },
+	{ hole: 'translate(395 285) rotate(8)' },
+	{ hole: 'translate(185 70) rotate(-8)' },
+	{ hole: 'translate(55 350) rotate(-10)' },
+	{ hole: 'translate(230 375) rotate(4)' },
+	{ hole: 'translate(388 108) rotate(14)' },
 ];
 function SpunionPuzzle({ size = 72, missing = 1 }: { size?: number; missing?: number }) {
-	const spots = PUZZLE_SPOTS.slice(0, Math.max(1, Math.min(3, missing)));
+	const spots = PUZZLE_SPOTS.slice(0, Math.max(1, Math.min(5, missing)));
 	const id = `sp-holes-${spots.length}`;
 	return (
 		<svg viewBox="-110 -80 760 600" width={(size * 760) / 600} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
@@ -6231,11 +6236,9 @@ function SpunionPuzzle({ size = 72, missing = 1 }: { size?: number; missing?: nu
 			</g>
 			<circle cx="196" cy="284" r="17" fill="#fff" />
 			<circle cx="352" cy="248" r="13" fill="#fff" />
-			{spots.map((sp, i) => (
-				<g key={sp.piece} className="rd-piece" style={{ animationDelay: `${i * 0.6}s` }}>
-					<path d={PUZZLE_PIECE} transform={sp.piece} fill="none" stroke="#fff" strokeWidth="14" strokeLinejoin="round" />
-				</g>
-			))}
+			<g className="rd-piece">
+				<path d={PUZZLE_PIECE} transform="translate(540 230) rotate(24)" fill="none" stroke="#fff" strokeWidth="14" strokeLinejoin="round" />
+			</g>
 		</svg>
 	);
 }
