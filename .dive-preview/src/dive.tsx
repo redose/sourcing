@@ -758,22 +758,26 @@ const SERIF = '"Iowan Old Style", "Charter", "Palatino Linotype", Palatino, Geor
 const BG = 'linear-gradient(170deg, #3a2e74 0%, #4f42a0 55%, #6152b4 100%)';
 
 const CSS = `
-/* Easter egg: trip mode. Slow, smooth changes only (nothing flashes): the page warps and breathes, colours drift. */
-@keyframes rd-trip-hue { from { filter: url(#rd-trip-warp) saturate(1.5) hue-rotate(0deg); } to { filter: url(#rd-trip-warp) saturate(1.5) hue-rotate(360deg); } }
-@keyframes rd-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
-@keyframes rd-spin { to { transform: rotate(360deg); } }
-@keyframes rd-rings { 0%, 100% { transform: scale(1); opacity: .08; } 50% { transform: scale(1.18); opacity: .16; } }
-.rd-tripping { animation: rd-trip-hue 18s linear infinite, rd-breathe 5s ease-in-out infinite; transform-origin: 50% 30%; }
-.rd-trip-mandala { position: fixed; inset: -30%; pointer-events: none; z-index: 60; mix-blend-mode: screen; opacity: .15;
-  background: repeating-conic-gradient(from 0deg at 50% 50%, #fc6c84 0deg 8deg, #5ae0e4 8deg 16deg, #8a7ddc 16deg 24deg, #58e2d8 24deg 32deg);
-  -webkit-mask-image: radial-gradient(circle, transparent 12%, #000 65%); mask-image: radial-gradient(circle, transparent 12%, #000 65%); animation: rd-spin 80s linear infinite; }
-.rd-trip-rings { position: fixed; inset: -20%; pointer-events: none; z-index: 61; mix-blend-mode: screen;
-  background: repeating-radial-gradient(circle at 50% 45%, rgba(255,255,255,.0) 0 26px, rgba(217,207,255,.5) 26px 28px); animation: rd-rings 7s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) {
-  .rd-tripping { animation: none; filter: saturate(1.4) hue-rotate(40deg); }
-  .rd-trip-mandala, .rd-trip-rings { animation: none; opacity: .08; }
+/* Easter egg: trip mode, after Effect Index's visual effects (drifting, breathing): text lifts off the page and
+   undulates in place. Only transforms and opacity
+   animate, so it stays smooth; nothing flashes. */
+@keyframes rd-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.01); } }
+@keyframes rd-wave {
+  0%, 100% { transform: translateY(0) skewX(0deg) scale(1); text-shadow: 0 2px 6px rgba(10,6,30,.25); }
+  25% { transform: translateY(-5px) skewX(1.6deg) scale(1.01); text-shadow: 0 10px 18px rgba(10,6,30,.35); }
+  50% { transform: translateY(-2px) skewX(0deg) scale(1.005); text-shadow: 0 6px 12px rgba(10,6,30,.3); }
+  75% { transform: translateY(-6px) skewX(-1.6deg) scale(1.012); text-shadow: 0 12px 20px rgba(10,6,30,.35); }
 }
-::selection { background: rgba(252,108,132,.45); color: #fff; }
+.rd-tripping { animation: rd-breathe 6s ease-in-out infinite; transform-origin: 50% 30%; }
+.rd-tripping :is(h1, h2, h3, p, li) { animation: rd-wave 4.2s ease-in-out infinite; }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-delay: -1.1s; }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-delay: -2.2s; }
+@media (prefers-reduced-motion: reduce) { .rd-tripping, .rd-tripping :is(h1, h2, h3, p, li) { animation: none; } }
+/* The accent is the logo coral, except on cannabis pages, where it goes green (safety colours stay as they are). */
+.rd { --rd-accent: ${C.coral}; --rd-select: rgba(252,108,132,.45); }
+.rd.rd-green { --rd-accent: #8fe3a4; --rd-select: rgba(120,220,140,.45); }
+.rd.rd-green::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 520px; pointer-events: none; background: radial-gradient(900px 420px at 50% -10%, rgba(110,220,130,.22), transparent 70%); }
+.rd ::selection { background: var(--rd-select); color: #fff; }
 /* Headings in serif (editorial, matches the serif lead line); everything else stays sans for reading data. */
 .rd h1, .rd h2 { font-family: ${SERIF}; letter-spacing: -0.01em; font-weight: 600; }
 /* Links take the colour around them; hosts (the Dive frame) otherwise paint visited links blue. Inline colours still win. */
@@ -1650,7 +1654,7 @@ function SubstanceTag({ name, note }: { name: string; note?: string }) {
 	const { open, classOf } = useContext(OpenCtx);
 	return (
 		<button className="rd-tag" onClick={() => open({ kind: 'substance', name })} title={[name, classOf(name)].filter(Boolean).join(' · ')}>
-			<ClassIcon cls={classOf(name)} size={15} color={C.coral} />
+			<ClassIcon cls={classOf(name)} size={15} color="var(--rd-accent)" />
 			{short(name)}
 			{note && <span style={{ color: C.faint, fontWeight: 500 }}>{note}</span>}
 		</button>
@@ -1828,14 +1832,14 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay, onEffect
 
 function SubstanceIcon({ name }: { name: string }) {
 	const { classOf } = useContext(OpenCtx);
-	return <ClassIcon cls={classOf(name)} size={20} color={C.coral} />;
+	return <ClassIcon cls={classOf(name)} size={20} color="var(--rd-accent)" />;
 }
 
 function DoseChip({ d, latest, count = 1 }: { d: { sub: string; amount: string; route: string; t: number; assumed: boolean }; latest: boolean; count?: number }) {
 	const { open, classOf } = useContext(OpenCtx);
 	return (
 		<button className={`rd-tag rd-in shrink-0 ${latest ? 'rd-new' : ''}`} onClick={() => open({ kind: 'substance', name: d.sub })} title={[d.sub, classOf(d.sub)].filter(Boolean).join(' · ')}>
-			<ClassIcon cls={classOf(d.sub)} size={15} color={C.coral} />
+			<ClassIcon cls={classOf(d.sub)} size={15} color="var(--rd-accent)" />
 			{short(d.sub)}
 			{d.route && <RouteIcon route={d.route} size={13} />}
 			{count > 1 ? <span style={{ color: C.soft, fontWeight: 500 }}>×{count}</span> : /\d/.test(d.amount) && <span style={{ color: C.soft, fontWeight: 500 }}>{d.amount}</span>}
@@ -2149,7 +2153,7 @@ function CombosList({ name, onCombo, bare }: { name: string; onCombo: (a: string
 								style={{ gridTemplateColumns: 'minmax(0, 1fr) auto 16px', columnGap: 12, rowGap: 6, borderTop: `1px solid ${C.line}` }}
 							>
 								<span className="flex items-center gap-2 font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={other}>
-									<ClassIcon cls={classOf(other)} size={16} color={C.coral} />
+									<ClassIcon cls={classOf(other)} size={16} color="var(--rd-accent)" />
 									{short(other)}
 								</span>
 								<span className="text-xs font-semibold" style={{ whiteSpace: 'nowrap' }} title={S(r.note) || undefined}>
@@ -2361,7 +2365,7 @@ function FocusPanel({ name, onPick, onCombo, onClose }: { name: string; onPick: 
 		<div className="rd-card rd-in mt-6 p-5 sm:p-6" onClick={(e) => e.stopPropagation()}>
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<h2 className="flex items-center gap-3 text-2xl font-semibold" style={{ whiteSpace: 'nowrap' }}>
-					<ClassIcon cls={classOf(name)} size={22} color={C.coral} />
+					<ClassIcon cls={classOf(name)} size={22} color="var(--rd-accent)" />
 					{short(name)}
 				</h2>
 				<div className="flex items-center gap-2">
@@ -3163,7 +3167,7 @@ function AliasDoodle({ kind }: { kind: string }) {
 			)}
 			{kind === 'chemical' && (
 				<>
-					<path d="M15 31h18l5 8c1 2 0 4-2 4H12c-2 0-3-2-2-4z" fill={C.coral} opacity="0.8" transform="translate(2 1) rotate(4 24 36)" />
+					<path d="M15 31h18l5 8c1 2 0 4-2 4H12c-2 0-3-2-2-4z" fill="var(--rd-accent)" opacity="0.8" transform="translate(2 1) rotate(4 24 36)" />
 					<path d="M19 6h10M21 6v12L10 39c-1 2 0 4 2 4h24c2 0 3-2 2-4L27 18V6" {...ink} />
 					<path d="M15 30h18" {...ink} strokeWidth={1.6} />
 					<circle cx="22" cy="36" r="1.4" fill="#fff" />
@@ -3804,7 +3808,7 @@ function EffectPage({ name, onSubstance, onCombo, onEffect, onReport }: { name: 
 					{rows(subsQ).map((x) => (
 						<button key={S(x.s)} onClick={() => onSubstance(S(x.s))} className="rd-hover grid items-center gap-3 rounded-xl px-3 py-2.5 text-left" style={{ gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.4fr) auto' }}>
 							<span className="flex items-center gap-2 font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-								<ClassIcon cls={classOf(S(x.s))} size={16} color={C.coral} />
+								<ClassIcon cls={classOf(S(x.s))} size={16} color="var(--rd-accent)" />
 								{short(S(x.s))}
 							</span>
 							<span className="flex items-center gap-3 text-xs" style={{ color: C.faint }}>
@@ -6213,7 +6217,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 									style={{ padding: '4px 10px', fontSize: 12, gap: 6, opacity: taken || near ? 1 : 0.42, background: near ? 'rgba(255,255,255,.22)' : undefined, borderColor: near ? '#fff' : undefined, transform: near ? 'translateY(-1px)' : 'none', transition: 'opacity .3s, background .2s, border-color .2s, transform .2s' }}
 								>
 									<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{d.assumed ? '—' : fmtT(d.t)}</span>
-									<ClassIcon cls={classOf(d.sub)} size={12} color={C.coral} />
+									<ClassIcon cls={classOf(d.sub)} size={12} color="var(--rd-accent)" />
 									{short(d.sub)}
 									{/\d/.test(d.amount) && <span style={{ color: C.soft, fontWeight: 500, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.amount}</span>}
 									{earlier && <Repeat size={11} color={C.lav} />}
@@ -6464,7 +6468,7 @@ function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, fro
 										>
 											<span className="tabular-nums" style={{ color: C.faint, textAlign: 'right' }}>{d.assumed ? '—' : fmtT(d.t)}</span>
 											<span className="flex justify-center">
-												<ClassIcon cls={classOf(d.sub)} size={14} color={C.coral} />
+												<ClassIcon cls={classOf(d.sub)} size={14} color="var(--rd-accent)" />
 											</span>
 											<button
 												onClick={(e) => {
@@ -7036,20 +7040,10 @@ export default function ReportTimelapse() {
 	return (
 		<GoCtx.Provider value={goSubstance}>
 		<OpenCtx.Provider value={{ open: setOpenItem, effectInfo, classOf: (n: string) => classMap.get(n) }}>
-			<main className="rd" style={{ minHeight: '100vh', background: BG, color: C.text }}>
+			<main className={`rd ${onSub && !withSub && sub === 'Cannabis' ? 'rd-green' : ''}`} style={{ minHeight: '100vh', background: BG, color: C.text, position: 'relative' }}>
 				<style>{CSS}</style>
 				{trip && (
 					<>
-						<svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
-							<filter id="rd-trip-warp">
-								<feTurbulence type="fractalNoise" baseFrequency="0.006 0.01" numOctaves="2" seed="7">
-									<animate attributeName="baseFrequency" dur="16s" values="0.006 0.01;0.013 0.006;0.006 0.01" repeatCount="indefinite" />
-								</feTurbulence>
-								<feDisplacementMap in="SourceGraphic" scale="16" xChannelSelector="R" yChannelSelector="G" />
-							</filter>
-						</svg>
-						<div className="rd-trip-mandala" aria-hidden />
-						<div className="rd-trip-rings" aria-hidden />
 						<button className="rd-btn text-sm" onClick={() => setTrip(false)} style={{ position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 70, background: '#fff', color: C.deep }}>
 							Come down (Esc)
 						</button>
@@ -7155,7 +7149,7 @@ export default function ReportTimelapse() {
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} onEffectPage={goEffect} />
-				{!openItem && <Spunion tips={trip ? ['Whoa… is the page breathing? Press Esc to come down.', ...spunionTips] : spunionTips} lift={onReport} autoOpen={spunionSpeaks || trip} onPoke={poke} />}
+				{!openItem && <Spunion tips={trip ? ['Whoa… is the text lifting off the page? Press Esc to come down.', ...spunionTips] : spunionTips} lift={onReport} autoOpen={spunionSpeaks || trip} onPoke={poke} />}
 			</main>
 		</OpenCtx.Provider>
 		</GoCtx.Provider>
