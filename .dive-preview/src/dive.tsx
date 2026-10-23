@@ -2378,6 +2378,7 @@ function KnownRisks({ name }: { name: string }) {
 				Notes are TripSit’s own words.
 				<TripSitBadge />
 			</p>
+			<OtherHarms name={name} />
 		</section>
 	);
 }
@@ -2531,8 +2532,9 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 						<section key={label || 'all'} id={label ? `kind-${label}` : undefined} className={label ? 'mt-10' : 'mt-6'} style={{ scrollMarginTop: 16 }}>
 							{label && (
 								<>
-									<h2 className="text-2xl font-semibold">
-										{label} <span className="text-base font-normal" style={{ color: C.faint }}>{items.length}</span>
+									<h2 className="flex items-center gap-3 text-2xl font-semibold">
+										<ClassIcon cls={Object.keys(SUBSTANCE_KIND).find((k) => SUBSTANCE_KIND[k].label === label)} size={22} color={C.lav} />
+										<span>{label} <span className="text-base font-normal" style={{ color: C.faint }}>{items.length}</span></span>
 									</h2>
 									<p className="mt-1 max-w-3xl text-sm" style={{ color: C.soft }}>{about}</p>
 								</>
@@ -3965,28 +3967,35 @@ function ArticleH2({ children, sub }: { icon?: typeof Clock; children: React.Rea
 }
 
 // Sticky list of the page's sections; the one you're reading is highlighted.
+// Sections load at different times and some don't appear at all, so it checks what's on the page as it goes, and
+// highlights the last section whose top has passed a third of the way down the window.
 function ContentsNav({ items }: { items: { id: string; label: string; icon: typeof Clock }[] }) {
 	const [here, setHere] = useState(items[0]?.id);
+	const [present, setPresent] = useState<string[]>(items.map((i) => i.id));
 	useEffect(() => {
-		const els = items.map((it) => document.getElementById(it.id)).filter(Boolean) as HTMLElement[];
-		if (!els.length || typeof IntersectionObserver === 'undefined') return;
-		const seen = new Map<string, boolean>();
-		const io = new IntersectionObserver(
-			(entries) => {
-				for (const e of entries) seen.set(e.target.id, e.isIntersecting);
-				const first = items.find((it) => seen.get(it.id));
-				if (first) setHere(first.id);
-			},
-			{ rootMargin: '-15% 0px -60% 0px' },
-		);
-		els.forEach((el) => io.observe(el));
-		return () => io.disconnect();
+		const update = () => {
+			const on = items.filter((it) => document.getElementById(it.id));
+			setPresent((prev) => (prev.join() === on.map((i) => i.id).join() ? prev : on.map((i) => i.id)));
+			const line = window.innerHeight * 0.33;
+			let cur = on[0]?.id;
+			for (const it of on) if (document.getElementById(it.id)!.getBoundingClientRect().top <= line) cur = it.id;
+			setHere(cur);
+		};
+		update();
+		const timer = setInterval(update, 900);
+		window.addEventListener('scroll', update, { passive: true });
+		window.addEventListener('resize', update);
+		return () => {
+			clearInterval(timer);
+			window.removeEventListener('scroll', update);
+			window.removeEventListener('resize', update);
+		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [items.map((i) => i.id).join(',')]);
 	return (
 		<nav className="rd-contents" aria-label="Contents">
 			<div className="rd-label mb-3 px-3">Contents</div>
-			{items.map((it) => (
+			{items.filter((it) => present.includes(it.id)).map((it) => (
 				<button
 					key={it.id}
 					onClick={() => document.getElementById(it.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -4774,20 +4783,25 @@ function LegalityMap({ list, locals = [], here, setHere, pick, setPick }: { list
 					Nothing on file
 				</span>
 			</div>
-			<div className="mt-4 overflow-hidden rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,.05)', height: 118 }}>
+			<div className="mt-4 overflow-hidden rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,.05)', height: 128 }}>
 				{focus ? (
 					<>
 						<div className="flex flex-wrap items-baseline gap-x-3">
 							<span className="font-semibold">{focus}</span>
 							<span className="text-sm" style={{ color: fg?.c ?? C.faint }}>{fr ? S(fr.status) : 'Nothing on file'}</span>
 						</div>
-						{locals.filter((l) => localOf(S(l.country))?.parent === focus).map((l) => (
-							<p key={S(l.country)} className="mt-1 text-xs" style={{ color: C.soft }}>
-								<b style={{ color: '#fff' }}>{localOf(S(l.country))!.region}:</b> {S(l.status)}
+						{locals.some((l) => localOf(S(l.country))?.parent === focus) && (
+							<p className="mt-1 text-xs" style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+								{locals.filter((l) => localOf(S(l.country))?.parent === focus).map((l, i) => (
+									<Fragment key={S(l.country)}>
+										{i > 0 && <span style={{ color: C.faint }}> · </span>}
+										<b style={{ color: '#fff' }}>{localOf(S(l.country))!.region}:</b> {S(l.status)}
+									</Fragment>
+								))}
 							</p>
-						))}
+						)}
 						{fr && S(fr.notes) && (
-							<p className="mt-1 text-sm" style={{ color: C.soft, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={S(fr.notes)}>
+							<p className="mt-1 text-sm" style={{ color: C.soft, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={S(fr.notes)}>
 								{S(fr.notes)}
 							</p>
 						)}
@@ -5006,10 +5020,8 @@ function ResourcesPage() {
 			<h1 className="text-4xl font-semibold">Resources</h1>
 			<p className="mt-2" style={{ color: C.soft, maxWidth: 720 }}>Where to get help, get your drugs checked, read up, and find people who get it.</p>
 
-			<div data-rd-safe="" className="mt-8 rounded-2xl p-5 sm:p-6" style={{ background: 'rgba(255,110,130,.12)', border: '1px solid rgba(255,125,142,.4)' }}>
-				<div className="flex items-center gap-2 text-lg font-semibold">
-					<AlertTriangle size={18} color={RISK[3].c} /> Get help now
-				</div>
+			<div data-rd-safe="" className="rd-card mt-8 p-5 sm:p-6">
+				<div className="text-lg font-semibold">Need help?</div>
 				<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
 					If someone is unresponsive, struggling to breathe, overheating, having a seizure or you’re worried at all, <b style={{ color: '#fff' }}>call your local emergency number</b> (911 in the US and Canada, 999 or 112 in the UK and Europe, 000 in Australia, 111 in New Zealand). Stay with them. Many places have laws protecting people who call for help in an overdose.
 				</p>
@@ -5067,6 +5079,94 @@ function ResourcesPage() {
 				</a>
 			</div>
 		</section>
+	);
+}
+
+// Addiction and tolerance, from dose.wiki (CC0): how likely physical and psychological dependence are, how it tends
+// to start, and how tolerance builds and fades.
+const harmsSQL = (name: string) => `SELECT area, level, description, source_url FROM ${DB}."substance_harms" WHERE substance = '${esc(name)}'`;
+const HARM_LEVELS = ['extremely_low', 'low', 'moderate', 'high', 'extremely_high'];
+const HARM_LEVEL_WORD: Record<string, string> = { extremely_low: 'Very low', low: 'Low', moderate: 'Moderate', high: 'High', extremely_high: 'Very high' };
+const HARM_LEVEL_COLOR = [C.mint, C.mint, '#ffe27a', '#ffb072', '#ff7d8e'];
+function LevelMeter({ level }: { level: string | null }) {
+	const i = level ? HARM_LEVELS.indexOf(level) : -1;
+	if (i < 0) return null;
+	return (
+		<span className="flex items-center gap-2">
+			<span className="font-semibold" style={{ color: HARM_LEVEL_COLOR[i] }}>{HARM_LEVEL_WORD[level!]}</span>
+			<span className="flex gap-1" aria-hidden>
+				{HARM_LEVELS.map((_, k) => (
+					<span key={k} style={{ width: 14, height: 6, borderRadius: 3, background: k <= i ? HARM_LEVEL_COLOR[i] : 'rgba(255,255,255,.14)' }} />
+				))}
+			</span>
+		</span>
+	);
+}
+function SubstanceAddiction({ name }: { name: string }) {
+	const q = useSQLQuery(harmsSQL(name));
+	const by = new Map(rows(q).map((r) => [S(r.area), r]));
+	const dep = (['physical_dependence', 'psychological_dependence'] as const).filter((k) => by.has(k));
+	const tol = ([['tolerance_full', 'How it builds'], ['tolerance_half', 'Halfway back'], ['tolerance_baseline', 'Back to baseline']] as const).filter(([k]) => by.has(k));
+	if (q.isLoading || (!dep.length && !tol.length)) return null;
+	const src = S(rows(q)[0]?.source_url);
+	return (
+		<section id="addiction" className="mt-24" style={{ scrollMarginTop: 16 }}>
+			<ArticleH2 icon={Repeat} sub="How likely it is to become a habit, how that tends to start, and how tolerance builds and fades.">Addiction &amp; Tolerance</ArticleH2>
+			{dep.length > 0 && (
+				<div className="mt-6 grid gap-4 md:grid-cols-2">
+					{dep.map((k) => {
+						const r = by.get(k)!;
+						return (
+							<div key={k} className="rd-card p-5">
+								<div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+									<span className="rd-label">{k === 'physical_dependence' ? 'Physical dependence' : 'Psychological dependence'}</span>
+									<LevelMeter level={r.level == null ? null : S(r.level)} />
+								</div>
+								<p className="mt-3 text-sm" style={{ color: C.soft, lineHeight: 1.65 }}>{S(r.description)}</p>
+							</div>
+						);
+					})}
+				</div>
+			)}
+			{tol.length > 0 && (
+				<div className="mt-8 grid gap-5">
+					<h3 className="text-lg font-semibold">Tolerance</h3>
+					{tol.map(([k, label]) => (
+						<div key={k} className="grid gap-x-6 gap-y-1 rd-g-risk">
+							<span className="font-semibold" style={{ color: '#fff' }}>{label}</span>
+							<p className="text-sm" style={{ color: C.soft, lineHeight: 1.65, maxWidth: 760 }}>{S(by.get(k)!.description)}</p>
+						</div>
+					))}
+				</div>
+			)}
+			<p className="mt-6 text-xs" style={{ color: C.faint }}>
+				From{' '}
+				<a href={src || 'https://effectindex.com'} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>dose.wiki (Effect Index)</a>
+				, shared under CC0. Not medical advice; if you’re worried about your use, talk to a doctor or a harm-reduction service.
+			</p>
+		</section>
+	);
+}
+// Other harms from dose.wiki (psychosis, seizures...), listed under Health Risks.
+function OtherHarms({ name }: { name: string }) {
+	const q = useSQLQuery(harmsSQL(name));
+	const list = rows(q).filter((r) => !/dependence|tolerance/.test(S(r.area)));
+	if (!list.length) return null;
+	const title = (a: string) => ({ psychosis: 'Psychosis', seizure: 'Seizures' } as Record<string, string>)[a] ?? a.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+	return (
+		<div className="mt-10">
+			<h3 className="text-lg font-semibold">Other risks</h3>
+			{list.map((r) => (
+				<div key={S(r.area)} className="grid gap-x-5 gap-y-1.5 py-4 rd-g-risk" style={{ borderTop: `1px solid ${C.line}` }}>
+					<div className="rd-risk-head">
+						<div className="font-semibold" style={{ whiteSpace: 'nowrap' }}>{title(S(r.area))}</div>
+						<LevelMeter level={r.level == null ? null : S(r.level)} />
+					</div>
+					<p className="text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>{S(r.description)}</p>
+				</div>
+			))}
+			<p className="mt-2 text-xs" style={{ color: C.faint }}>From dose.wiki (Effect Index), shared under CC0.</p>
+		</div>
 	);
 }
 
@@ -5915,6 +6015,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 								{ id: 'effects', label: 'Effects', icon: Sparkles },
 								{ id: 'mixes', label: 'Combinations', icon: Link2 },
 								{ id: 'risks', label: 'Health Risks', icon: AlertTriangle },
+								{ id: 'addiction', label: 'Addiction & Tolerance', icon: Repeat },
 								{ id: 'legal', label: 'Legal Status', icon: Scale },
 								{ id: 'slang', label: 'Aliases', icon: MessageCircle },
 								{ id: 'stories', label: 'Experiences', icon: BookOpen },
@@ -5927,6 +6028,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 			{!withSub && <SubstanceOverview name={sub} afterDosage={curveQ.isLoading || kq.isLoading ? <Loading height={320} className="mt-24" quiet /> : enoughToChart || rows(effectsListQ).length > 0 ? unfoldSection : null} />}
 			{!withSub && <MixingBoard name={sub} onCombo={onCombo} />}
 			{!withSub && <KnownRisks name={sub} />}
+			{!withSub && <SubstanceAddiction name={sub} />}
 			{!withSub && <SubstanceLegality name={sub} />}
 			{!withSub && <SlangSection name={sub} />}
 			{withSub && <div className="mt-4">{onlyToggle}</div>}
@@ -7507,7 +7609,7 @@ export default function ReportTimelapse() {
 							<a href="https://ajar.org" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>AJAr Foundation</a> under{' '}
 							<a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>CC0 1.0</a>
 							. Material from our sources (experiences from Erowid, combination ratings from TripSit, replications by their artists) keeps its own terms. Effect names, categories and descriptions © Effect Index and contributors, used under{' '}
-							<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>CC BY-NC-SA 4.0</a>; we shorten descriptions to their first sentence, and those shortened versions are shared under the same licence.{' '}
+							<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>CC BY-NC-SA 4.0</a>; we shorten descriptions to their first sentence, and those shortened versions are shared under the same licence. re:dose isn’t directly affiliated with any of the sources named here.{' '}
 							<button onClick={() => goView('privacy')} style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>Privacy</button>
 						</p>
 					</footer>
