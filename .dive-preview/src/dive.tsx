@@ -4996,24 +4996,34 @@ function TripSitBadge() {
 	);
 }
 
-// Loading: the little pill with electrons going round, in place of a grey placeholder of the same height.
-// Loading: a faint white Spunion bouncing, once per page visit. The first loader on a page shows him; every other
-// loader on that page (at the same time or later, or one marked quiet) just holds its space until its content arrives.
+// Loading: one Spunion bouncing per page. The first loader on a page shows him; the others just hold their space.
+// When his loader finishes and another is still waiting, he hands off to it (and hops over, see BouncingSpunion).
 let pillOwner: object | null = null;
 let pillPage = ''; // the page that has already had its pill
 let currentPage = ''; // set by the main view on every render
+let handoffUntil = 0; // briefly after he's freed, a waiting loader on the same page may take him
+const pillListeners = new Set<() => void>();
 function Loading({ height = 200, className = '', quiet }: { height?: number; className?: string; quiet?: boolean }) {
 	const me = useRef<object>({});
-	if (!quiet && pillOwner == null && pillPage !== currentPage) {
+	const [, bump] = useState(0);
+	const handoff = Date.now() < handoffUntil && pillPage === currentPage;
+	if (pillOwner == null && ((!quiet && pillPage !== currentPage) || handoff)) {
 		pillOwner = me.current;
 		pillPage = currentPage;
 	}
-	useEffect(
-		() => () => {
-			if (pillOwner === me.current) pillOwner = null;
-		},
-		[],
-	);
+	useEffect(() => {
+		const wake = () => bump((n) => n + 1);
+		pillListeners.add(wake);
+		return () => {
+			pillListeners.delete(wake);
+			if (pillOwner === me.current) {
+				pillOwner = null;
+				handoffUntil = Date.now() + 400;
+				// Let a loader that's still waiting take him; deferred so it doesn't update others mid-render.
+				setTimeout(() => pillListeners.forEach((l) => l()), 0);
+			}
+		};
+	}, []);
 	if (pillOwner !== me.current) return <div className={className} style={{ height }} aria-busy="true" />;
 	return (
 		<div className={`flex items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
@@ -6523,9 +6533,46 @@ const BOUNCE_CSS = `
 
 // The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
 // preview's startup screen.
+// Where the last loader Spunion was on screen, and when; a new one that appears soon after hops over from there.
+let lastSpunionSpot: { x: number; y: number; at: number } | null = null;
 export function BouncingSpunion({ size = 96 }: { size?: number }) {
+	const ref = useRef<HTMLSpanElement | null>(null);
+	useEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		const r = el.getBoundingClientRect();
+		const prev = lastSpunionSpot;
+		// A big arcing hop from the old spot to this one: up and over, landing with a little squash.
+		if (!still && prev && Date.now() - prev.at < 1500 && typeof el.animate === 'function') {
+			const dx = prev.x - r.left, dy = prev.y - r.top;
+			if (Math.hypot(dx, dy) > 24) {
+				const peak = Math.min(dy, 0) - Math.max(140, Math.abs(dx) * 0.35);
+				el.animate(
+					[
+						{ transform: `translate(${dx}px, ${dy}px) scale(1.1, .85)` },
+						{ transform: `translate(${dx * 0.5}px, ${peak}px) scale(.95, 1.08)`, offset: 0.5 },
+						{ transform: 'translate(0, 0) scale(1.15, .82)', offset: 0.9 },
+						{ transform: 'translate(0, 0) scale(1, 1)' },
+					],
+					{ duration: 720, easing: 'cubic-bezier(.33,.66,.4,1)' },
+				);
+			}
+		}
+		// Keep note of where he is while he's here, so the next one knows where to hop from.
+		const note = () => {
+			const b = el.getBoundingClientRect();
+			lastSpunionSpot = { x: b.left, y: b.top, at: Date.now() };
+		};
+		note();
+		const timer = setInterval(note, 150);
+		return () => {
+			clearInterval(timer);
+			note();
+		};
+	}, []);
 	return (
-		<span className="rd-loader" style={{ width: size, height: size }}>
+		<span ref={ref} className="rd-loader" style={{ width: size, height: size }}>
 			<style>{BOUNCE_CSS}</style>
 			<span className="rd-floor" />
 			<span className="rd-ring" />
