@@ -5080,7 +5080,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				)}
 				{!enoughToChart ? (
 					<div className="mt-6 flex flex-col items-center py-6 text-center">
-						<SpunionPuzzle size={104} missing={closeReads <= 1 ? 5 : closeReads <= 3 ? 4 : closeReads <= 5 ? 3 : closeReads <= 7 ? 2 : 1} />
+						<SpunionPuzzle size={96} />
 						<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
 						<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
 							Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
@@ -6193,46 +6193,32 @@ function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boole
 		</span>
 	);
 }
-// Spunion with pieces missing, for "not enough data yet": solid white, holes cut out with dashed edges,
-// one loose piece bobbing beside him. The thinner the data, the more pieces are missing (1 to 5).
+// Spunion with a big piece missing, for "not enough data yet": a puzzle-shaped bite out of his side (dashed edge),
+// the piece itself bobbing beside him, his eyes on it.
 const PUZZLE_PIECE = 'M0 0 h30 a15 15 0 1 1 30 0 h30 v30 a15 15 0 1 1 0 30 v30 h-90 Z';
-const PUZZLE_SPOTS = [
-	{ hole: 'translate(395 285) rotate(8)' },
-	{ hole: 'translate(185 70) rotate(-8)' },
-	{ hole: 'translate(55 350) rotate(-10)' },
-	{ hole: 'translate(230 375) rotate(4)' },
-	{ hole: 'translate(388 108) rotate(14)' },
-];
-function SpunionPuzzle({ size = 72, missing = 1 }: { size?: number; missing?: number }) {
-	const spots = PUZZLE_SPOTS.slice(0, Math.max(1, Math.min(5, missing)));
-	const id = `sp-holes-${spots.length}`;
+function SpunionPuzzle({ size = 72 }: { size?: number }) {
+	const hole = 'translate(318 232) rotate(8) scale(1.75)';
 	return (
-		<svg viewBox="-110 -80 760 600" width={(size * 760) / 600} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
+		<svg viewBox="-20 -20 780 520" width={(size * 780) / 520} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
 			<defs>
-				<mask id={id} maskUnits="userSpaceOnUse" x="-110" y="-80" width="760" height="600">
-					<rect x="-110" y="-80" width="760" height="600" fill="#fff" />
-					{spots.map((sp) => (
-						<path key={sp.hole} d={PUZZLE_PIECE} transform={sp.hole} fill="#000" />
-					))}
+				<mask id="sp-bite" maskUnits="userSpaceOnUse" x="-20" y="-20" width="780" height="520">
+					<rect x="-20" y="-20" width="780" height="520" fill="#fff" />
+					<path d={PUZZLE_PIECE} transform={hole} fill="#000" />
 				</mask>
 			</defs>
 			<path
 				d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
 				fill="#fff"
 				fillOpacity="0.92"
-				mask={`url(#${id})`}
+				mask="url(#sp-bite)"
 			/>
-			<g fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="7" strokeDasharray="14 12" strokeLinejoin="round">
-				{spots.map((sp) => (
-					<path key={sp.hole} d={PUZZLE_PIECE} transform={sp.hole} />
-				))}
-			</g>
-			<circle cx="180" cy="268" r="54" fill={C.deep} />
-			<circle cx="198" cy="286" r="15" fill="#fff" />
-			<circle cx="340" cy="236" r="40" fill={C.deep} />
-			<circle cx="354" cy="250" r="11" fill="#fff" />
+			<path d={PUZZLE_PIECE} transform={hole} fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="4" strokeDasharray="8 7" strokeLinejoin="round" />
+			<circle cx="152" cy="270" r="52" fill={C.deep} />
+			<circle cx="170" cy="288" r="15" fill="#fff" />
+			<circle cx="272" cy="236" r="39" fill={C.deep} />
+			<circle cx="286" cy="250" r="11" fill="#fff" />
 			<g className="rd-piece">
-				<path d={PUZZLE_PIECE} transform="translate(540 230) rotate(24)" fill="#fff" fillOpacity="0.92" />
+				<path d={PUZZLE_PIECE} transform="translate(560 200) rotate(22) scale(1.75)" fill="#fff" fillOpacity="0.92" />
 			</g>
 		</svg>
 	);
