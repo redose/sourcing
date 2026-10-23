@@ -15,7 +15,7 @@ TABLES = [
     "substances", "timeline_sentiment", "tripsit_group_members", "street_names", "erowid_substance_map",
     "substance_aliases", "routes_of_administration", "report_timeline", "tripsit_combos", "substance_structures",
     "substance_effects", "interactions", "alias_mixes", "world_countries", "substance_overviews", "substance_legality",
-    "substance_legality_international", "substance_harms", "report_phases", "effect_replications",
+    "substance_legality_international", "substance_harms", "report_phases", "effect_replications", "llm_context_events",
 ]
 
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")

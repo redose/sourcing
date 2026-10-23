@@ -1,7 +1,7 @@
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
 import * as d3 from "d3";
-import { Activity, AlertTriangle, Cookie, LifeBuoy, EyeOff, Lock, UserX, BarChart3, BookOpen, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, FileText, FlaskConical, Info, Link2, MessageCircle, MessageSquareQuote, Search, Sparkles, Pause, Play, Repeat, RotateCcw, Scale, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
+import { Activity, AlertTriangle, Cookie, LifeBuoy, EyeOff, Lock, UserX, BarChart3, BookOpen, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, FileText, FlaskConical, Info, Link2, Moon, Utensils, Droplet, Footprints, MapPin, Users, Music, Heart, Circle, MessageCircle, MessageSquareQuote, Search, Sparkles, Pause, Play, Repeat, RotateCcw, Scale, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
 
@@ -483,7 +483,7 @@ ORDER BY read_closely DESC, m.n_marks DESC, e.id
 LIMIT 40`;
 
 const reportSQL = (id: string) => `
-SELECT r.id, r.body, r.title, r.experience_year AS yr, r.gender, r.age,
+SELECT r.id, r.body, r.title, r.category_tags AS tags, r.experience_year AS yr, r.gender, r.age,
   array_to_string(list_distinct(r.substances), ' · ') AS subs,
   x.overall_sentiment AS overall, x.would_repeat AS repeat
 FROM ${DB}."experience_reports" r
@@ -602,21 +602,27 @@ const sessionDosesSQL = (id: string) => `
 WITH story AS (
   SELECT (d->>'$.order')::INT AS ord,
     trim(regexp_replace(d->>'$.substance', '\\s*\\(.*\\)$', '')) AS raw,
-    d->>'$.amount' AS amount, d->>'$.route' AS route, d->>'$.context' AS quote,
+    d->>'$.amount' AS amount, d->>'$.route' AS route, d->>'$.context' AS quote, d->>'$.substance_original' AS said_as,
     ${relMins(`d->>'$.time_relative'`)} AS mins
   FROM ${DB}."llm_extractions", unnest(from_json(extraction->'$.doses', '["json"]')) AS u(d)
   WHERE report_id = '${esc(id)}'
 )
-SELECT ord, amount, route, quote, mins, coalesce(
+SELECT ord, amount, route, quote, said_as, mins, coalesce(
     (SELECT s.name FROM ${DB}."substances" s WHERE lower(s.name) = lower(raw) LIMIT 1),
     (SELECT s.name FROM ${DB}."substances" s WHERE list_contains(list_transform(coalesce(s.common_names, []), x -> lower(x)), lower(raw)) LIMIT 1),
     raw) AS sub
 FROM story ORDER BY mins NULLS FIRST, ord`;
 
+// Things they did that weren't drugs (sleep, food, a change of place, people around…), from llm_context_events.
+const sessionDidSQL = (id: string) => `
+SELECT mins, kind, note, quote FROM ${DB}."llm_context_events"
+WHERE report_id = '${esc(id)}' AND mins IS NOT NULL ORDER BY mins, ev_index`;
+
 const sessionObsSQL = (id: string) => `
 SELECT o.obs_index, o.description AS quote, o.sentiment AS tone, o.sentiment_detail AS gist,
   ${relMins('o.time_relative')} AS mins,
-  list(e.effect_name ORDER BY e.effect_name) FILTER (WHERE e.effect_name IS NOT NULL) AS effects
+  list(e.effect_name ORDER BY e.effect_name) FILTER (WHERE e.effect_name IS NOT NULL) AS effects,
+  list(e.effect_name) FILTER (WHERE e.confidence = 'medium') AS inferred
 FROM ${DB}."llm_observations" o
 LEFT JOIN ${DB}."llm_observation_effects" e
   ON e.report_id = o.report_id AND e.obs_index = o.obs_index AND e.confidence <> 'low'
@@ -888,6 +894,17 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
 .rd h1, .rd h2 { letter-spacing: -0.02em; }
 .rd svg, .rd svg text { user-select: none; -webkit-user-select: none; }
 .rd-tl { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 56px; align-items: start; }
+.rd-tl > * { min-width: 0; }
+.rd-tl.rd-fit { flex: 1; min-height: 0; align-items: stretch; }
+.rd-tl.rd-fit .rd-tlscroll { max-height: none; height: 100%; }
+.rd-tl.rd-fit > .rd-side { position: static; max-height: none; height: 100%; overflow-y: auto; padding-bottom: 24px; align-content: start; }
+.rd-more { position: absolute; left: 50%; transform: translateX(-50%); z-index: 4; font-size: 12px; font-weight: 600; padding: 3px 12px; border-radius: 999px;
+  background: rgba(42,32,89,.92); color: rgba(255,255,255,.84); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 4px 14px rgba(10,4,40,.3); }
+.rd-more.top { top: 4px; } .rd-more.bottom { bottom: 6px; }
+.rd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (min-width: 641px) { .rd-sr { display: none; } }
+@media (max-width: 640px) { .rd-hide-xs { display: none !important; } }
+.rd-tlscroll { max-height: calc(100vh - 210px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; padding: 8px 10px 40px 4px; }
 .rd-story { font-family: ${SERIF}; font-size: 19px; line-height: 1.8; color: ${C.text}; opacity: .92; white-space: pre-line; max-width: 720px; transition: color .6s; }
 .rd-story.focus { color: rgba(255,255,255,.42); }
 .rd-side > * { min-width: 0; }
@@ -898,6 +915,8 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
 .rd-range::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff; cursor: pointer; }
 @media (max-width: 960px) {
   .rd-tl { grid-template-columns: 1fr; }
+  .rd-tlscroll { max-height: none; overflow: visible; }
+  .rd-tl > aside.rd-side { order: -1; }
   .rd-story { font-size: 18px; }
   .rd-side { position: static; max-height: none; }
   .rd-hide-sm { display: none !important; }
@@ -943,6 +962,7 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
 .rd .rd-home-search:focus-within { border-color: rgba(217,207,255,.6) !important; box-shadow: 0 0 0 4px rgba(217,207,255,.12), 0 20px 50px rgba(10,4,40,.5) !important; }
 /* Homepage only: the molecules wander further and quicker, a little brighter and warmer. */
 @keyframes rd-drift-home { 0% { transform: translate(0, 0); } 50% { transform: translate(110px, 170px); } 100% { transform: translate(180px, 50px); } }
+div:not(.rd-home):not(.rd-fx-rainbow):not(.rd-fx-breathe):not(.rd-fx-shift) > .rd-molecules { animation: none; }
 .rd-home .rd-molecules { opacity: .07; animation: rd-drift-home 70s ease-in-out infinite alternate; }
 .rd-home .rd-molecules.b { opacity: .045; animation: rd-drift-home 95s ease-in-out infinite alternate-reverse; }
 @media (prefers-reduced-motion: reduce) { .rd-home .rd-molecules { animation: none; } }
@@ -1959,9 +1979,9 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay, onEffect
 	);
 }
 
-function SubstanceIcon({ name }: { name: string }) {
+function SubstanceIcon({ name, color = 'var(--rd-accent)' }: { name: string; color?: string }) {
 	const { classOf } = useContext(OpenCtx);
-	return <ClassIcon cls={classOf(name)} size={20} color="var(--rd-accent)" />;
+	return <ClassIcon cls={classOf(name)} size={20} color={color} />;
 }
 
 function DoseChip({ d, latest, count = 1 }: { d: { sub: string; amount: string; route: string; t: number; assumed: boolean }; latest: boolean; count?: number }) {
@@ -6711,35 +6731,293 @@ const DOSE_VERB: Record<string, string> = {
 const hm = (m: number) => `${m < 0 ? '−' : '+'}${Math.floor(Math.abs(m) / 60)}:${String(Math.abs(m) % 60).padStart(2, '0')}`;
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 const unquote = (q: string) => q.trim().replace(/^["“'\s]+|["”'\s]+$/g, '');
+const wordCount = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
+const DID_ICON: Record<string, typeof Moon> = { sleep: Moon, food: Utensils, water: Droplet, exercise: Footprints, meditation: Sparkles, setting: MapPin, social: Users, activity: Music, mindset: Heart };
+const readSecs = (e: { kind: 'took' | 'felt' | 'did'; quote: string }) =>
+	e.kind === 'felt' ? clamp(1.2 + wordCount(e.quote) / 3.5, 1.5, 12) : clamp(0.7 + wordCount(e.quote) / 5, 0.8, 5);
+// Quotes must be the writer's own words. The AI's notes are sometimes word for word, sometimes paraphrase, so check
+// them against the story: keep what appears in it verbatim, otherwise use the story sentence that best matches.
+const foldText = (t: string) => t.toLowerCase().replace(/[‘’`]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+const QUOTE_STOP = new Set('the and for with that this was were had have has then from into just about after before them they their there what when which while very really some more like than also been being would could just took take'.split(' '));
+const quoteWords = (t: string) => foldText(t).match(/[a-z0-9µ]+/g)?.filter((w) => /\d/.test(w) || (w.length >= 3 && !QUOTE_STOP.has(w))) ?? [];
+function ownWords(note: string, body: string, hints: string[] = []): string | null {
+	const story = foldText(body);
+	if (!story || !note.trim()) return null;
+	const clean = (x: string) => x.trim().replace(/^["“'\s]+|["”'\s.,;]+$/g, '');
+	if (story.includes(foldText(clean(note)))) return clean(note);
+	// Quoted bits inside the note, and pieces either side of an ellipsis.
+	const bits = [...note.matchAll(/["“]([^"”]{8,})["”]/g)].map((m) => clean(m[1]))
+		.concat(note.split(/\s*(?:\.\.\.|…)\s*/).map(clean))
+		.filter((b, i, all) => b.length >= 12 && all.indexOf(b) === i && story.includes(foldText(b)));
+	if (bits.length) return bits.join(' … ');
+	// Paraphrase: the story sentence sharing the most words with the note (and the dose's own words, for doses).
+	const want = new Set([...quoteWords(note), ...hints.flatMap(quoteWords)]);
+	let best = { text: '', score: 0 };
+	for (const sent of body.split(/(?<=[.!?])\s+|\n+/)) {
+		const t = sent.trim();
+		if (t.length < 12 || t.length > 260) continue;
+		const ws = new Set(quoteWords(t));
+		const hit = [...want].filter((w) => ws.has(w)).length;
+		const score = hit / Math.sqrt(Math.max(4, ws.size));
+		if (hit >= 2 && score > best.score) best = { text: t, score };
+	}
+	return best.text || null;
+}
+// The amount as a few words: drop asides in brackets; if what's left is still a long or vague phrase ("Unweighed
+// lines from ~4 grams shared among 3 people"), just say "some" (the full wording stays in the tooltip).
+const shortAmount = (a: string) => {
+	const t = a.replace(/\s*\([^)]*\)?/g, '').replace(/\s*[,;].*$/, '').trim() || a.trim();
+	return t.split(/\s+/).length <= 3 && t.length <= 18 ? t : 'some';
+};
 const EYEBALLED = 'Eyeballed, not weighed. For drugs active in tiny amounts, eyeballing is inaccurate and can be dangerous.';
 
 type Alert = { level: 'danger' | 'caution'; text: string };
 type SessionEv =
-	| { kind: 'took'; mins: number; sub: string; amount: string; route: string; quote: string; color: string; alert: Alert | null }
-	| { kind: 'felt'; mins: number; gist: string; quote: string; tone: string; effects: string[]; total: number };
+	| { kind: 'took'; mins: number; sub: string; amount: string; route: string; quote: string; color: string; alert: Alert | null; runTotal: string | null; nth: number }
+	| { kind: 'did'; mins: number; act: string; note: string; quote: string }
+	| { kind: 'felt'; mins: number; gist: string; quote: string; tone: string; effects: string[]; inferred: Set<string>; total: number };
 
-// One story read top to bottom: what they took and what they felt, a mood dot per moment, quotes on tap.
-function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ: Q; obsQ: Q; pairsQ: Q }) {
+// ── How much, and how active: running totals and typical activity curves for a story's doses ──
+// The first amount in a dose note, in a unit we can add up ("1/2 tab", "~600ug", "7 grams" → 7000 mg).
+function parseAmount(a: string): { v: number; u: string } | null {
+	const m = /(\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)\s*(mg|µg|μg|ug|mcg|grams?|g\b|ml|tabs?|hits?|pills?|caps?|drops?|blotters?)/i.exec(a);
+	if (!m) return null;
+	const raw = m[1].replace(',', '.');
+	let v = raw.includes('/') ? Number(raw.split('/')[0]) / Number(raw.split('/')[1]) : Number(raw);
+	let u = m[2].toLowerCase();
+	if (['ug', 'mcg', 'μg'].includes(u)) u = 'µg';
+	if (u === 'g' || u.startsWith('gram')) { v *= 1000; u = 'mg'; }
+	u = u.replace(/s$/, '').replace('blotter', 'tab');
+	return Number.isFinite(v) && v > 0 ? { v, u } : null;
+}
+function fmtAmount(v: number, u: string) {
+	const r = (x: number) => String(Math.round(x * 10) / 10);
+	if (u === 'mg' && v >= 1000) return `${r(v / 1000)} g`;
+	if (u === 'µg' && v >= 1000) return `${r(v / 1000)} mg`;
+	if (['tab', 'hit', 'pill', 'cap', 'drop'].includes(u)) return `${r(v)} ${u}${v === 1 ? '' : 's'}`;
+	return `${r(v)} ${u}`;
+}
+// Typical stage ends for a dose, in minutes after taking it, from PsychonautWiki's timings for that route.
+type Stages = { t1: number; t2: number; t3: number; t4: number; t5: number };
+const PW_ROUTE: Record<string, string[]> = {
+	insufflated: ['insufflated'], snorted: ['insufflated'], oral: ['oral'], swallowed: ['oral'], sublingual: ['sublingual', 'buccal'], buccal: ['buccal', 'sublingual'],
+	smoked: ['smoked', 'vaporized'], inhaled: ['smoked', 'vaporized'], vaporized: ['vaporized', 'smoked'], vaped: ['vaporized', 'smoked'],
+	injected: ['intravenous', 'intramuscular'], iv: ['intravenous'], im: ['intramuscular'], intravenous: ['intravenous'], rectal: ['rectal'],
+};
+function stagesFor(p: Record<string, unknown>): Stages | null {
+	const mid = (key: string) => {
+		const v = S(p[key]).split('-').map(Number).filter(Number.isFinite);
+		if (!v.length) return null;
+		const m = (Math.min(...v) + Math.max(...v)) / 2;
+		return m * (key === 'duration_aftereffects' ? 60 : pwIsSec(p, key) ? 1 / 60 : pwIsMin(p, key) ? 1 : 60);
+	};
+	const total = mid('duration_total'), peak = mid('duration_peak'), offset = mid('duration_offset');
+	if (total == null && peak == null) return null;
+	const t1 = mid('duration_onset') ?? 0;
+	const t2 = t1 + (mid('duration_comeup') ?? Math.max(5, t1 * 0.5));
+	const t3 = t2 + (peak ?? Math.max(10, ((total ?? t2 * 3) - t2) * 0.4));
+	const t4 = Math.max(t3 + (offset ?? 0), total ?? 0, t3 + 10);
+	return { t1, t2, t3, t4, t5: t4 + (mid('duration_aftereffects') ?? 0) };
+}
+// 0…1 activity at x minutes after the dose: a gentle start, a climb, the peak, the come-down, a faint tail.
+function activity(st: Stages, x: number) {
+	const f = (a: number, b: number) => { const t = b > a ? clamp((x - a) / (b - a), 0, 1) : 1; return t * t * (3 - 2 * t); };
+	if (x <= 0) return 0;
+	if (x < st.t1) return 0.15 * f(0, st.t1);
+	if (x < st.t2) return 0.15 + 0.85 * f(st.t1, st.t2);
+	if (x < st.t3) return 1;
+	if (x < st.t4) return 1 - 0.9 * f(st.t3, st.t4);
+	if (x < st.t5) return 0.1 * (1 - f(st.t4, st.t5));
+	return 0;
+}
+function phaseOf(st: Stages, x: number) {
+	return x < 0 ? 'not yet' : x < st.t1 ? 'kicking in' : x < st.t2 ? 'coming up' : x < st.t3 ? 'peaking' : x < st.t4 ? 'coming down' : x < st.t5 ? 'after-effects' : 'worn off';
+}
+// Elimination half-lives (from Wikipedia, see pharmacokinetics/half_lives.csv), loaded as substance_half_lives.
+const sessionHalfLifeSQL = (subs: string[]) => `
+SELECT substance AS sub, coalesce((hours_low + hours_high) / 2, hours_low, hours_high) AS hours
+FROM ${DB}."substance_half_lives"
+WHERE substance IN (${subs.length ? subs.map((x) => `'${esc(x)}'`).join(', ') : "''"}) AND coalesce(hours_low, hours_high) IS NOT NULL`;
+
+const sessionRoaSQL = (subs: string[]) => `
+SELECT s.name AS sub, r.route, r.duration_onset, r.duration_comeup, r.duration_peak, r.duration_offset, r.duration_total, r.duration_aftereffects
+FROM ${DB}."routes_of_administration" r JOIN ${DB}."substances" s ON s.id = r.substance_id
+WHERE s.name IN (${subs.length ? subs.map((x) => `'${esc(x)}'`).join(', ') : "''"})`;
+
+const SYS_W = 340, SYS_H = 100, MOOD_H = 0;
+// What Spunion tells you on a story page: how to read the timeline.
+const SESSION_NOTES = [
+	'+ felt better, − rougher, ~ mixed. The further right a dot sits, the better that moment felt.',
+	'Faded effects are my best guess. They didn’t say those outright.',
+	'Quotes are their own words, straight from the story. Tap a feeling to see its points.',
+	'“In their system” uses typical timings for each route, not blood levels. Running totals add up the amounts they gave.',
+	'This is one person’s trip, not a forecast for yours. Bodies differ!',
+];
+
+// Spunion narrates the story as you move through it; the story page hands him a line through this.
+type SpunionLine = { text: string; tone: 'good' | 'bad' | 'info' };
+const SpunionLineCtx = createContext<(line: SpunionLine | null) => void>(() => {});
+// Tell us when a reading is wrong: a few ticks and a note become a pre-filled public issue (nothing is sent until they
+// press the button on GitHub, and there's no server here to send it to anyway).
+function NotRight({ storyId, at, what, options }: { storyId: string; at: string; what: string; options: string[] }) {
+	const [open, setOpen] = useState(false);
+	const [ticked, setTicked] = useState<string[]>([]);
+	const [note, setNote] = useState('');
+	const url = () => {
+		const title = `Reading looks wrong: ${storyId} at ${at}`;
+		const body = [`Story: ${storyId} (${window.location.href})`, `Moment: ${at} · ${what}`, '', ticked.length ? `What's off:\n${ticked.map((t) => `- ${t}`).join('\n')}` : '', note ? `\nNote: ${note}` : ''].filter(Boolean).join('\n');
+		return `https://github.com/redose/sourcing/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+	};
+	if (!open) return <button onClick={() => setOpen(true)} style={{ fontSize: 12, color: C.faint, textDecoration: 'underline', textUnderlineOffset: 3, whiteSpace: 'nowrap' }}>Not right?</button>;
+	return (
+		<div className="rd-in" style={{ flexBasis: '100%', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,.06)', fontSize: 13 }}>
+			<span style={{ color: C.soft }}>What looks wrong here?</span>
+			<div className="flex flex-wrap gap-2">
+				{options.map((o) => {
+					const on = ticked.includes(o);
+					return <button key={o} onClick={() => setTicked(on ? ticked.filter((x) => x !== o) : [...ticked, o])} className="rd-tag" style={{ fontSize: 12, padding: '3px 10px', background: on ? 'rgba(255,163,182,.22)' : 'rgba(255,255,255,.06)', color: on ? C.text : C.soft }}>{o}</button>;
+				})}
+			</div>
+			<textarea value={note} onChange={(ev) => setNote(ev.target.value)} rows={2} placeholder="Anything else? (No personal details, please.)" style={{ width: '100%', resize: 'vertical', borderRadius: 8, padding: '6px 8px', background: 'rgba(0,0,0,.18)', color: C.text, border: `1px solid ${C.line}`, fontSize: 13 }} />
+			<div className="flex flex-wrap items-center gap-3">
+				<a href={url()} target="_blank" rel="noopener noreferrer" className="rd-tag" style={{ textDecoration: 'none', background: 'rgba(255,255,255,.12)', fontSize: 12 }}>Send on GitHub ↗</a>
+				<button onClick={() => setOpen(false)} style={{ fontSize: 12, color: C.faint }}>Cancel</button>
+				<span style={{ fontSize: 11, color: C.faint }}>Opens a public GitHub issue.</span>
+			</div>
+		</div>
+	);
+}
+const MARK_GOOD = 'rgba(140,230,150,.34)', MARK_BAD = 'rgba(255,125,140,.38)';
+const escRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Their words with the effects marked (green when that effect usually feels good, red when not) and every substance
+// they mention in its legend colour.
+function markQuote(text: string, effects: string[], subs: { names: string[]; color: string }[], key: string) {
+	const hits: { at: number; end: number; el: (k: string) => JSX.Element }[] = [];
+	const take = (re: RegExp, el: (m: string) => (k: string) => JSX.Element) => {
+		for (const m of text.matchAll(re)) if (m.index != null) hits.push({ at: m.index, end: m.index + m[0].length, el: el(m[0]) });
+	};
+	for (const s of subs) {
+		const names = [...new Set(s.names.map((n) => n.trim()).filter((n) => n.length >= 3))].sort((a, b) => b.length - a.length);
+		if (names.length) take(new RegExp(`\\b(${names.map(escRe).join('|')})\\b`, 'gi'), (m) => (k) => <b key={k} style={{ color: s.color, fontWeight: 600 }}>{m}</b>);
+	}
+	for (const r of rulesFor(effects, (e) => ((EFFECT_POINTS[e] ?? 0) > 0 ? 'positive' : (EFFECT_POINTS[e] ?? 0) < 0 ? 'negative' : 'neutral'))) {
+		if (r.tone === 'neutral') continue;
+		take(new RegExp(`\\b${escRe(r.stem)}[a-z’'-]*`, 'gi'), (m) => (k) => (
+			<mark key={k} title={`${r.effect} ${signed(EFFECT_POINTS[r.effect] ?? 0)}`} style={{ background: r.tone === 'positive' ? MARK_GOOD : MARK_BAD, color: 'inherit', borderRadius: 4, padding: '0 2px' }}>{m}</mark>
+		));
+	}
+	hits.sort((a, b) => a.at - b.at || b.end - a.end);
+	const out: (string | JSX.Element)[] = [];
+	let last = 0;
+	hits.forEach((h, i) => {
+		if (h.at < last) return;
+		if (h.at > last) out.push(text.slice(last, h.at));
+		out.push(h.el(`${key}-${i}`));
+		last = h.end;
+	});
+	if (last < text.length) out.push(text.slice(last));
+	return out;
+}
+// The same quote, word by word, for play: words light up at reading pace (lit = 0…1 of the way through), keeping
+// the effect highlights and substance colours.
+const readMarksCache = new Map<string, { at: number; end: number; style: React.CSSProperties; title?: string }[]>();
+function readAlong(text: string, effects: string[], subs: { names: string[]; color: string }[], lit: number) {
+	const ck = `${text}\u0000${effects.join('|')}\u0000${subs.map((x) => x.names.join('/') + x.color).join('|')}`;
+	const cached = readMarksCache.get(ck);
+	const marks: { at: number; end: number; style: React.CSSProperties; title?: string }[] = cached ?? [];
+	if (!cached) {
+	for (const s of subs) {
+		const names = [...new Set(s.names.map((n) => n.trim()).filter((n) => n.length >= 3))].sort((a, b) => b.length - a.length);
+		if (names.length) for (const m of text.matchAll(new RegExp(`\\b(${names.map(escRe).join('|')})\\b`, 'gi'))) marks.push({ at: m.index!, end: m.index! + m[0].length, style: { color: s.color, fontWeight: 600 } });
+	}
+	for (const r of rulesFor(effects, (e) => ((EFFECT_POINTS[e] ?? 0) > 0 ? 'positive' : (EFFECT_POINTS[e] ?? 0) < 0 ? 'negative' : 'neutral'))) {
+		if (r.tone === 'neutral') continue;
+		for (const m of text.matchAll(new RegExp(`\\b${escRe(r.stem)}[a-z’'-]*`, 'gi')))
+			marks.push({ at: m.index!, end: m.index! + m[0].length, title: `${r.effect} ${signed(EFFECT_POINTS[r.effect] ?? 0)}`, style: { background: r.tone === 'positive' ? MARK_GOOD : MARK_BAD, borderRadius: 4, padding: '0 2px' } });
+	}
+	if (readMarksCache.size > 200) readMarksCache.clear();
+	readMarksCache.set(ck, marks);
+	}
+	const words = [...text.matchAll(/\S+/g)];
+	const shown = lit >= 1 ? words.length : Math.ceil(lit * words.length);
+	return words.map((w, i) => {
+		const mk = marks.find((m) => w.index! < m.end && w.index! + w[0].length > m.at);
+		return (
+			<Fragment key={i}>
+				{i > 0 && ' '}
+				<span title={mk?.title} style={{ ...(mk?.style ?? {}), opacity: i < shown ? 1 : 0.55, transition: 'opacity .3s' }}>{w[0]}</span>
+			</Fragment>
+		);
+	});
+}
+// How a moment got its score, in a sentence Spunion can say.
+function scoreStory(e: { effects: string[]; tone: string; total: number }) {
+	const scored = e.effects.map((x) => ({ x, p: EFFECT_POINTS[x] ?? 0 })).filter((v) => v.p !== 0).sort((a, b) => Math.abs(b.p) - Math.abs(a.p));
+	const name = (v: { x: string; p: number }) => `${v.x.toLowerCase()} (${signed(v.p)})`;
+	const ups = scored.filter((v) => v.p > 0).slice(0, 2), downs = scored.filter((v) => v.p < 0).slice(0, 2);
+	const safety = e.effects.find((x) => SAFETY_EFFECTS.has(x));
+	const lead = safety ? `${safety} came up here. That’s serious; if it happens to you, get help. ` : '';
+	const tone = TONE_POINTS[e.tone] ? ` Their tone adds ${signed(TONE_POINTS[e.tone])}.` : '';
+	if (ups.length && downs.length) return `${lead}${ups.map(name).join(' and ')} against ${downs.map(name).join(' and ')}.${tone} It nets out at ${signed(e.total)}.`;
+	if (ups.length) return `${lead}${ups.map(name).join(' and ')} carry this one.${tone} ${signed(e.total)} overall.`;
+	if (downs.length) return `${lead}${downs.map(name).join(' and ')} weigh on this one.${tone} ${signed(e.total)} overall.`;
+	return `${lead}No scored effects here, just how it sounded.${tone} ${signed(e.total)} overall.`;
+}
+
+// One story read top to bottom: what they took and what they felt, a mood dot per moment. As you move through it,
+// the moment you're on opens up (how its score adds up), the side column shows their words and what's active in
+// their system, and Spunion talks you through it. Play glides down slowly and pauses long enough to read.
+function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ, roaQ, didQ, hlQ }: { reportQ: Q; dosesQ: Q; obsQ: Q; pairsQ: Q; roaQ: Q; didQ: Q; hlQ: Q }) {
 	const { open: openPanel } = useContext(OpenCtx);
+	const say = useContext(SpunionLineCtx);
 	const [atH, setAt] = useDiveState<number | null>('at', null);
-	const [openKey, setOpenKey] = useState<string | null>(null);
+	const [picked, setPicked] = useState<number | null>(null);
 	const [tip, setTip] = useState<string | null>(null);
 	const [playing, setPlaying] = useState(false);
+	const [playY, setPlayY] = useState<number | null>(null);
+	// Scrolling the timeline moves the cursor: where you've scrolled to is where you are in the story.
+	const [scrubY, setScrubY] = useState<number | null>(null);
+	const [lit, setLit] = useState<{ i: number; f: number } | null>(null);
 	const [copied, setCopied] = useState(false);
+	const [allNames, setAllNames] = useState(false);
+	const [allTags, setAllTags] = useState(false);
 	const boxRef = useRef<HTMLDivElement>(null);
+	const headRef = useRef<HTMLDivElement | null>(null);
+	const scrollRef = useRef<HTMLDivElement>(null);
+	const userScrollAt = useRef(0);
+	const wide = useWide();
+	useEffect(() => {
+		const mark = () => (userScrollAt.current = performance.now());
+		window.addEventListener('wheel', mark, { passive: true });
+		window.addEventListener('touchmove', mark, { passive: true });
+		return () => (window.removeEventListener('wheel', mark), window.removeEventListener('touchmove', mark));
+	}, []);
+	const rowRefs = useRef(new Map<number, HTMLSpanElement>());
 	const dotRefs = useRef(new Map<number, HTMLSpanElement>());
+	const [ys, setYs] = useState<number[]>([]);
 	const [pts, setPts] = useState<{ x: number; y: number; mins: number }[]>([]);
+	const peakCache = useRef<{ deps: unknown[]; v: Map<string, number> } | null>(null);
 	const report = rows(reportQ)[0];
 
 	const { events, key } = useMemo(() => {
 		const color = new Map<string, string>();
 		const count = new Map<string, number>();
-		const ds = rows(dosesQ).map((d) => ({ sub: S(d.sub), amount: S(d.amount), route: S(d.route).toLowerCase(), quote: S(d.quote), mins: d.mins == null ? 0 : N(d.mins) }));
+		const aliases = new Map<string, string[]>();
+		const body = S(rows(reportQ)[0]?.body);
+		const ds = rows(dosesQ).map((d) => ({ sub: S(d.sub), saidAs: S(d.said_as), amount: S(d.amount), route: S(d.route).toLowerCase(), quote: ownWords(S(d.quote), body, [S(d.said_as), S(d.amount)]) ?? '', note: S(d.quote), mins: d.mins == null ? 0 : N(d.mins) }));
 		const pairs = rows(pairsQ);
 		const flagged = new Set<string>();
+		const run = new Map<string, { v: number; u: string; ok: boolean; n: number }>();
 		const evs: SessionEv[] = ds.map((d, i) => {
 			if (!color.has(d.sub)) color.set(d.sub, DOSE_COLORS[color.size % DOSE_COLORS.length]);
 			count.set(d.sub, (count.get(d.sub) ?? 0) + 1);
+			aliases.set(d.sub, [...(aliases.get(d.sub) ?? [d.sub, short(d.sub)]), d.saidAs]);
+			// Running total per substance, while every amount so far is in the same unit.
+			const amt = parseAmount(d.amount);
+			const was = run.get(d.sub);
+			const tot = !was ? { v: amt?.v ?? 0, u: amt?.u ?? '', ok: !!amt, n: 1 } : { v: was.v + (amt?.v ?? 0), u: was.u, ok: was.ok && !!amt && amt.u === was.u, n: was.n + 1 };
+			run.set(d.sub, tot);
+			const runTotal = was && tot.ok ? fmtAmount(tot.v, tot.u) : null;
 			// A risky pairing is flagged on the first dose that brings the two together (within a day).
 			let alert: Alert | null = null, worst = 0;
 			for (const e of ds.slice(0, i)) {
@@ -6753,8 +7031,8 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 				const label = S(p.status) || (sev >= 3 ? 'Dangerous' : sev === 2 ? 'Unsafe' : 'Take care');
 				alert = { level: sev >= 2 ? 'danger' : 'caution', text: `${label} with ${short(e.sub)}${p.note ? `: ${S(p.note)}` : '.'}` };
 			}
-			if (!alert && /eyeball/i.test(d.quote)) alert = { level: 'caution', text: EYEBALLED };
-			return { kind: 'took', mins: d.mins, sub: d.sub, amount: d.amount, route: d.route, quote: unquote(d.quote), color: color.get(d.sub)!, alert };
+			if (!alert && /eyeball/i.test(d.note)) alert = { level: 'caution', text: EYEBALLED };
+			return { kind: 'took', mins: d.mins, sub: d.sub, amount: d.amount, route: d.route, quote: d.quote, color: color.get(d.sub)!, alert, runTotal, nth: tot.n };
 		});
 		for (const o of rows(obsQ)) {
 			if (o.mins == null) continue;
@@ -6762,220 +7040,685 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 			const tone = S(o.tone);
 			const total = effects.reduce((s, e) => s + (EFFECT_POINTS[e] ?? 0), 0) + (TONE_POINTS[tone] ?? 0);
 			const gist = S(o.gist) || effects.slice(0, 2).join(', ').toLowerCase() || 'a moment';
-			evs.push({ kind: 'felt', mins: N(o.mins), gist, quote: unquote(S(o.quote)), tone, effects, total });
+			evs.push({ kind: 'felt', mins: N(o.mins), gist, quote: ownWords(S(o.quote), body) ?? '', tone, effects, inferred: new Set(L(o.inferred)), total });
 		}
-		// In time order; at the same minute what they took comes before what they felt.
-		evs.sort((a, b) => a.mins - b.mins || (a.kind === b.kind ? 0 : a.kind === 'took' ? -1 : 1));
-		return { events: evs, key: [...color].map(([sub, c]) => ({ sub, c, n: count.get(sub) ?? 1 })) };
-	}, [dosesQ.data, obsQ.data, pairsQ.data]);
+		for (const d of rows(didQ)) evs.push({ kind: 'did', mins: N(d.mins), act: S(d.kind), note: S(d.note), quote: ownWords(S(d.quote), body) ?? '' });
+		// In time order; at the same minute: what they did, then what they took, then what they felt.
+		const ORDER = { did: 0, took: 1, felt: 2 } as const;
+		evs.sort((a, b) => a.mins - b.mins || ORDER[a.kind] - ORDER[b.kind]);
+		return { events: evs, key: [...color].map(([sub, c]) => ({ sub, c, n: count.get(sub) ?? 1, names: aliases.get(sub) ?? [sub] })) };
+	}, [dosesQ.data, obsQ.data, pairsQ.data, reportQ.data, didQ.data]);
 
-	const now = atH == null ? null : Math.round(atH * 60);
-	// Play steps "now" through each moment in turn and keeps it in view.
-	const times = useMemo(() => [...new Set(events.map((e) => e.mins))], [events]);
+	// While playing, "now" is wherever the playhead sits between two rows; otherwise it's the moment picked (?at=).
+	const tAtY = (y: number) => {
+		if (!ys.length || !events.length) return null;
+		if (y <= ys[0]) return events[0].mins;
+		for (let i = 1; i < ys.length; i++) {
+			if (y <= ys[i]) {
+				const f = ys[i] === ys[i - 1] ? 1 : (y - ys[i - 1]) / (ys[i] - ys[i - 1]);
+				return events[i - 1].mins + (events[i].mins - events[i - 1].mins) * f;
+			}
+		}
+		return events[events.length - 1].mins;
+	};
+	const cursorY = playY ?? scrubY;
+	const now = cursorY != null ? tAtY(cursorY) : atH == null ? null : atH * 60;
+	// The row you're on: the one the playhead last reached, or the one you tapped, or the last one at or before now.
+	const focus = cursorY != null
+		? ys.reduce((f, y, i) => (y <= cursorY + 0.5 ? i : f), -1)
+		: picked != null && events[picked] && now != null && Math.abs(events[picked].mins - now) < 1e-6 ? picked
+		: now == null ? -1 : events.reduce((f, e, i) => (e.mins <= now + 1e-6 ? i : f), -1);
+	const cur = focus >= 0 ? events[focus] : null;
+
+	// Play: the playhead eases toward each row, lingers there for as long as it takes to read, then eases off again.
+	// It's anchored to the row it last reached, so rows opening and closing never make it jump, and the page drifts
+	// along with it rather than snapping.
+	const ysRef = useRef(ys);
+	ysRef.current = ys;
+	const startRef = useRef(0);
 	useEffect(() => {
 		if (!playing) return;
-		const i = times.findIndex((t) => now == null || t > now);
-		if (i < 0) return setPlaying(false);
-		const h = setTimeout(() => setAt(times[i] / 60), now == null ? 0 : 1100);
-		return () => clearTimeout(h);
-	}, [playing, now, times]);
+		let last = performance.now(), raf = 0, idx = startRef.current, off = 0, v = 0, lastSync = 0, tail = 0;
+		setLit({ i: idx, f: 0 });
+		const step = (ts: number) => {
+			const dt = Math.min(0.05, (ts - last) / 1000);
+			last = ts;
+			const Y = ysRef.current;
+			if (!Y.length) { raf = requestAnimationFrame(step); return; }
+			let arrived = false, f = 1;
+			if (idx + 1 < Y.length) {
+				// This stretch's pace: never quicker than 34px/s, and slow enough to read the line just reached.
+				const dist = Math.max(1, Y[idx + 1] - Y[idx]);
+				const want = Math.min(34, dist / readSecs(events[idx]));
+				v += (want - v) * Math.min(1, dt * 2.5);
+				off = Math.min(dist, off + Math.max(2, v) * dt);
+				f = off / dist;
+				if (dist - off < 0.4) { idx += 1; off = 0; arrived = true; }
+			} else {
+				// After the last line, keep drifting a little while it's read, then stop.
+				tail += dt;
+				f = Math.min(1, tail / readSecs(events[idx]));
+				if (tail >= readSecs(events[idx])) {
+					setPlaying(false);
+					setPlayY(null);
+					setAt(events[events.length - 1].mins / 60);
+					return;
+				}
+				off += Math.max(2, v * (1 - f)) * dt * 0.3;
+			}
+			const y = (Y[idx] ?? 0) + off;
+			if (headRef.current) headRef.current.style.transform = `translateY(${y}px)`;
+			if (arrived || ts - lastSync > 100) {
+				lastSync = ts;
+				setPlayY(y);
+				setLit({ i: idx, f: arrived ? 0 : f });
+			}
+			// Keep the timeline's scroll in step with the story, the same mapping scrolling uses; on a phone (no inner
+			// scroll) the page gently follows instead.
+			const head = headRef.current, box = scrollRef.current;
+			if (box && box.scrollHeight > box.clientHeight + 1) {
+				autoScroll.current = true;
+				box.scrollTop = yToScroll(y, box);
+			} else if (head && !wide && performance.now() - userScrollAt.current > 2500) {
+				window.scrollBy(0, (head.getBoundingClientRect().top - window.innerHeight * 0.5) * 0.08);
+			}
+			raf = requestAnimationFrame(step);
+		};
+		raf = requestAnimationFrame(step);
+		return () => cancelAnimationFrame(raf);
+	}, [playing]);
+	const togglePlay = () => {
+		if (playing) {
+			setPlaying(false);
+			if (now != null) setAt(now / 60);
+			setScrubY(playY);
+			setPlayY(null);
+			return;
+		}
+		const lastT = events[events.length - 1]?.mins ?? 0;
+		const from = now == null || now >= lastT ? 0 : Math.max(0, focus);
+		setPicked(null);
+		setScrubY(null);
+		startRef.current = from;
+		setPlayY(ys[from] ?? 0);
+		setPlaying(true);
+	};
+	const goRow = (i: number) => {
+		setPlaying(false);
+		setPlayY(null);
+		setPicked(i);
+		setAt(events[i].mins / 60);
+		const box = scrollRef.current;
+		if (box && box.scrollHeight > box.clientHeight + 1 && ys[i] != null) {
+			setScrubY(ys[i]);
+			autoScroll.current = true;
+			box.scrollTo({ top: yToScroll(ys[i], box), behavior: performance.now() - userScrollAt.current < 600 ? 'auto' : 'smooth' });
+		} else {
+			setScrubY(null);
+			requestAnimationFrame(() => rowRefs.current.get(i)?.closest('[data-row]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+		}
+	};
+	// Space plays and pauses; the arrow keys step to the next or previous line.
+	const keys = useRef({ togglePlay, goRow, focus, n: events.length });
+	keys.current = { togglePlay, goRow, focus, n: events.length };
 	useEffect(() => {
-		if (playing && now != null) document.getElementById(`rd-now-${now}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-	}, [playing, now]);
-	const CX = 48, R = 40, CAP = 6;
+		const onKey = (ev: KeyboardEvent) => {
+			const t = ev.target as HTMLElement | null;
+			if (ev.metaKey || ev.ctrlKey || ev.altKey || (t && (t.closest('input, textarea, select, [contenteditable="true"]') || t.closest('[role="dialog"]')))) return;
+			const k = keys.current;
+			if (!k.n) return;
+			if (ev.key === ' ') { ev.preventDefault(); k.togglePlay(); }
+			else if (ev.key === 'ArrowDown' || ev.key === 'ArrowRight') { ev.preventDefault(); k.goRow(Math.min(k.n - 1, k.focus < 0 ? 0 : k.focus + 1)); }
+			else if (ev.key === 'ArrowUp' || ev.key === 'ArrowLeft') { ev.preventDefault(); k.goRow(Math.max(0, k.focus - 1)); }
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, []);
+	// On a wide screen the whole story fits the window: the timeline and side column scroll inside it, and small
+	// counters say how many lines are tucked away above and below.
+	const rootRef = useRef<HTMLDivElement>(null);
+	const [fitH, setFitH] = useState<number | null>(null);
+	useLayoutEffect(() => {
+		const fit = () => {
+			const el = rootRef.current;
+			if (!el || !window.matchMedia('(min-width: 961px)').matches) return setFitH(null);
+			setFitH(Math.max(420, window.innerHeight - (el.getBoundingClientRect().top + window.scrollY) - 16));
+		};
+		fit();
+		window.addEventListener('resize', fit);
+		return () => window.removeEventListener('resize', fit);
+	}, [reportQ.isLoading]);
+	// Room above the first line and below the last, so any line can sit in the middle.
+	const [padY, setPadY] = useState(0);
+	useLayoutEffect(() => setPadY(fitH && scrollRef.current ? Math.max(0, scrollRef.current.clientHeight / 2 - 16) : 0), [fitH]);
+	// Open on the moment in the link (?at=) centred.
+	const centred = useRef(false);
+	useLayoutEffect(() => {
+		if (centred.current || !ys.length || !scrollRef.current) return;
+		centred.current = true;
+		if (focus >= 0) rowRefs.current.get(focus)?.closest('[data-row]')?.scrollIntoView({ block: 'center' });
+		else scrollRef.current.scrollTop = 0;
+	}, [ys, focus, padY]);
+	const autoScroll = useRef(false);
+	const yToScroll = (y: number, box: HTMLDivElement) => {
+		const Y = ysRef.current, max = box.scrollHeight - box.clientHeight;
+		if (Y.length < 2) return 0;
+		return clamp((y - Y[0]) / Math.max(1, Y[Y.length - 1] - Y[0]), 0, 1) * max;
+	};
+	const scrollToY = (box: HTMLDivElement) => {
+		const Y = ysRef.current, max = box.scrollHeight - box.clientHeight;
+		if (Y.length < 2 || max <= 0) return null;
+		return Y[0] + (box.scrollTop / max) * (Y[Y.length - 1] - Y[0]);
+	};
+	const atTimer = useRef(0);
+	const scrollFrame = useRef(0);
+	const onTimelineScroll = () => {
+		if (scrollFrame.current) return;
+		scrollFrame.current = requestAnimationFrame(() => { scrollFrame.current = 0; onTimelineScrollNow(); });
+	};
+	const scrubLine = useRef<HTMLDivElement | null>(null);
+	const scrubSync = useRef({ last: 0, timer: 0 });
+	const onTimelineScrollNow = () => {
+		const box = scrollRef.current;
+		if (!box) return;
+		const byUser = performance.now() - userScrollAt.current < 400;
+		if (autoScroll.current && !byUser) { autoScroll.current = false; return; }
+		autoScroll.current = false;
+		if (playing) {
+			if (!byUser) return;
+			setPlaying(false);
+			setPlayY(null);
+		}
+		const y = scrollToY(box);
+		if (y == null) return;
+		if (scrubLine.current) scrubLine.current.style.transform = `translateY(${y}px)`;
+		// Catch the page up at most ~12 times a second, and once more when the scrolling settles.
+		const sync = () => { scrubSync.current.last = performance.now(); setPicked(null); setScrubY(y); countHidden(); };
+		clearTimeout(scrubSync.current.timer);
+		if (performance.now() - scrubSync.current.last > 80) sync();
+		else scrubSync.current.timer = window.setTimeout(sync, 90);
+		// Remember the spot in the link once they stop scrolling.
+		clearTimeout(atTimer.current);
+		atTimer.current = window.setTimeout(() => { const t = tAtY(y); if (t != null) setAt(t / 60); }, 450);
+	};
+	const [hidden, setHidden] = useState({ above: 0, below: 0 });
+	const countHidden = () => {
+		const box = scrollRef.current;
+		if (!box || box.scrollHeight <= box.clientHeight + 1) return setHidden((h) => (h.above || h.below ? { above: 0, below: 0 } : h));
+		const top = box.scrollTop, bot = top + box.clientHeight;
+		const above = ys.filter((y) => y < top - 4).length, below = ys.filter((y) => y > bot - 16).length;
+		setHidden((h) => (h.above === above && h.below === below ? h : { above, below }));
+	};
+	useEffect(countHidden, [ys, fitH, padY]);
+
+	// Spunion says what's happening on the row you're on.
+	useEffect(() => {
+		if (!cur) return say(null);
+		// Spunion speaks up only when it matters: a risky mix or a heads-up on a dose, or a safety effect.
+		if (cur.kind === 'took' && cur.alert) return say({ text: cur.alert.text, tone: cur.alert.level === 'danger' ? 'bad' : 'info' });
+		const safety = cur.kind === 'felt' ? cur.effects.find((x) => SAFETY_EFFECTS.has(x)) : undefined;
+		say(safety ? { text: `${safety} came up here. That’s serious: if it happens to you, get help.`, tone: 'bad' } : null);
+	}, [focus, events]);
+	useEffect(() => () => say(null), []);
+
+	const CX = wide ? 48 : 30, R = wide ? 40 : 24, CAP = 6, TIME_W = wide ? 72 : 58, LANE_W = wide ? 96 : 60;
 	const groupTotal = new Map<number, number>();
 	for (const e of events) if (e.kind === 'felt') groupTotal.set(e.mins, (groupTotal.get(e.mins) ?? 0) + e.total);
-	const segStyle = (mins: number, first: boolean) => (first ? 'none' : mins <= 0 ? 'before' : now == null || mins <= now ? 'past' : 'future');
+	const segStyle = (mins: number, first: boolean) => (first ? 'none' : mins <= 0 ? 'before' : now == null || mins <= now + 1e-6 ? 'past' : 'future');
 	const SEG: Record<string, React.CSSProperties> = {
 		none: {},
-		before: { backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,.5) 0 2px, transparent 2px 7px)' },
-		past: { background: 'rgba(255,255,255,.55)' },
-		future: { backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,.25) 0 5px, transparent 5px 10px)' },
+		before: { backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,.45) 0 2px, transparent 2px 7px)' },
+		past: { background: 'rgba(255,255,255,.5)' },
+		future: { backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,.22) 0 5px, transparent 5px 10px)' },
 	};
 
-	// Measure where the mood dots landed, to draw the faint line that joins them.
+	// Measure where the rows landed, for the playhead (again as rows open and close).
 	useLayoutEffect(() => {
 		const box = boxRef.current;
 		if (!box) return;
+		const same = (a: number[], b: number[]) => a.length === b.length && a.every((v, k) => Math.abs(v - b[k]) < 0.5);
 		const measure = () => {
 			const b = box.getBoundingClientRect();
-			setPts([...dotRefs.current].filter(([, el]) => el.isConnected).map(([mins, el]) => {
+			const nys = events.map((_, i) => { const el = rowRefs.current.get(i); return el ? Math.round(el.getBoundingClientRect().top - b.top) : 0; });
+			setYs((old) => (same(old, nys) ? old : nys));
+			const npts = [...dotRefs.current].filter(([, el]) => el.isConnected).map(([mins, el]) => {
 				const r = el.getBoundingClientRect();
-				return { mins, x: r.left - b.left + r.width / 2, y: r.top - b.top + r.height / 2 };
-			}).sort((a, b) => a.y - b.y));
+				return { mins, x: Math.round(r.left - b.left + r.width / 2), y: Math.round(r.top - b.top + r.height / 2) };
+			}).sort((a, c) => a.y - c.y);
+			setPts((old) => (same(old.flatMap((p) => [p.x, p.y]), npts.flatMap((p) => [p.x, p.y])) ? old : npts));
+		};
+		let last = 0, timer = 0;
+		const soon = () => {
+			clearTimeout(timer);
+			const wait = Math.max(0, 100 - (performance.now() - last));
+			timer = window.setTimeout(() => { last = performance.now(); measure(); }, wait);
 		};
 		measure();
-		const ro = new ResizeObserver(measure);
+		const ro = new ResizeObserver(soon);
 		ro.observe(box);
-		return () => ro.disconnect();
-	}, [events, openKey, now]);
+		return () => (ro.disconnect(), clearTimeout(timer));
+	}, [events]);
 
+	// The chart model, rebuilt only when "now" moves on by a couple of story-minutes (not on every scroll frame).
+	const nowB = now == null ? null : Math.round(now / 2) * 2;
+	const sys = useMemo(() => {
+		const roa = rows(roaQ);
+		const doses = events.filter((e): e is Extract<SessionEv, { kind: 'took' }> => e.kind === 'took');
+		const stageOf = (d: { sub: string; route: string }) => {
+			const mine = roa.filter((r) => S(r.sub) === d.sub);
+			const want = PW_ROUTE[d.route] ?? [d.route];
+			const p = want.map((w) => mine.find((r) => S(r.route).toLowerCase() === w)).find(Boolean) ?? mine[0];
+			return p ? stagesFor(p) : null;
+		};
+		const withSt = doses.map((d) => ({ ...d, st: stageOf(d) }));
+		const at = nowB ?? Infinity;
+		const legend = key.map((k) => {
+			const taken = withSt.filter((d) => d.sub === k.sub && d.mins <= at + 1e-6);
+			let tot: { v: number; u: string; ok: boolean } | null = null;
+			for (const d of taken) {
+				const a = parseAmount(d.amount);
+				tot = !tot ? { v: a?.v ?? 0, u: a?.u ?? '', ok: !!a } : { v: tot.v + (a?.v ?? 0), u: tot.u, ok: tot.ok && !!a && a.u === tot.u };
+			}
+			const total = !taken.length ? '' : tot?.ok ? fmtAmount(tot.v, tot.u) : `${taken.length} dose${taken.length > 1 ? 's' : ''}`;
+			const last = taken[taken.length - 1];
+			const phase = !taken.length ? 'not yet' : nowB == null ? '' : last.st ? phaseOf(last.st, nowB - last.mins) : 'timing unknown';
+			return { sub: k.sub, color: k.c, total, phase, taken: taken.length > 0, left: null as string | null, typical: false };
+		});
+		if (!events.length) return { legend, chart: null };
+		// How much is in their body: each dose climbs in over its usual come-up, then halves every half-life. Where we
+		// have no half-life, its typical effect curve stands in (the legend says which).
+		const hl = new Map(rows(hlQ).map((r) => [S(r.sub), N(r.hours) * 60]));
+		const unitOf = new Map<string, string | null>();
+		for (const d of withSt) {
+			const a = parseAmount(d.amount);
+			const u = unitOf.get(d.sub);
+			unitOf.set(d.sub, u === undefined ? a?.u ?? null : u && a && a.u === u ? u : null);
+		}
+		const inBody = (sub: string, x: number) => withSt.filter((d) => d.sub === sub).reduce((sum, d) => {
+			const t = x - d.mins, half = hl.get(sub)!;
+			if (t <= 0) return sum;
+			const amt = unitOf.get(sub) ? parseAmount(d.amount)?.v ?? 0 : 1;
+			const rise = Math.max(5, d.st?.t2 ?? 30);
+			const k = t < rise ? (t / rise) * (t / rise) * (3 - 2 * (t / rise)) : Math.pow(0.5, (t - rise) / half);
+			return sum + amt * k;
+		}, 0);
+		const timed = withSt.filter((d) => d.st || hl.has(d.sub));
+		const x0 = events[0].mins;
+		const full = Math.min(Math.max(events[events.length - 1].mins, ...timed.map((d) => d.mins + (hl.has(d.sub) ? hl.get(d.sub)! * 2 : d.st!.t4))), events[events.length - 1].mins + 12 * 60);
+		const x1 = nowB == null ? full : Math.min(full, Math.max(nowB + 75, x0 + 90));
+		const X = (x: number) => ((x - x0) / Math.max(1, x1 - x0)) * SYS_W;
+		// Each substance on its own scale (its own peak = full height), since mg of one and µg of another don't compare.
+		const raw = (sub: string, x: number) => (hl.has(sub) ? inBody(sub, x) : withSt.filter((d) => d.sub === sub && d.st).reduce((s2, d) => s2 + activity(d.st!, x - d.mins), 0));
+		const deps = [events, roaQ.data, hlQ.data];
+		if (!peakCache.current || peakCache.current.deps.some((d, k) => d !== deps[k]))
+			peakCache.current = { deps, v: new Map(key.map((k) => {
+				const first = withSt.find((d) => d.sub === k.sub)?.mins ?? 0;
+				let m = 0;
+				for (let q = 0; q <= 80; q++) m = Math.max(m, raw(k.sub, first + ((full - first) * q) / 80));
+				return [k.sub, m || 1];
+			})) };
+		const peakOf = peakCache.current.v;
+		const level = (sub: string, x: number) => raw(sub, x) / (peakOf.get(sub) ?? 1);
+		const subs = key.map((k) => {
+			const first = withSt.find((d) => d.sub === k.sub)?.mins ?? Infinity;
+			const n = 60, from = Math.max(x0, first);
+			const xs = from >= x1 ? [] : Array.from({ length: n + 1 }, (_, q) => from + ((x1 - from) * q) / n);
+			return { sub: k.sub, color: k.c, pts: xs.map((x) => [x, level(k.sub, x)] as [number, number]) };
+		}).filter((s2) => s2.pts.length && s2.pts.some(([, y]) => y > 0));
+		// What's left right nowB, in their units, for the legend.
+		const leftNow = (sub: string) => {
+			if (nowB == null || !hl.has(sub) || !unitOf.get(sub)) return null;
+			const v = inBody(sub, nowB);
+			return v > 0 ? `≈ ${fmtAmount(v, unitOf.get(sub)!)} left` : null;
+		};
+		const top = Math.max(1, ...subs.flatMap((s) => s.pts.map(([, y]) => y)));
+		const Y = (y: number) => SYS_H - (y / top) * (SYS_H - 6);
+		const line = d3.line<[number, number]>().x(([x]) => X(x)).y(([, y]) => Y(y)).curve(d3.curveMonotoneX);
+		const area = d3.area<[number, number]>().x(([x]) => X(x)).y0(SYS_H).y1(([, y]) => Y(y)).curve(d3.curveMonotoneX);
+		const dosePts = withSt.filter((d) => (d.st || hl.has(d.sub)) && d.mins <= x1).map((d) => ({ x: X(d.mins), y: Y(level(d.sub, d.mins + 1)), color: d.color, past: nowB == null || d.mins <= nowB + 1e-6 }));
+		const follow = nowB == null ? [] : subs.map((s) => ({ color: s.color, y: Y(level(s.sub, nowB)) })).filter((f) => f.y < SYS_H - 0.5);
+		const moods = [...groupTotal].filter(([m]) => m <= x1).map(([m, t]) => [m, t] as [number, number]);
+		const MY = (t: number) => MOOD_H / 2 - (clamp(t, -CAP, CAP) / CAP) * (MOOD_H / 2 - 4);
+		const moodLine = d3.line<[number, number]>().x(([x]) => X(x)).y(([, t]) => MY(t)).curve(d3.curveMonotoneX);
+		for (const r of legend) {
+			r.left = leftNow(r.sub);
+			r.typical = !hl.has(r.sub);
+		}
+		return {
+			legend,
+			chart: {
+				x0, x1, nowX: nowB == null ? null : clamp(X(nowB), 0, SYS_W),
+				subs: subs.map((s) => ({ ...s, line: line(s.pts) ?? '', area: area(s.pts) ?? '' })),
+				dosePts, follow,
+				mood: moods.length > 1 ? moodLine(moods) ?? '' : '',
+				moodPts: moods.map(([m, t]) => ({ x: X(m), y: MY(t), color: (t >= 2 ? C.cyan : t <= -2 ? C.coral : C.lav), past: nowB == null || m <= nowB + 1e-6 })),
+			},
+		};
+	}, [events, key, roaQ.data, hlQ.data, nowB, wide]);
 	if (reportQ.isLoading || dosesQ.isLoading || obsQ.isLoading) return <Loading height={420} />;
 	if (!report) return <p style={{ color: C.soft }}>Story not found.</p>;
 
-	const path = (ps: { x: number; y: number }[]) => ps.map((p, i) => {
+	const erowidId = /^erowid-(\d+)$/.exec(S(report.id))?.[1];
+	const curve = (ps: { x: number; y: number }[]) => ps.map((p, i) => {
 		if (!i) return `M${p.x} ${p.y}`;
 		const q = ps[i - 1], my = (q.y + p.y) / 2;
 		return ` C${q.x} ${my} ${p.x} ${my} ${p.x} ${p.y}`;
 	}).join('');
-	const pastPts = now == null ? pts : pts.filter((p) => p.mins <= now);
-	const futPts = now == null ? [] : pts.filter((p) => p.mins > now);
+	const pastPts = now == null ? pts : pts.filter((p) => p.mins <= now + 1e-6);
+	const futPts = now == null ? [] : pts.filter((p) => p.mins > now + 1e-6);
 	if (pastPts.length && futPts.length) futPts.unshift(pastPts[pastPts.length - 1]);
-	const title = S(report.title) || key.map((k) => short(k.sub)).join(' · ') || 'A story';
-	const repeat = report.repeat == null ? null : report.repeat ? 'would do again' : 'wouldn’t do again';
-	const dotDone = new Set<number>();
-	const erowidId = /^erowid-(\d+)$/.exec(S(report.id))?.[1];
+	const moodOf = (n: number) => (n >= 2 ? C.cyan : n <= -2 ? C.coral : C.lav);
+	const moodMix = (n: number) => (n >= 0 ? d3.interpolateRgb('#ffffff', C.cyan)(Math.min(1, n / CAP)) : d3.interpolateRgb('#ffffff', C.coral)(Math.min(1, -n / CAP)));
+	const signOf = (n: number) => (n >= 2 ? '+' : n <= -2 ? '−' : '~');
+	const fx = new Map<string, { n: number; first: number }>();
+	for (const e of events) if (e.kind === 'felt') for (const x of e.effects) {
+		const v = fx.get(x);
+		fx.set(x, { n: (v?.n ?? 0) + 1, first: Math.min(v?.first ?? Infinity, e.mins) });
+	}
+	const allFx = [...fx].sort((a, b) => b[1].n - a[1].n || a[1].first - b[1].first);
+	const span = events.length ? events[events.length - 1].mins - Math.min(0, events[0].mins) : 0;
+	const tags = L(report.tags);
+	const facts: [JSX.Element, string, string][] = [];
+	if (report.yr) facts.push([<Calendar size={13} />, String(N(report.yr)), 'When it happened']);
+	if (S(report.gender) || report.age != null) facts.push([<User size={13} />, [S(report.gender), report.age != null ? String(N(report.age)) : ''].filter(Boolean).join(', '), 'Who wrote it']);
+	if (span > 0) facts.push([<Clock size={13} />, fmtDur(span / 60), 'How long the story covers']);
+	const overall = MOMENT[S(report.overall)];
+	const overallWord = ({ positive: 'went well', negative: 'was rough', mixed: 'was mixed', neutral: 'was neutral' } as Record<string, string>)[S(report.overall)];
+	if (overall && overallWord) facts.push([<span className="rd-dot" style={{ background: overall.color }} />, overallWord, 'How it went overall']);
+	if (report.repeat != null) facts.push([<RotateCcw size={13} />, report.repeat ? 'would do it again' : 'wouldn’t do it again', 'Would they do it again?']);
+	const names = key.length ? key.map((k) => k.sub) : S(report.subs).split(' · ').filter(Boolean);
+	const subMarks = key.map((k) => ({ names: k.names, color: k.c }));
+
+	// In their system: each substance's typical activity (its doses' curves added up), drawn only from its first dose,
+	// on an axis that grows with "now"; mood underneath as its own line. Points mark each dose and each moment.
+
 
 	return (
-		<div className="mx-auto" style={{ maxWidth: 760, display: 'flex', flexDirection: 'column', gap: 26 }}>
-			<header style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-				<p style={{ margin: 0, fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', color: C.faint }}>{['Erowid', report.yr ? String(report.yr) : null, repeat].filter(Boolean).join(' · ')}</p>
-				<h2 style={{ margin: 0, fontSize: 30, lineHeight: 1.2 }}>{title}</h2>
-				<div className="flex flex-wrap items-center justify-center gap-2" style={{ marginTop: 6 }}>
-					{erowidId && (
-						<a href={`https://erowid.org/experiences/exp.php?ID=${erowidId}`} target="_blank" rel="noopener noreferrer" className="rd-tag" title="Read the original report on Erowid" style={{ textDecoration: 'none', background: 'rgba(255,255,255,.08)' }}>
-							<img src={EROWID_ICON} alt="" width={16} height={16} style={{ display: 'block', borderRadius: 4 }} />
-							Erowid #{erowidId}
-							<span style={{ color: C.faint }}>↗</span>
-						</a>
-					)}
-					<button
-						className="rd-tag"
-						aria-label="Copy link to this moment"
-						title={copied ? 'Link copied' : 'Copy link to this moment'}
-						style={{ background: copied ? 'rgba(166,242,228,.18)' : 'rgba(255,255,255,.08)', padding: '6px 10px' }}
-						onClick={() => navigator.clipboard?.writeText(window.location.href).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)))}
-					>
-						{copied ? <Check size={14} color={C.mint} /> : <Link2 size={14} />}
-					</button>
-					<button
-						className="rd-tag"
-						style={{ background: 'rgba(255,255,255,.08)' }}
-						onClick={() => {
-							if (playing) return setPlaying(false);
-							if (now != null && now >= times[times.length - 1]) setAt(undefined as unknown as null);
-							setPlaying(true);
-						}}
-					>
-						{playing ? <Pause size={14} /> : <Play size={14} />}
-						{playing ? 'Pause' : 'Play'}
-					</button>
+		<div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: 20, overflowX: 'clip', minWidth: 0, ...(fitH ? { height: fitH } : {}) }}>
+			<header>
+				{/* Substances on a small line, the writer's own words as the title, then one line of facts. */}
+				<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+					<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-lg font-semibold" style={{ letterSpacing: '-0.01em' }}>
+						{(allNames ? names : names.slice(0, 4)).map((n, i) => (
+							<span key={n} className="inline-flex items-center gap-3">
+								{i > 0 && <span style={{ color: C.faint, fontWeight: 300 }}>+</span>}
+								<button onClick={() => openPanel({ kind: 'substance', name: n })} className="inline-flex items-center gap-2" style={{ whiteSpace: 'nowrap' }} title={`About ${n}`}>
+									<SubstanceIcon name={n} color={key.find((k) => k.sub === n)?.c} />
+									{short(n)}
+								</button>
+							</span>
+						))}
+						{names.length > 4 && (
+							<button className="rd-btn" style={{ fontSize: 13, padding: '3px 10px' }} onClick={() => setAllNames(!allNames)} title={allNames ? 'Show fewer' : names.slice(4).join(', ')}>
+								{allNames ? 'Show fewer' : `+${names.length - 4} more`}
+							</button>
+						)}
+					</div>
+					<div className="flex items-center gap-2">
+						<button className="rd-tag" onClick={togglePlay} style={{ background: 'rgba(255,255,255,.12)' }}>
+							{playing ? <Pause size={14} /> : <Play size={14} />}
+							{playing ? 'Pause' : 'Play'}
+						</button>
+						{erowidId && (
+							<a href={`https://erowid.org/experiences/exp.php?ID=${erowidId}`} target="_blank" rel="noopener noreferrer" className="rd-tag" title="Read the original report on Erowid" style={{ textDecoration: 'none', background: 'rgba(255,255,255,.08)' }}>
+								<img src={EROWID_ICON} alt="" width={16} height={16} style={{ display: 'block', borderRadius: 4 }} />
+								Erowid #{erowidId}
+								<span style={{ color: C.faint }}>↗</span>
+							</a>
+						)}
+						<button className="rd-tag" aria-label="Copy link to this moment" title={copied ? 'Link copied' : 'Copy link to this moment'} style={{ background: copied ? 'rgba(166,242,228,.18)' : 'rgba(255,255,255,.08)', padding: '6px 10px' }}
+							onClick={() => navigator.clipboard?.writeText(window.location.href).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)))}>
+							{copied ? <Check size={14} color={C.mint} /> : <Link2 size={14} />}
+						</button>
+					</div>
+				</div>
+				{/* The headline (a picked line in their words) is off for now: the moment you're on, pinned below, says more.
+				{headline && <h1 className="mt-4" style={{ fontFamily: SERIF, fontSize: 34, lineHeight: 1.25, fontWeight: 500 }}>“{headline}”</h1>} */}
+				<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" style={{ color: C.faint }}>
+					{facts.map(([icon, text, hint]) => <span key={hint} className="inline-flex items-center gap-1.5" title={hint}>{icon} {text}</span>)}
 				</div>
 			</header>
 
-			{key.length > 0 && (
-				<div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '6px 16px', padding: '10px 16px', borderRadius: 14, background: 'rgba(42,32,89,.45)', fontSize: 13 }}>
-					<span style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: C.faint }}>In the mix</span>
-					{key.map((k) => (
-						<button key={k.sub} onClick={() => openPanel({ kind: 'substance', name: k.sub })} title="About this substance" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-							<span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: k.c }} />
-							<span style={{ color: k.c, fontWeight: 600 }}>{short(k.sub)}</span>
-							{k.n > 1 && <span style={{ color: C.faint }}>×{k.n}</span>}
-						</button>
-					))}
+			{/* The moment you're on, above everything: when, its score, and their words (lit word by word during play).
+			    A fixed-height band, so the timeline below never jumps as quotes change length. */}
+			<div className="rd-hide-sm" style={{ height: 156, overflow: 'hidden', flexShrink: 0, display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', columnGap: 28, alignItems: 'start', borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, padding: '16px 0' }}>
+				{/* Left: when, and how it scored, stacked like a margin note. */}
+				<div style={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'right', paddingTop: 4 }}>
+					<span style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: C.faint }}>{cur ? (cur.kind === 'took' ? 'Took' : cur.kind === 'did' ? 'Did' : 'Felt') : 'Their words'}</span>
+					{cur && <span style={{ fontSize: 30, fontWeight: 300, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', color: C.text, lineHeight: 1.1 }}>{hm(Math.round(now ?? cur.mins))}</span>}
+					{cur?.kind === 'felt' && <span style={{ fontSize: 15, fontWeight: 700, color: moodOf(cur.total) }}>{signed(cur.total)}</span>}
+					{cur?.kind === 'took' && <span style={{ fontSize: 14, fontWeight: 600, color: cur.color }}>{short(cur.sub)}</span>}
 				</div>
-			)}
-
-			<div ref={boxRef} style={{ position: 'relative' }}>
-				<svg aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-					<path d={path(pastPts)} fill="none" stroke="rgba(255,255,255,.28)" strokeWidth={1.5} />
-					<path d={path(futPts)} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth={1.5} strokeDasharray="3 5" />
-				</svg>
-				{events.map((e, i) => {
-					const prev = events[i - 1], next = events[i + 1];
-					const same = !!prev && prev.mins === e.mins;
-					const lastOfGroup = !next || next.mins !== e.mins;
-					const mins = prev ? e.mins - prev.mins : 0;
-					const big = mins > 240;
-					const gap = !prev ? 0 : same ? 4 : big ? 40 : Math.round(clamp(Math.sqrt(mins) * 3, 10, 24));
-					const future = now != null && e.mins > now;
-					const isNow = now != null && e.mins === now && !same;
-					const k = `${e.kind}${i}`;
-					const isOpen = openKey === k;
-					const showDot = e.kind === 'felt' && !dotDone.has(e.mins);
-					if (showDot) dotDone.add(e.mins);
-					const gt = groupTotal.get(e.mins) ?? 0;
-					const moodOf = (n: number) => (n >= 2 ? C.cyan : n <= -2 ? C.coral : C.lav);
-					const dotX = CX + (clamp(gt, -CAP, CAP) / CAP) * R;
-					return (
-						<div key={k} style={{ display: 'grid', gridTemplateColumns: '58px 96px minmax(0, 1fr)', opacity: future ? 0.45 : 1 }}>
-							<div style={{ position: 'relative', paddingTop: gap, display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
-								{big && <span style={{ position: 'absolute', right: 8, top: gap / 2 - 7, fontSize: 11, lineHeight: '14px', color: C.faint, whiteSpace: 'nowrap' }}>{Math.round(mins / 60)}h later</span>}
-								{!same && (
-									<button id={`rd-now-${e.mins}`} onClick={() => (setPlaying(false), setAt(isNow ? (undefined as unknown as null) : e.mins / 60))} title="Set now to this moment" style={{ fontSize: 13, lineHeight: '24px', fontWeight: 600, padding: '0 8px', borderRadius: 999, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', userSelect: 'none', color: isNow ? C.deep : C.soft, background: isNow ? '#fff' : 'transparent' }}>
-										{hm(e.mins)}
-									</button>
-								)}
-								{(same || !lastOfGroup) && <span aria-hidden style={{ position: 'absolute', right: 4, top: same ? 0 : gap + 28, bottom: lastOfGroup ? 'auto' : 0, height: lastOfGroup ? gap + 12 : undefined, width: 2, borderRadius: 2, background: 'rgba(255,255,255,.28)' }} />}
-							</div>
-							<div style={{ position: 'relative', paddingTop: gap, minHeight: 24 }}>
-								<span aria-hidden style={{ position: 'absolute', left: CX - 1, top: 0, height: gap + 12, width: 2, ...SEG[segStyle(e.mins, !prev)] }} />
-								{next && <span aria-hidden style={{ position: 'absolute', left: CX - 1, top: gap + 12, bottom: 0, width: 2, ...SEG[segStyle(next.mins, false)] }} />}
-								{e.kind === 'took' && <span aria-hidden style={{ position: 'absolute', left: CX - 5, top: gap + 7, width: 10, height: 10, borderRadius: 3, background: e.color }} />}
-								{showDot && (
-									<>
-										<span aria-hidden style={{ position: 'absolute', top: gap + 11, height: 2, left: Math.min(CX, dotX), width: Math.abs(dotX - CX), background: moodOf(gt), opacity: 0.7 }} />
-										<span ref={(el) => { if (el) dotRefs.current.set(e.mins, el); else dotRefs.current.delete(e.mins); }} aria-hidden style={{ position: 'absolute', left: dotX - 7, top: gap + 5, width: 14, height: 14, boxSizing: 'border-box', borderRadius: 999, background: future ? C.deep : moodOf(gt), border: `2px solid ${moodOf(gt)}`, boxShadow: isNow ? '0 0 0 5px rgba(255,255,255,.22)' : 'none' }} />
-									</>
-								)}
-							</div>
-							<div style={{ paddingTop: gap, paddingLeft: 10, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 15, lineHeight: '24px' }}>
-								{e.kind === 'took' ? (
-									<>
-										<div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0 6px' }}>
-											<button onClick={() => (setOpenKey(isOpen ? null : k), setAt(e.mins / 60))} aria-expanded={isOpen} title="Their words" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: C.soft, whiteSpace: 'nowrap' }}>
-												{e.route && <RouteIcon route={e.route} size={16} color={C.soft} />}
-												{DOSE_VERB[e.route] ?? 'took'}
-											</button>
-											{e.amount && <><b style={{ fontWeight: 600 }}>{e.amount}</b><span style={{ color: C.soft }}>of</span></>}
-											<button onClick={() => openPanel({ kind: 'substance', name: e.sub })} title="About this substance" style={{ color: e.color, fontWeight: 600, textDecoration: 'underline', textDecorationColor: `${e.color}66`, textUnderlineOffset: 3, whiteSpace: 'nowrap' }}>{short(e.sub)}</button>
-											{e.alert && (
-												<span style={{ position: 'relative', display: 'inline-flex' }} onMouseEnter={() => setTip(k)} onMouseLeave={() => setTip(null)}>
-													<button onClick={() => setTip(tip === k ? null : k)} onFocus={() => setTip(k)} onBlur={() => setTip(null)} aria-label={`${e.alert.level === 'danger' ? 'Warning' : 'Heads up'}: ${e.alert.text}`} style={{ display: 'inline-flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', color: e.alert.level === 'danger' ? C.coral : C.soft }}>
-														{e.alert.level === 'danger' ? <AlertTriangle size={15} /> : <Info size={15} />}
-													</button>
-													{tip === k && (
-														<span role="tooltip" style={{ position: 'absolute', left: '50%', top: 28, transform: 'translateX(-50%)', zIndex: 5, width: 'max-content', maxWidth: 280, padding: '8px 12px', borderRadius: 10, background: C.deep, boxShadow: '0 6px 20px rgba(20,12,60,.35)', fontSize: 13, lineHeight: '18px', color: e.alert.level === 'danger' ? C.coral : C.soft }}>{e.alert.text}</span>
-													)}
-												</span>
-											)}
-										</div>
-										{isOpen && e.quote && <div style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 14, lineHeight: '21px', color: C.faint }}>“{e.quote}”</div>}
-									</>
-								) : (
-									<>
-										<button onClick={() => (setOpenKey(isOpen ? null : k), setAt(e.mins / 60))} aria-expanded={isOpen} style={{ display: 'flex', alignItems: 'baseline', gap: 10, textAlign: 'left', color: moodOf(e.total) }}>
-											<span aria-label={e.total >= 2 ? 'better' : e.total <= -2 ? 'rougher' : 'mixed'} style={{ width: 16, flexShrink: 0, textAlign: 'center', fontSize: 18, fontWeight: 700 }}>{e.total >= 2 ? '+' : e.total <= -2 ? '−' : '~'}</span>
-											<span style={{ fontWeight: 500 }}>{e.gist}</span>
-											{e.effects.some((x) => SAFETY_EFFECTS.has(x)) && <AlertTriangle size={14} color={C.coral} style={{ flexShrink: 0, alignSelf: 'center' }} />}
-										</button>
-										{isOpen && (
-											<div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 26, paddingBottom: 4 }}>
-												<div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontSize: 13, lineHeight: '20px', color: C.soft }}>
-													{e.effects.map((x) => {
-														const p = EFFECT_POINTS[x] ?? 0;
-														return (
-															<button key={x} onClick={() => openPanel({ kind: 'effect', name: x })} style={{ whiteSpace: 'nowrap', color: C.soft }}>
-																{x} <b style={{ color: p > 0 ? C.cyan : p < 0 ? C.coral : C.faint }}>{signed(p)}</b>
-															</button>
-														);
-													})}
-													<span style={{ whiteSpace: 'nowrap', color: C.faint }}>their tone <b style={{ color: (TONE_POINTS[e.tone] ?? 0) > 0 ? C.cyan : (TONE_POINTS[e.tone] ?? 0) < 0 ? C.coral : C.faint }}>{signed(TONE_POINTS[e.tone] ?? 0)}</b></span>
-												</div>
-												{e.quote && <div style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 14, lineHeight: '21px', color: C.faint }}>“{e.quote}”</div>}
-											</div>
-										)}
-									</>
-								)}
-							</div>
-						</div>
-					);
-				})}
+				{/* Right: their words, the type shrinking as the quote grows; the opening mark hangs in the moment's colour. */}
+				<div style={{ borderLeft: `1px solid ${C.line}`, paddingLeft: 28, minHeight: 120 }}>
+					{!cur ? (
+						<p style={{ margin: 0, fontFamily: SERIF, fontStyle: 'italic', fontSize: 24, lineHeight: 1.35, color: C.faint }}>Press play (or space), or tap a line, to read their words here.</p>
+					) : cur.quote ? (
+						<p key={focus} className="rd-in" style={{ margin: 0, fontFamily: SERIF, fontSize: cur.quote.length > 260 ? 18 : cur.quote.length > 170 ? 21 : cur.quote.length > 90 ? 25 : 31, lineHeight: 1.32, letterSpacing: '-0.01em', color: C.text, maxWidth: 980, textIndent: '-0.45em' }}>
+							<span aria-hidden style={{ color: cur.kind === 'felt' ? moodOf(cur.total) : cur.kind === 'took' ? cur.color : C.lav }}>“</span>
+							{readAlong(cur.quote, cur.kind === 'felt' ? cur.effects : [], subMarks, playing && lit && lit.i === focus ? lit.f : 1)}
+							<span aria-hidden style={{ color: C.faint }}>”</span>
+						</p>
+					) : (
+						<p style={{ margin: 0, fontFamily: SERIF, fontStyle: 'italic', fontSize: 20, color: C.faint }}>No exact words for this one.</p>
+					)}
+				</div>
 			</div>
 
-			<p style={{ margin: 0, textAlign: 'center', fontSize: 12, lineHeight: 1.7, color: C.faint }}>
-				+ better · − rougher · ~ mixed. Dots sit right when it felt better, left when rougher. Tap a line to jump there and see its points and their words.
-			</p>
+			<div className={`rd-tl ${fitH ? 'rd-fit' : ''}`}>
+				<div style={{ position: 'relative', minHeight: 0, height: fitH ? '100%' : undefined }}>
+				{hidden.above > 0 && <button className="rd-more top" onClick={() => scrollRef.current?.scrollBy({ top: -scrollRef.current.clientHeight * 0.7, behavior: 'smooth' })}>↑ {hidden.above} earlier</button>}
+				{hidden.below > 0 && <button className="rd-more bottom" onClick={() => scrollRef.current?.scrollBy({ top: scrollRef.current.clientHeight * 0.7, behavior: 'smooth' })}>↓ {hidden.below} more</button>}
+				<div ref={scrollRef} className="rd-tlscroll" onScroll={onTimelineScroll}>
+					<div ref={boxRef} style={{ position: 'relative' }}>
+						{/* The mood curve: a smooth line through each moment's dot; solid so far, dashed for what's to come. */}
+						<svg aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+							<defs>
+								<linearGradient id="rd-mood-grad" gradientUnits="userSpaceOnUse" x1={TIME_W + CX - R} x2={TIME_W + CX + R} y1={0} y2={0}>
+									<stop offset="0" stopColor={C.coral} />
+									<stop offset="0.5" stopColor="#ffffff" />
+									<stop offset="1" stopColor={C.cyan} />
+								</linearGradient>
+							</defs>
+							<path d={curve(pastPts)} fill="none" stroke="url(#rd-mood-grad)" strokeWidth={2} opacity={0.75} />
+							<path d={curve(futPts)} fill="none" stroke="url(#rd-mood-grad)" strokeWidth={2} strokeDasharray="3 5" opacity={0.4} />
+						</svg>
+						{playY == null && scrubY != null && (
+							<div ref={(el) => { scrubLine.current = el; if (el && !el.style.transform) el.style.transform = `translateY(${scrubY}px)`; }} aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 0, borderTop: '1px solid rgba(255,255,255,.28)', zIndex: 3, pointerEvents: 'none', willChange: 'transform' }} />
+						)}
+						{playY != null && (
+							<div ref={(el) => { headRef.current = el; if (el && !el.style.transform) el.style.transform = `translateY(${playY}px)`; }} aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 0, borderTop: '1px solid rgba(255,255,255,.35)', zIndex: 3, pointerEvents: 'none', willChange: 'transform' }} />
+						)}
+						{events.map((e, i) => {
+							const prev = events[i - 1], next = events[i + 1];
+							const same = !!prev && prev.mins === e.mins;
+							const mins = prev ? e.mins - prev.mins : 0;
+							const big = mins > 240;
+							const gap = !prev ? 0 : same ? 4 : big ? 40 : Math.round(clamp(Math.sqrt(mins) * 3, 10, 24));
+							const future = now != null && e.mins > now + 1e-6;
+							const isFocus = i === focus;
+							const isNowTime = cur != null && cur.mins === e.mins && !same && playY == null;
+							const showDot = e.kind === 'felt' && !(prev && prev.mins === e.mins && events.slice(0, i).some((x) => x.kind === 'felt' && x.mins === e.mins));
+							const gt = groupTotal.get(e.mins) ?? 0;
+							const dotX = CX + (clamp(gt, -CAP, CAP) / CAP) * R;
+							return (
+								<div key={`${e.kind}${i}`} data-row style={{ display: 'grid', gridTemplateColumns: `${TIME_W}px ${LANE_W}px minmax(0, 1fr)`, opacity: focus >= 0 && i < focus && e.mins !== cur?.mins ? (playing ? 0.28 : 0.42) : future ? 0.8 : 1, transition: 'opacity .5s, background .3s', borderRadius: 10, background: isFocus ? 'linear-gradient(to bottom, transparent 0, transparent var(--g), rgba(255,255,255,.1) var(--g), rgba(255,255,255,.1) 100%)' : 'transparent', ['--g' as never]: `${gap}px` }}>
+									<div style={{ position: 'relative', paddingTop: gap, display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
+										{big && <span style={{ position: 'absolute', right: 8, top: gap / 2 - 7, fontSize: 11, lineHeight: '14px', color: C.faint, whiteSpace: 'nowrap' }}>{Math.round(mins / 60)}h later</span>}
+										{!same && (
+											<button onClick={() => goRow(i)} title="Go to this moment" style={{ fontSize: 13, lineHeight: '24px', fontWeight: 600, padding: '0 7px', borderRadius: 999, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', userSelect: 'none', color: isNowTime ? C.deep : C.soft, background: isNowTime ? '#fff' : 'transparent' }}>
+												{hm(e.mins)}
+											</button>
+										)}
+									</div>
+									<div style={{ position: 'relative', paddingTop: gap, minHeight: 24 }}>
+										<span aria-hidden style={{ position: 'absolute', left: CX - 1, top: 0, height: gap + 12, width: 2, ...SEG[segStyle(e.mins, !prev)] }} />
+										{next && <span aria-hidden style={{ position: 'absolute', left: CX - 1, top: gap + 12, bottom: 0, width: 2, ...SEG[segStyle(next.mins, false)] }} />}
+										<span ref={(el) => { if (el) rowRefs.current.set(i, el); else rowRefs.current.delete(i); }} aria-hidden style={{ position: 'absolute', left: CX, top: gap + 12, width: 0, height: 0 }} />
+										{e.kind === 'did' && <span aria-hidden style={{ position: 'absolute', left: CX - 4, top: gap + 8, width: 8, height: 8, borderRadius: 999, border: '1.5px solid rgba(255,255,255,.6)', background: C.deep }} />}
+										{e.kind === 'took' && <span aria-hidden style={{ position: 'absolute', left: CX - 5, top: gap + 7, width: 10, height: 10, borderRadius: 3, background: e.color, boxShadow: isFocus ? '0 0 0 4px rgba(255,255,255,.2)' : 'none' }} />}
+										{showDot && (
+											<>
+												<span aria-hidden style={{ position: 'absolute', top: gap + 11, height: 2, left: Math.min(CX, dotX), width: Math.abs(dotX - CX), background: `linear-gradient(${dotX < CX ? 'to left' : 'to right'}, rgba(255,255,255,.7), ${moodMix(gt)})` }} />
+												<span ref={(el) => { if (el) dotRefs.current.set(e.mins, el); else dotRefs.current.delete(e.mins); }} aria-hidden style={{ position: 'absolute', left: dotX - 7, top: gap + 5, width: 14, height: 14, boxSizing: 'border-box', borderRadius: 999, background: future ? C.deep : moodMix(gt), border: `2px solid ${moodMix(gt)}`, boxShadow: isFocus ? '0 0 0 5px rgba(255,255,255,.22)' : 'none', transition: 'background .3s' }} />
+											</>
+										)}
+									</div>
+									<div style={{ paddingTop: gap, paddingLeft: 10, paddingRight: 10, minWidth: 0, display: 'flex', flexDirection: 'column', fontSize: 15, lineHeight: '24px', fontWeight: isFocus ? 600 : undefined }}>
+										{e.kind === 'did' ? (
+											<div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+												<button onClick={() => goRow(i)} title={e.note} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: isFocus ? C.text : C.soft, textAlign: 'left', minWidth: 0, whiteSpace: 'nowrap' }}>
+													{(() => { const Icon = DID_ICON[e.act] ?? Circle; return <Icon size={15} color={C.faint} style={{ flexShrink: 0 }} />; })()}
+													<span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.note}</span>
+												</button>
+											</div>
+										) : e.kind === 'took' ? (
+											<div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', minWidth: 0, overflow: 'hidden' }}>
+												<button onClick={() => goRow(i)} title="Go to this moment" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: isFocus ? C.text : C.soft, whiteSpace: 'nowrap', flexShrink: 0 }}>
+													{e.route && <RouteIcon route={e.route} size={16} color={e.color} />}
+													{DOSE_VERB[e.route] ?? 'took'}
+												</button>
+												{e.amount && <><b title={e.amount} style={{ fontWeight: 600, color: e.color, flexShrink: 0 }}>{shortAmount(e.amount)}</b><span style={{ color: C.soft, flexShrink: 0 }}>of</span></>}
+												<button onClick={() => openPanel({ kind: 'substance', name: e.sub })} title={`About ${e.sub}`} style={{ color: e.color, fontWeight: 600, textDecoration: 'underline', textDecorationColor: `${e.color}66`, textUnderlineOffset: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{short(e.sub)}</button>
+												{e.runTotal && <span style={{ color: C.faint, fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 }}>· {e.runTotal} in all</span>}
+												{e.alert && (
+													<span style={{ position: 'relative', display: 'inline-flex' }} onMouseEnter={() => setTip(`t${i}`)} onMouseLeave={() => setTip(null)}>
+														<button onClick={() => setTip(tip === `t${i}` ? null : `t${i}`)} onFocus={() => setTip(`t${i}`)} onBlur={() => setTip(null)} aria-label={`${e.alert.level === 'danger' ? 'Warning' : 'Heads up'}: ${e.alert.text}`} style={{ display: 'inline-flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', color: e.alert.level === 'danger' ? C.coral : C.soft }}>
+															{e.alert.level === 'danger' ? <AlertTriangle size={15} /> : <Info size={15} />}
+														</button>
+														{tip === `t${i}` && (
+															<span role="tooltip" style={{ position: 'absolute', left: '50%', top: 28, transform: 'translateX(-50%)', zIndex: 5, width: 'max-content', maxWidth: 280, padding: '8px 12px', borderRadius: 10, background: C.deep, boxShadow: '0 6px 20px rgba(20,12,60,.35)', fontSize: 13, lineHeight: '18px', color: e.alert.level === 'danger' ? C.coral : C.soft }}>{e.alert.text}</span>
+														)}
+													</span>
+												)}
+											</div>
+										) : (
+											<>
+												<button onClick={() => goRow(i)} title={e.gist} style={{ display: 'flex', alignItems: 'baseline', gap: 10, textAlign: 'left', minWidth: 0, whiteSpace: 'nowrap' }}>
+													<span aria-label={e.total >= 2 ? 'better' : e.total <= -2 ? 'rougher' : 'mixed'} style={{ width: 16, flexShrink: 0, textAlign: 'center', fontSize: 18, fontWeight: 700, color: moodOf(e.total) }}>{signOf(e.total)}</span>
+													<span style={{ fontWeight: isFocus ? 600 : 500, color: isFocus ? C.text : C.soft, overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{e.gist}</span>
+													{e.effects.some((x) => SAFETY_EFFECTS.has(x)) && <AlertTriangle size={14} color={C.coral} style={{ flexShrink: 0, alignSelf: 'center' }} />}
+												</button>
+											</>
+										)}
+										{isFocus && !wide && e.quote && (
+											<p key={`m${focus}`} className="rd-in" style={{ margin: '6px 0 4px', paddingLeft: e.kind === 'felt' ? 26 : 0, fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.text }}>
+												“{readAlong(e.quote, e.kind === 'felt' ? e.effects : [], subMarks, playing && lit && lit.i === focus ? lit.f : 1)}”
+											</p>
+										)}
+									</div>
+								</div>
+							);
+						})}
+					</div>
+
+				</div>
+				</div>
+
+				<aside className="rd-side">
+					{sys.chart && (
+						<div className="px-1" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+							{sys.chart.subs.length === 0 && (
+								<div className="flex items-center gap-4" style={{ padding: '8px 0' }}>
+									<SpunionPuzzle size={64} />
+									<span className="text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>Missing a piece: there’s no timing or half-life data for these yet, so no curve.</span>
+								</div>
+							)}
+							<span className="rd-label">In the mix</span>
+							{sys.chart.subs.length > 0 && <svg viewBox={`0 -14 ${SYS_W} ${SYS_H + MOOD_H + 40}`} width="100%" aria-label="How active each substance is over the story" style={{ display: 'block', overflow: 'visible', width: '100%', maxWidth: 420, maxHeight: wide ? '22vh' : '13vh' }}>
+								<line x1={0} x2={SYS_W} y1={SYS_H} y2={SYS_H} stroke="rgba(255,255,255,.16)" />
+								{sys.chart.subs.map((s) => (
+									<g key={s.sub}>
+										<defs>
+											<linearGradient id={`rd-sys-${s.sub.replace(/\W/g, '')}`} x1="0" x2="0" y1="0" y2="1">
+												<stop offset="0" stopColor={s.color} stopOpacity={0.32} />
+												<stop offset="1" stopColor={s.color} stopOpacity={0} />
+											</linearGradient>
+										</defs>
+										<path d={s.area} fill={`url(#rd-sys-${s.sub.replace(/\W/g, '')})`} />
+										<path d={s.line} fill="none" stroke={s.color} strokeWidth={1.8} />
+									</g>
+								))}
+								{sys.chart.dosePts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={p.past ? p.color : C.deep} stroke={p.color} strokeWidth={1.5} />)}
+								{sys.chart.nowX != null && (
+									<g>
+										<line x1={sys.chart.nowX} x2={sys.chart.nowX} y1={0} y2={SYS_H + MOOD_H + 14} stroke="#fff" strokeWidth={1} strokeDasharray="2 3" opacity={0.8} />
+										<text x={sys.chart.nowX} y={-4} fontSize={10} fontWeight={700} fill="#fff" textAnchor={sys.chart.nowX > SYS_W - 24 ? 'end' : sys.chart.nowX < 24 ? 'start' : 'middle'}>{hm(Math.round(now ?? 0))}</text>
+										{sys.chart.follow.map((f, i) => <circle key={i} cx={sys.chart!.nowX!} cy={f.y} r={3} fill={f.color} />)}
+									</g>
+								)}
+								<text x={0} y={SYS_H + MOOD_H + 32} fontSize={10} fill={C.faint}>{hm(sys.chart.x0)}</text>
+								<text x={SYS_W} y={SYS_H + MOOD_H + 32} fontSize={10} fill={C.faint} textAnchor="end">{hm(Math.round(sys.chart.x1))}</text>
+							</svg>}
+							<div style={wide ? { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '4px 12px', alignItems: 'baseline', fontSize: 14, maxWidth: 420 } : { display: 'flex', flexWrap: 'wrap', gap: '4px 16px', fontSize: 13 }}>
+								{sys.legend.map((r) => (
+									<Fragment key={r.sub}>
+										<button onClick={() => openPanel({ kind: 'substance', name: r.sub })} title="About this substance" className="inline-flex items-center gap-2" style={{ minWidth: 0, textAlign: 'left', opacity: r.taken ? 1 : 0.45 }}>
+											<span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: r.color, flexShrink: 0 }} />
+											<span style={{ color: r.color, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{short(r.sub)}</span>
+											<span style={{ color: C.soft, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{r.total}</span>
+											{r.left && <span style={{ color: C.faint, whiteSpace: 'nowrap', fontSize: 12 }}>{r.left}</span>}
+											{r.taken && r.typical && <span title="No half-life on record: drawn from typical effect timing instead" style={{ color: C.faint, fontSize: 11 }}>timing</span>}
+										</button>
+										{wide && <span style={{ fontSize: 12, color: r.phase === 'peaking' ? C.text : C.faint, whiteSpace: 'nowrap' }}>{r.phase}</span>}
+									</Fragment>
+								))}
+							</div>
+						</div>
+					)}
+
+					{/* How the moment you're on scored, effect by effect, and a way to say it's wrong. */}
+					{cur && (
+						<div className="px-1" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 28 }}>
+							<span className="rd-label">{cur.kind === 'felt' ? 'How it scored' : 'This moment'}</span>
+							{cur.kind === 'felt' && (
+								<div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: 14, lineHeight: '22px', color: C.soft }}>
+									{cur.effects.map((x) => {
+										const pt = EFFECT_POINTS[x] ?? 0;
+										return (
+											<button key={x} onClick={() => openPanel({ kind: 'effect', name: x })} title={cur.inferred.has(x) ? 'Read between the lines: they didn’t name this outright' : 'They described this'} style={{ whiteSpace: 'nowrap', color: C.soft, opacity: cur.inferred.has(x) ? 0.65 : 1 }}>
+												{x} <b style={{ color: pt > 0 ? C.cyan : pt < 0 ? C.coral : C.faint }}>{signed(pt)}</b>
+											</button>
+										);
+									})}
+									<span style={{ whiteSpace: 'nowrap', color: C.faint }}>their tone <b style={{ color: (TONE_POINTS[cur.tone] ?? 0) > 0 ? C.cyan : (TONE_POINTS[cur.tone] ?? 0) < 0 ? C.coral : C.faint }}>{signed(TONE_POINTS[cur.tone] ?? 0)}</b></span>
+									<span style={{ whiteSpace: 'nowrap', fontWeight: 700, color: moodOf(cur.total) }}>= {signed(cur.total)}</span>
+								</div>
+							)}
+							{cur.kind === 'took' && <span className="text-sm" style={{ color: C.soft }} title={cur.amount}>{DOSE_VERB[cur.route] ?? 'took'} {cur.amount || 'some'} of {cur.sub}{cur.runTotal ? ` · ${cur.runTotal} in all` : ''}</span>}
+							{cur.kind === 'did' && <span className="text-sm" style={{ color: C.soft }}>{cur.note}</span>}
+							{!playing && (
+								<NotRight key={focus} storyId={S(report.id)} at={hm(cur.mins)} what={cur.kind === 'felt' ? cur.gist : cur.kind === 'took' ? `${cur.amount} ${cur.sub} (${cur.route})` : cur.note}
+									options={cur.kind === 'felt' ? [...cur.effects.map((x) => `${x} doesn’t fit`), 'Score feels off', 'Not their words', 'Wrong time'] : cur.kind === 'took' ? ['Wrong substance', 'Wrong amount', 'Wrong route', 'Wrong time', 'Not their words'] : ['Didn’t happen', 'Wrong time', 'Not their words']} />
+							)}
+						</div>
+					)}
+
+					{/* Quiet tags for the whole session: what they felt, and how Erowid filed it. */}
+					{(allFx.length > 0 || tags.length > 0) && (
+						<div className="rd-hide-sm px-1" style={{ display: 'flex', flexDirection: 'column', gap: 18, marginTop: 32, fontSize: 15, lineHeight: 1.85, color: C.faint }}>
+							{allFx.length > 0 && (
+								<div>
+									<span className="rd-label" style={{ display: 'block', marginBottom: 4 }}>Effects</span>
+									{(allTags ? allFx : allFx.slice(0, 12)).map(([x, v], k) => (
+										<Fragment key={x}>
+											{k > 0 && <span aria-hidden> · </span>}
+											<button onClick={() => openPanel({ kind: 'effect', name: x })} title={`First at ${hm(v.first)} · mentioned ${v.n}×`} style={{ color: now == null || v.first <= now + 1e-6 ? C.soft : C.faint, transition: 'color .4s' }}>{x}</button>
+										</Fragment>
+									))}
+									{allFx.length > 12 && <button onClick={() => setAllTags(!allTags)} style={{ marginLeft: 8, color: C.faint, textDecoration: 'underline', textUnderlineOffset: 3 }}>{allTags ? 'fewer' : `+${allFx.length - 12} more`}</button>}
+								</div>
+							)}
+							{tags.length > 0 && (
+								<div>
+									<span className="rd-label" style={{ display: 'block', marginBottom: 4 }}>On Erowid</span>
+									{tags.join(' · ')}
+								</div>
+							)}
+						</div>
+					)}
+				</aside>
+			</div>
 		</div>
 	);
 }
@@ -7756,10 +8499,13 @@ const SPUNION_CSS = `
 .sp-me.hop .sp-body { animation: sp-hop .9s linear 1, sp-bob 3.4s ease-in-out .9s infinite; }
 .sp-eye { animation: sp-blink 4.7s infinite; transform-origin: center; transform-box: fill-box; }
 .sp-eye.r { animation-duration: 6.1s; animation-delay: 2.3s; }
-.sp-bubble { position: relative; max-width: min(280px, calc(100vw - 110px)); margin-bottom: 30px; padding: 12px 34px 12px 14px; border-radius: 18px 18px 6px 18px;
-  background: rgba(40,31,92,.92); border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 12px 34px rgba(10,4,40,.35); font-size: 14px; line-height: 1.45; color: #fff; }
-.sp-bubble b { color: #8ff4c8; }
+.sp-bubble { position: relative; max-width: min(270px, calc(100vw - 110px)); margin-bottom: 24px; padding: 11px 30px 11px 14px; border-radius: 14px 14px 4px 14px;
+  background: #fff; color: #2a2059; font-weight: 500; font-size: 14px; line-height: 1.45;
+  box-shadow: 0 4px 0 var(--sp-tone, #ffd36e), 0 12px 28px rgba(10,4,40,.28); }
+/* The tail: a small point on the bubble's right side, toward Spunion. */
+.sp-bubble::after { content: ''; position: absolute; right: -7px; bottom: 9px; width: 0; height: 0; border-style: solid;
+  border-width: 6px 0 6px 8px; border-color: transparent transparent transparent #fff; }
+.sp-bubble b { color: #1f7a52; }
 @media (max-width: 960px) { .sp-wrap.lift { bottom: 104px; } .sp-me { width: 54px; height: 54px; } }
 @media (prefers-reduced-motion: reduce) { .sp-body, .sp-eye, .sp-me.hop .sp-body { animation: none !important; } }
 `;
@@ -8064,7 +8810,8 @@ function SpunionDizzy({ size = 64 }: { size?: number }) {
 	);
 }
 
-function Spunion({ tips, lift, autoOpen, onPoke }: { tips: string[]; lift: boolean; autoOpen: boolean; onPoke?: () => void }) {
+const SP_TONE: Record<string, string> = { good: '#7ee0a0', bad: '#ff8a9a', info: '#ffd36e' };
+function Spunion({ tips, lift, autoOpen, onPoke, firstTone }: { tips: string[]; lift: boolean; autoOpen: boolean; onPoke?: () => void; firstTone?: string }) {
 	const [i, setI] = useState(0);
 	const [open, setOpen] = useState(autoOpen);
 	const meRef = useRef<HTMLButtonElement | null>(null);
@@ -8096,7 +8843,7 @@ function Spunion({ tips, lift, autoOpen, onPoke }: { tips: string[]; lift: boole
 		<div className={`sp-wrap ${lift ? 'lift' : ''}`}>
 			<style>{SPUNION_CSS}</style>
 			{open && (
-				<div key={tip} className="sp-bubble rd-in" role="status">
+				<div key={tip} className="sp-bubble rd-in" role="status" style={{ '--sp-tone': SP_TONE[(i % tips.length === 0 && firstTone) || 'info'] } as React.CSSProperties}>
 					{tip}
 					{/Discord/.test(tip) && (
 						<div className="mt-3">
@@ -8106,7 +8853,7 @@ function Spunion({ tips, lift, autoOpen, onPoke }: { tips: string[]; lift: boole
 							</a>
 						</div>
 					)}
-					<button onClick={() => setOpen(false)} aria-label="Hide tip" style={{ position: 'absolute', top: 9, right: 9, color: 'rgba(255,255,255,.6)' }}>
+					<button onClick={() => setOpen(false)} aria-label="Hide tip" style={{ position: 'absolute', top: 9, right: 9, color: 'rgba(42,32,89,.55)' }}>
 						<X size={14} />
 					</button>
 				</div>
@@ -8332,13 +9079,19 @@ export default function ReportTimelapse() {
 	const pairEffectsQ = useSQLQuery(pairEffectsSQL(sub ?? '', withSub ?? ''), { enabled: onSub && !!withSub });
 	const pairSeqQ = useSQLQuery(pairSeqSQL(sub ?? '', withSub ?? ''), { enabled: onSub && !!withSub });
 	const reportQ = useSQLQuery(reportSQL(reportId ?? ''), { enabled: onReport });
-	const marksQ = useSQLQuery(reportMarksSQL(reportId ?? ''), { enabled: onReport });
-	const dosesQ = useSQLQuery(reportDosesSQL(reportId ?? ''), { enabled: onReport });
-	const obsQ = useSQLQuery(reportObsSQL(reportId ?? ''), { enabled: onReport });
 	const sDosesQ = useSQLQuery(sessionDosesSQL(reportId ?? ''), { enabled: onReport });
 	const sObsQ = useSQLQuery(sessionObsSQL(reportId ?? ''), { enabled: onReport });
+	// Stories without a close reading still use the older view; only those need its heavier queries.
+	const oldView = onReport && !sObsQ.isLoading && rows(sObsQ).length === 0;
+	const marksQ = useSQLQuery(reportMarksSQL(reportId ?? ''), { enabled: oldView });
+	const dosesQ = useSQLQuery(reportDosesSQL(reportId ?? ''), { enabled: onReport });
+	const obsQ = useSQLQuery(reportObsSQL(reportId ?? ''), { enabled: oldView });
+	const sDidQ = useSQLQuery(sessionDidSQL(reportId ?? ''), { enabled: onReport });
+	const sessSubs = useMemo(() => [...new Set(rows(sDosesQ).map((d) => S(d.sub)).filter(Boolean))].sort(), [sDosesQ.data]);
+	const sRoaQ = useSQLQuery(sessionRoaSQL(sessSubs), { enabled: onReport && sessSubs.length > 0 });
+	const sHlQ = useSQLQuery(sessionHalfLifeSQL(sessSubs), { enabled: onReport && sessSubs.length > 0 });
 	const doseSubs = useMemo(() => [...new Set(rows(dosesQ).map((d) => S(d.sub)).filter(Boolean))].sort(), [dosesQ.data]);
-	const timingQ = useSQLQuery(timingSQL(doseSubs), { enabled: onReport && doseSubs.length > 0 });
+	const timingQ = useSQLQuery(timingSQL(doseSubs), { enabled: oldView && doseSubs.length > 0 });
 	const pairsQ = useSQLQuery(reportPairsSQL(doseSubs), { enabled: onReport && doseSubs.length > 1 });
 	const effectsQ = useSQLQuery(effectsBrowseSQL, { enabled: view === 'effects' });
 
@@ -8380,14 +9133,18 @@ export default function ReportTimelapse() {
 		if (N(t.end_m) > 0 && N(t.end_m) <= 3) return `${name} usually wears off within about ${fmtDur(N(t.end_m))}, which makes topping up tempting. Pace yourself.`;
 		return '';
 	})();
+	const [storyLine, setStoryLine] = useState<SpunionLine | null>(null);
 	const spunionTips = [
-		onReport ? 'Scroll through the story and the timeline follows along. Or press play and I’ll walk you through it.'
+		onReport && storyLine ? storyLine.text : null,
+		onReport && rows(sObsQ).length ? SESSION_NOTES[0]
+		: onReport ? 'Scroll through the story and the timeline follows along. Or press play and I’ll walk you through it.'
 		: pairSev >= 2 ? `${short(sub!)} with ${short(withSub!)} is a risky mix. If you go ahead anyway: go low, go slow, and don’t do it alone.`
 		: onSub && withSub ? `Here’s how ${short(sub!)} and ${short(withSub!)} tend to go together, from people who tried it.`
 		: onSub ? subTip
 		: view === 'effects' ? 'Tap an effect to see what it is, and what people had taken when they felt it.'
 		: view === 'home' ? 'Hi, I’m Spunion! Search anything you like. Want to talk to real people? The re:dose community is on Discord.'
 		: 'Hi, I’m Spunion! Tap a substance to see how it usually goes.',
+		...(onReport && rows(sObsQ).length ? SESSION_NOTES.slice(1) : []),
 		...SPUNION_TIPS,
 	].filter(Boolean) as string[];
 	// He opens his bubble by himself only when it matters; otherwise he waits to be tapped.
@@ -8532,7 +9289,7 @@ export default function ReportTimelapse() {
 					{view === 'reports' && !sub && !reportId && <StoriesBrowse onOpen={goReport} />}
 					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} onCombo={goCombo} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} effectsRoute={effectsRoute} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
 					{onReport && (sObsQ.isLoading || rows(sObsQ).length > 0
-						? <SessionTimeline reportQ={reportQ} dosesQ={sDosesQ} obsQ={sObsQ} pairsQ={pairsQ} />
+						? <SpunionLineCtx.Provider value={setStoryLine}><SessionTimeline reportQ={reportQ} dosesQ={sDosesQ} obsQ={sObsQ} pairsQ={pairsQ} roaQ={sRoaQ} didQ={sDidQ} hlQ={sHlQ} /></SpunionLineCtx.Provider>
 						: <TimelapseStep id={reportId!} reportQ={reportQ} marksQ={marksQ} dosesQ={dosesQ} obsQ={obsQ} timingQ={timingQ} pairsQ={pairsQ} frozen={!!openItem} />)}
 					{view === 'home' && <HomePage q={pickQ} onSubstance={goSubstance} onEffect={goEffect} onReport={goReport} onCombo={goCombo} onView={goView} />}
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
@@ -8566,7 +9323,8 @@ export default function ReportTimelapse() {
 							{(Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map((k) => (
 								<a key={k} className="rd-thanks" href={SOURCES[k].href} target="_blank" rel="noopener noreferrer" title={SOURCES[k].gives} style={{ color: C.soft }}>
 									<img src={SOURCES[k].logo} alt="" width={15} height={15} />
-									{SOURCES[k].name}
+									<span className="rd-hide-xs">{SOURCES[k].name}</span>
+									<span className="rd-sr">{SOURCES[k].name}</span>
 								</a>
 							))}
 						</div>
@@ -8593,7 +9351,7 @@ export default function ReportTimelapse() {
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} onEffectPage={goEffect} />
-				{!openItem && <Spunion tips={trip ? ['Whoa… are the letters swimming? Press Esc to come down.', ...spunionTips] : spunionTips} lift={onReport} autoOpen={spunionSpeaks || trip} onPoke={poke} />}
+				{!openItem && <Spunion tips={trip ? ['Whoa… are the letters swimming? Press Esc to come down.', ...spunionTips] : spunionTips} lift={onReport} autoOpen={spunionSpeaks || trip || (onReport && !!storyLine)} firstTone={onReport && storyLine ? storyLine.tone : spunionSpeaks ? 'bad' : undefined} onPoke={poke} />}
 			</main>
 		</OpenCtx.Provider>
 		</GoCtx.Provider>

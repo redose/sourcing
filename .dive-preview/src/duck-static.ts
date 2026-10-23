@@ -18,6 +18,7 @@ const IN_MEMORY = [
 	'routes_of_administration', 'report_timeline', 'tripsit_combos', 'substance_structures', 'substance_effects',
 	'interactions', 'alias_mixes', 'world_countries', 'substance_overviews', 'substance_legality',
 	'substance_legality_international', 'substance_harms', 'report_phases', 'effect_replications',
+	'substance_half_lives', 'llm_context_events',
 ];
 const FROM_FILE = ['experience_reports'];
 

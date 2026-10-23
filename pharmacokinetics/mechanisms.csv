@@ -1,0 +1,93 @@
+substance,chembl_id,target,action_type,source_url
+Alprazolam,CHEMBL661,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL661
+Amphetamine,CHEMBL405,Sodium-dependent dopamine transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL405
+Amphetamine,CHEMBL405,Sodium-dependent noradrenaline transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL405
+Armodafinil,CHEMBL1201192,Sodium-dependent dopamine transporter,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1201192
+Baclofen,CHEMBL701,GABA-B receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL701
+Benzydamine,CHEMBL12610,Cyclooxygenase,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL12610
+Bromazepam,CHEMBL277062,Gamma-aminobutyric acid receptor subunit alpha-2,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL277062
+Buprenorphine,CHEMBL511142,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL511142
+Buprenorphine,CHEMBL511142,Kappa-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL511142
+Buspirone,CHEMBL49,5-hydroxytryptamine receptor 1A,partial agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL49
+Caffeine,CHEMBL113,Adenosine receptor,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL113
+Cannabidiol,CHEMBL190461,Cannabinoid receptor 1,negative allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL190461
+Cannabis,CHEMBL465,Cannabinoid receptor 1,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL465
+Clonazepam,CHEMBL452,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL452
+Clonidine,CHEMBL134,Adrenergic receptor alpha-2,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL134
+Coca,CHEMBL370805,Sodium channel alpha subunit,blocker,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL370805
+Cocaine,CHEMBL370805,Sodium channel alpha subunit,blocker,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL370805
+Codeine,CHEMBL485,Opioid receptors; mu/kappa/delta,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL485
+Dextroamphetamine,CHEMBL612,Sodium-dependent dopamine transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL612
+Dextroamphetamine,CHEMBL612,Sodium-dependent noradrenaline transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL612
+Dextroamphetamine,CHEMBL612,Synaptic vesicular amine transporter,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL612
+Dextromethorphan,CHEMBL52440,Sigma non-opioid intracellular receptor 1,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL52440
+Dextromethorphan,CHEMBL52440,"Glutamate receptor ionotropic, NMDA 2A",antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL52440
+Dextropropoxyphene,CHEMBL1213351,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1213351
+Diazepam,CHEMBL12,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL12
+Dihydrocodeine,CHEMBL1595,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1595
+Diphenhydramine,CHEMBL657,Histamine H1 receptor,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL657
+Efavirenz,CHEMBL223228,Human immunodeficiency virus type 1 reverse transcriptase,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL223228
+Ephedrine,CHEMBL211456,Adrenergic receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL211456
+Eszopiclone,CHEMBL1522,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1522
+Fentanyl,CHEMBL596,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL596
+Flunitrazepam,CHEMBL13280,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL13280
+GHB,CHEMBL1342,GABA-B receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1342
+Gabapentin,CHEMBL940,Voltage-gated calcium channel,modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL940
+Gaboxadol,CHEMBL312443,Gamma-aminobutyric acid receptor subunit alpha-4/beta3/delta,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL312443
+Galantamine,CHEMBL659,Acetylcholinesterase,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL659
+Haloperidol,CHEMBL54,5-hydroxytryptamine receptor 2A,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL54
+Haloperidol,CHEMBL54,D2-like dopamine receptor,inverse agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL54
+Heroin,CHEMBL459324,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL459324
+Hydrocodone,CHEMBL1457,Opioid receptors; mu/kappa/delta,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1457
+Hydromorphone,CHEMBL398707,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL398707
+Ketamine,CHEMBL742,Glutamate [NMDA] receptor,negative allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL742
+Lisdexamfetamine,CHEMBL1201222,Sodium-dependent dopamine transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1201222
+Lisdexamfetamine,CHEMBL1201222,Sodium-dependent noradrenaline transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1201222
+Lisdexamfetamine,CHEMBL1201222,Synaptic vesicular amine transporter,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1201222
+Lorazepam,CHEMBL580,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL580
+MDMA,CHEMBL43048,Sodium-dependent dopamine transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL43048
+MDMA,CHEMBL43048,Sodium-dependent serotonin transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL43048
+MDMA,CHEMBL43048,Sodium-dependent noradrenaline transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL43048
+Melatonin,CHEMBL45,Melatonin receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL45
+Memantine,CHEMBL807,Glutamate [NMDA] receptor,negative allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL807
+Methadone,CHEMBL651,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL651
+Methamphetamine,CHEMBL1201201,Monoamine transporter,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1201201
+Methaqualone,CHEMBL282052,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL282052
+Methylphenidate,CHEMBL796,Sodium-dependent dopamine transporter,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL796
+Methylphenidate,CHEMBL796,Sodium-dependent noradrenaline transporter,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL796
+Midazolam,CHEMBL655,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL655
+Mirtazapine,CHEMBL654,5-hydroxytryptamine receptor 2A,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL654
+Mirtazapine,CHEMBL654,5-hydroxytryptamine receptor 2C,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL654
+Mirtazapine,CHEMBL654,Adrenergic receptor alpha-2,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL654
+Modafinil,CHEMBL1373,Sodium-dependent dopamine transporter,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1373
+Morphine,CHEMBL70,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL70
+Naloxone,CHEMBL80,Opioid receptors; mu/kappa/delta,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL80
+Nicotine,CHEMBL3,Neuronal acetylcholine receptor; alpha4/beta2,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL3
+Oxycodone,CHEMBL656,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL656
+Oxymorphone,CHEMBL963,Opioid receptors; mu/kappa/delta,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL963
+Pentobarbital,CHEMBL448,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL448
+Pethidine,CHEMBL607,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL607
+Phentermine,CHEMBL1574,Sodium-dependent noradrenaline transporter,releasing agent,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1574
+Pregabalin,CHEMBL1059,Voltage-gated calcium channel,modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1059
+Prochlorperazine,CHEMBL728,D(2) dopamine receptor,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL728
+Progesterone,CHEMBL103,Progesterone receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL103
+Promethazine,CHEMBL643,Histamine H1 receptor,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL643
+Psilocybe cubensis,CHEMBL194378,5-hydroxytryptamine receptor 2A,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL194378
+Psilocybin mushrooms,CHEMBL194378,5-hydroxytryptamine receptor 2A,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL194378
+Quetiapine,CHEMBL716,5-hydroxytryptamine receptor 2A,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL716
+Quetiapine,CHEMBL716,5-hydroxytryptamine receptor 2C,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL716
+Quetiapine,CHEMBL716,D(2) dopamine receptor,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL716
+Risperidone,CHEMBL85,5-hydroxytryptamine receptor 2A,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL85
+Risperidone,CHEMBL85,5-hydroxytryptamine receptor 2C,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL85
+Risperidone,CHEMBL85,D(2) dopamine receptor,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL85
+Secobarbital,CHEMBL447,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL447
+Sufentanil,CHEMBL658,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL658
+Tapentadol,CHEMBL1201776,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1201776
+Tapentadol,CHEMBL1201776,Sodium-dependent noradrenaline transporter,inhibitor,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1201776
+Temazepam,CHEMBL967,GABA-A receptor; anion channel,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL967
+Tetrahydrocannabinol,CHEMBL465,Cannabinoid receptor 1,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL465
+Tizanidine,CHEMBL1079,Adrenergic receptor alpha-2,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1079
+Tramadol,CHEMBL1237044,Mu-type opioid receptor,agonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1237044
+Trihexyphenidyl,CHEMBL1490,Muscarinic acetylcholine receptor M1,antagonist,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL1490
+Zolpidem,CHEMBL911,GABA A receptor alpha-1/beta-1/gamma-2,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL911
+Zopiclone,CHEMBL135400,GABA-A receptor; agonist GABA site,positive allosteric modulator,https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL135400
