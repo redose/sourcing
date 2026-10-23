@@ -1968,12 +1968,12 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 // ── Browse: substances ────────────────────────────────────────────
 
 // Top combinations for one substance, with how they went and any interaction note.
-const focusCombosSQL = (sub: string) => `
+const focusCombosSQL = (sub: string, limit = 8) => `
 WITH co AS (
   SELECT d2.canonical_substance AS s, count(DISTINCT d1.report_id) AS n
   FROM ${DB}."report_doses" d1 JOIN ${DB}."report_doses" d2 USING (report_id)
   WHERE d1.canonical_substance = '${esc(sub)}' AND d2.canonical_substance IS NOT NULL AND d2.canonical_substance <> '${esc(sub)}'
-  GROUP BY 1 ORDER BY n DESC, 1 LIMIT 8
+  GROUP BY 1 ORDER BY n DESC, 1 LIMIT ${limit}
 ),
 pairrep AS (
   SELECT DISTINCT d2.canonical_substance AS s, d1.report_id
@@ -2070,6 +2070,241 @@ function CombosList({ name, onCombo, bare }: { name: string; onCombo: (a: string
 				</span>
 			</p>
 		</>
+	);
+}
+
+// ── Mixing ────────────────────────────────────────────────────────
+// TripSit's chart for every group this substance belongs to: each other group, its rating and note, and which of our
+// substances it covers.
+const knownMixSQL = (name: string) => `
+WITH mine AS (SELECT group_key FROM ${DB}."tripsit_group_members" WHERE substance = '${esc(name)}'),
+pairs AS (
+  SELECT CASE WHEN c.group_a IN (SELECT group_key FROM mine) THEN c.group_b ELSE c.group_a END AS grp, c.status, c.severity_rank AS rank, c.note
+  FROM ${DB}."tripsit_combos" c
+  WHERE c.group_a IN (SELECT group_key FROM mine) OR c.group_b IN (SELECT group_key FROM mine)
+),
+mem AS (SELECT group_key, list(substance ORDER BY substance) AS members FROM ${DB}."tripsit_group_members" GROUP BY 1)
+SELECT p.grp, max(p.rank) AS rank, arg_max(p.status, p.rank) AS status, arg_max(p.note, p.rank) AS note, any_value(mem.members) AS members
+FROM pairs p LEFT JOIN mem ON mem.group_key = p.grp
+WHERE p.grp NOT IN (SELECT group_key FROM mine)
+GROUP BY 1 ORDER BY rank DESC, grp`;
+
+const TS_GROUP: Record<string, string> = {
+	maois: 'MAOIs', ssris: 'SSRIs', nbomes: 'NBOMes', '2c-x': '2C-x', '2c-t-x': '2C-T-x', '5-meo-xxt': '5-MeO-xxT', dox: 'DOx', 'ghb/gbl': 'GHB / GBL',
+	amt: 'αMT', mxe: 'MXE', pcp: 'PCP', lsd: 'LSD', dmt: 'DMT', mdma: 'MDMA', benzodiazepines: 'Benzos', amphetamines: 'Amphetamines', mushrooms: 'Mushrooms',
+};
+const tsGroup = (k: string) => TS_GROUP[k] ?? k.replace(/\b\w/g, (c) => c.toUpperCase());
+const TS_PHRASE: Record<string, string> = {
+	'Low Risk & Synergy': 'Low risk, and the effects add up.',
+	'Low Risk & No Synergy': 'Low risk, and they barely change each other.',
+	'Low Risk & Decrease': 'Low risk, and one dulls the other.',
+	Caution: 'Take care with this one.',
+	Unsafe: 'There’s a real risk of harm.',
+	Dangerous: 'Avoid this combination.',
+};
+const TS_FALLBACK: Record<number, string> = {
+	3: 'TripSit rates this pair as dangerous. Don’t mix them.',
+	2: 'TripSit rates this pair as unsafe: a real risk of harm, even at ordinary doses.',
+	1: 'TripSit says to take care with this pair, especially at higher doses.',
+};
+const LANES = [
+	{ k: 0, label: 'Low risk', c: C.mint },
+	{ k: 1, label: 'Caution', c: RISK[1].c },
+	{ k: 2, label: 'Unsafe', c: RISK[2].c },
+	{ k: 3, label: 'Dangerous', c: RISK[3].c },
+];
+type Mix = { key: string; label: string; lane: number; n: number; status: string; note: string; members: string[]; known: boolean; r?: Record<string, unknown> };
+
+// The mixing board: what people actually mix it with, sorted into TripSit's risk levels from low to dangerous, plus
+// the pairs TripSit warns about that nobody wrote about. Pick one to see the note and how it went.
+function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
+	const commonQ = useSQLQuery(focusCombosSQL(name, 14));
+	const knownQ = useSQLQuery(knownMixSQL(name));
+	const [pick, setPick] = useState<string | null>(null);
+	const known = rows(knownQ).map((r) => ({ grp: S(r.grp), rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
+	const common: Mix[] = rows(commonQ).map((r) => {
+		const g = known.find((k) => k.members.includes(S(r.s)));
+		const lane = r.sev != null ? N(r.sev) : r.status ? 0 : -1;
+		return { key: S(r.s), label: short(S(r.s)), lane, n: N(r.n), status: S(r.status) || g?.status || '', note: S(r.note) || (lane >= 0 ? g?.note ?? '' : ''), members: [], known: false, r };
+	});
+	const covered = new Set(common.flatMap((m) => known.filter((k) => k.members.includes(m.key)).map((k) => k.grp)));
+	const extra: Mix[] = known
+		.filter((k) => !covered.has(k.grp) && k.rank >= 1)
+		.map((k) => ({ key: `ts:${k.grp}`, label: tsGroup(k.grp), lane: k.rank, n: 0, status: k.status, note: k.note, members: k.members, known: true }));
+	const all = [...common, ...extra];
+	const unrated = all.filter((m) => m.lane < 0);
+	const maxN = Math.max(1, ...common.map((m) => m.n));
+	const sel = all.find((m) => m.key === pick) ?? common.find((m) => m.lane >= 0) ?? all[0];
+	if (commonQ.isLoading || knownQ.isLoading) return <Loading height={300} className="mt-5" quiet />;
+	if (!all.length) return <p className="mt-4 text-sm" style={{ color: C.faint }}>No combinations on record.</p>;
+	const top = common.slice(0, 3).map((m) => m.label);
+	const nBad = (k: number) => all.filter((m) => m.lane === k).length;
+	return (
+		<div className="mt-5">
+			<p style={{ color: C.soft, lineHeight: 1.6 }}>
+				{top.length > 0 && (
+					<>
+						People most often mix it with <b style={{ color: '#fff' }}>{top.slice(0, -1).join(', ')}{top.length > 1 ? ' and ' : ''}{top[top.length - 1]}</b>.{' '}
+					</>
+				)}
+				{nBad(3) + nBad(2) > 0
+					? `TripSit warns against ${[nBad(3) && `${nBad(3)} as dangerous`, nBad(2) && `${nBad(2)} as unsafe`].filter(Boolean).join(' and ')}.`
+					: 'TripSit doesn’t mark any of these as unsafe.'}
+			</p>
+			<div className="mt-6 grid gap-x-4 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+				{LANES.map((lane) => {
+					const list = all.filter((m) => m.lane === lane.k);
+					return (
+						<div key={lane.k} className="min-w-0">
+							<div style={{ height: 4, borderRadius: 4, background: lane.c, opacity: 0.9 }} />
+							<div className="mt-2.5 flex items-baseline justify-between">
+								<span className="text-sm font-semibold" style={{ color: lane.c }}>{lane.label}</span>
+								<span className="text-xs tabular-nums" style={{ color: C.faint }}>{list.length || ''}</span>
+							</div>
+							<div className="mt-3 grid gap-1.5">
+								{list.length === 0 && <span className="text-xs" style={{ color: C.faint }}>None here</span>}
+								{list.map((m) => {
+									const on = sel?.key === m.key;
+									return (
+										<button
+											key={m.key}
+											onClick={() => setPick(m.key)}
+											className="rd-hover min-w-0 rounded-xl px-3 py-2 text-left"
+											aria-pressed={on}
+											style={{ background: on ? 'rgba(255,255,255,.15)' : m.known ? 'transparent' : 'rgba(255,255,255,.06)', border: `1px ${m.known ? 'dashed' : 'solid'} ${on ? lane.c : m.known ? 'rgba(255,255,255,.22)' : 'transparent'}` }}
+										>
+											<span className="flex items-baseline justify-between gap-2">
+												<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</span>
+												<span className="text-xs tabular-nums" style={{ color: C.faint, whiteSpace: 'nowrap' }}>{m.known ? 'less common' : m.n.toLocaleString()}</span>
+											</span>
+											{!m.known && (
+												<span className="mt-1.5 block" style={{ height: 3, borderRadius: 3, background: 'rgba(255,255,255,.08)' }}>
+													<span className="block h-full" style={{ width: `${Math.max(4, (100 * m.n) / maxN)}%`, borderRadius: 3, background: lane.c, opacity: 0.75 }} />
+												</span>
+											)}
+										</button>
+									);
+								})}
+							</div>
+						</div>
+					);
+				})}
+			</div>
+			{unrated.length > 0 && (
+				<p className="mt-6 text-sm" style={{ color: C.faint }}>
+					Also often mixed with, but not on TripSit’s chart:{' '}
+					{unrated.map((m, i) => (
+						<Fragment key={m.key}>
+							{i > 0 && ', '}
+							<button onClick={() => setPick(m.key)} style={{ color: sel?.key === m.key ? '#fff' : C.soft, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.25)', textUnderlineOffset: 3, whiteSpace: 'nowrap' }}>
+								{m.label}
+							</button>
+						</Fragment>
+					))}
+					. Not being on the chart doesn’t make a mix safe.
+				</p>
+			)}
+			{sel && (
+				<div key={sel.key} className="rd-card rd-fade mt-6 p-5 sm:p-6">
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<h3 className="text-xl font-semibold" style={{ whiteSpace: 'nowrap' }}>
+							{short(name)} + {sel.label}
+						</h3>
+						{sel.lane >= 1 ? <RiskPill sev={sel.lane} /> : sel.lane === 0 ? <span className="text-sm font-semibold" style={{ color: C.mint }}>Low risk</span> : <span className="text-sm" style={{ color: C.faint }}>Not on TripSit’s chart</span>}
+					</div>
+					{sel.lane >= 0 && (
+						<p className="mt-3" style={{ lineHeight: 1.6 }}>
+							<b>{TS_PHRASE[sel.status] ?? ''}</b> <span style={{ color: C.soft }}>{sel.note || TS_FALLBACK[sel.lane] || ''}</span>
+						</p>
+					)}
+					{sel.known ? (
+						<p className="mt-3 text-sm" style={{ color: C.faint, lineHeight: 1.6 }}>
+							Covers {sel.members.slice(0, 6).map(short).join(', ')}
+							{sel.members.length > 6 ? ` and ${sel.members.length - 6} more` : ''}. Not one of the mixes people write about most, so it’s here for TripSit’s warning.
+						</p>
+					) : (
+						<div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+							<span className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" style={{ color: C.soft }}>
+								<span>{sel.n.toLocaleString()} stories together</span>
+								{sel.r && <OutcomeBar pos={sel.r.pos} neg={sel.r.neg} n={N(sel.r.n_llm)} />}
+							</span>
+							<button className="rd-btn text-sm" style={{ background: '#fff', color: C.deep }} onClick={() => onCombo(name, sel.key)}>
+								Read the stories
+							</button>
+						</div>
+					)}
+				</div>
+			)}
+			<p className="mt-4 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint }}>
+				Risk levels from TripSit’s combination chart; numbers from our stories.
+				<TripSitBadge />
+			</p>
+		</div>
+	);
+}
+
+// Known risks: everything TripSit's chart warns about for this substance, worst first, in plain words. Caution-level
+// pairs fold away so the serious ones stand out.
+function KnownRisks({ name }: { name: string }) {
+	const q = useSQLQuery(knownMixSQL(name));
+	const [more, setMore] = useState(false);
+	const list = rows(q).map((r) => ({ grp: S(r.grp), rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
+	const bad = list.filter((k) => k.rank >= 2), care = list.filter((k) => k.rank === 1);
+	if (q.isLoading) return null;
+	const row = (k: (typeof list)[number]) => (
+		<div key={k.grp} className="grid gap-x-5 gap-y-1.5 py-4 sm:grid-cols-[150px_minmax(0,1fr)]" style={{ borderTop: `1px solid ${C.line}` }}>
+			<div className="flex items-center gap-2 sm:block">
+				<div className="font-semibold" style={{ whiteSpace: 'nowrap' }}>{tsGroup(k.grp)}</div>
+				<div className="sm:mt-1.5">
+					<RiskPill sev={k.rank} small />
+				</div>
+			</div>
+			<div className="min-w-0">
+				<p style={{ color: C.soft, lineHeight: 1.6 }}>{k.note || TS_FALLBACK[k.rank]}</p>
+				{k.members.length > 1 && (
+					<p className="mt-1 text-xs" style={{ color: C.faint }}>
+						Includes {k.members.slice(0, 5).map(short).join(', ')}
+						{k.members.length > 5 ? ` and ${k.members.length - 5} more` : ''}
+					</p>
+				)}
+			</div>
+		</div>
+	);
+	return (
+		<section id="risks" className="mt-24" style={{ scrollMarginTop: 16 }}>
+			<ArticleH2 icon={AlertTriangle} sub="What’s known to go badly, mostly from TripSit’s combination chart. Not medical advice.">Known Risks</ArticleH2>
+			<ul className="mt-6 grid gap-3 text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
+				{[
+					'Mixing is where most of the danger is. Two things that are fine alone can be risky together.',
+					'If a mix isn’t listed, that doesn’t mean it’s safe. It may just not be studied.',
+					'Effects can stack for longer than you expect, so leave plenty of time between doses and between substances.',
+				].map((t) => (
+					<li key={t} className="flex gap-3">
+						<span className="rd-dot mt-2" style={{ width: 6, height: 6, background: C.lav, flexShrink: 0 }} />
+						{t}
+					</li>
+				))}
+			</ul>
+			{list.length > 0 ? (
+				<div className="mt-8">
+					{bad.length > 0 ? bad.map(row) : <p className="py-4 text-sm" style={{ color: C.faint, borderTop: `1px solid ${C.line}` }}>TripSit doesn’t mark any combination with {short(name)} as unsafe or dangerous.</p>}
+					{care.length > 0 && (
+						<>
+							{more && care.map(row)}
+							<button className="rd-btn mt-3 text-sm" onClick={() => setMore(!more)}>
+								{more ? 'Hide the ones to be careful with' : `Show ${care.length} more to be careful with`}
+							</button>
+						</>
+					)}
+				</div>
+			) : (
+				<p className="mt-6 text-sm" style={{ color: C.faint }}>{short(name)} isn’t on TripSit’s combination chart, so check each mix carefully before trying it.</p>
+			)}
+			<p className="mt-5 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint }}>
+				Notes are TripSit’s own words.
+				<TripSitBadge />
+			</p>
+		</section>
 	);
 }
 
@@ -2656,11 +2891,13 @@ function SubstanceOverview({ name }: { name: string }) {
 			)}
 		</div>
 	);
+	const molecules = rows(structQ);
+	const molecule = molecules[0];
 	const habit = habitLevel(S(r.addiction));
 	const tolZero = S(r.tolerance_zero).replace(/\s*-\s*/g, '–');
 	const tolFull = S(r.tolerance_full);
 	const glance = (
-		<ul className="rd-glance grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
+		<ul className={`rd-glance grid gap-x-8 gap-y-6 sm:grid-cols-2 ${molecule ? '' : 'lg:grid-cols-4'}`}>
 			{habit && (
 				<li title={S(r.addiction)}>
 					<span className="rd-label">Habit-forming</span>
@@ -2698,7 +2935,6 @@ function SubstanceOverview({ name }: { name: string }) {
 		</div>
 	);
 	const cls = L(r.cls), chem = L(r.chem);
-	const molecule = rows(structQ)[0];
 	return (
 		<>
 			<section id="overview" className="rd-in" style={{ scrollMarginTop: 16 }}>
@@ -2747,6 +2983,7 @@ function SubstanceOverview({ name }: { name: string }) {
 							</p>
 						)}
 						<StreetNames name={name} known={[name, ...aka]} />
+							{molecule && <div className="mt-10">{glance}</div>}
 						{group && members.length > 0 && (
 							<p className="mt-4" style={{ color: C.soft, lineHeight: 1.5 }}>
 								Reports filed here sometimes name the drug:{' '}
@@ -2765,11 +3002,11 @@ function SubstanceOverview({ name }: { name: string }) {
 							<div className="flex justify-end">
 								<Sources className="pt-4" list={['erowid', 'pw', 'sei', 'tripsit']} />
 							</div>
-							<MoleculeCard r={molecule} />
+							<MoleculeCard list={molecules} />
 						</div>
 					)}
 				</div>
-				<div className="mt-12">{glance}</div>
+				{!molecule && <div className="mt-12">{glance}</div>}
 				{warning && (
 					<div className="mt-5 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
 						<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -3847,7 +4084,7 @@ const pwPhases = (p: Record<string, unknown>) =>
 		.filter(([, h]) => h > 0);
 // Dose ranges as a rising staircase: one column per level, each a step taller, its range underneath. Always fits,
 // whatever the units, and reads as "more" at a glance.
-const DOSE_STEP_COLOR: Record<string, string> = { threshold: 'rgba(217,207,255,.45)', light: C.mint, common: C.lav, strong: C.amber, heavy: '#ff9aab' };
+const DOSE_STEP_COLOR: Record<string, string> = { threshold: '#a99fd8', light: C.mint, common: C.lav, strong: C.amber, heavy: '#ff9aab' };
 function DoseSteps({ p }: { p: Record<string, unknown> }) {
 	const v = (k: string) => (p[k] == null ? '' : num(p[k]));
 	const range = (k: string) => {
@@ -3858,9 +4095,9 @@ function DoseSteps({ p }: { p: Record<string, unknown> }) {
 	};
 	const steps = DOSE_ROWS.map((d) => ({ ...d, text: range(d.key) })).filter((d) => d.text);
 	if (!steps.length) return null;
-	const H = 92;
+	const H = 64;
 	return (
-		<div className="mt-5 grid gap-1.5 sm:gap-3" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+		<div className="mt-5 grid" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))`, columnGap: 3 }}>
 			{steps.map((d, i) => {
 				const h = Math.round(H * (0.22 + (0.78 * (i + 1)) / steps.length));
 				const c = DOSE_STEP_COLOR[d.key];
@@ -3871,16 +4108,16 @@ function DoseSteps({ p }: { p: Record<string, unknown> }) {
 								className="rd-rise block w-full"
 								style={{
 									height: h,
-									borderRadius: '12px 12px 4px 4px',
-									background: d.key === 'heavy' ? `linear-gradient(0deg, ${c}, ${c}55 70%, ${c}10)` : `linear-gradient(0deg, ${c}, ${c}bb)`,
+									borderRadius: `8px 8px ${i === steps.length - 1 ? 8 : 0}px ${i === 0 ? 8 : 0}px`,
+									background: d.key === 'heavy' ? `linear-gradient(90deg, ${c}d0, ${c}10)` : `${c}d0`,
 									animationDelay: `${i * 0.12}s`,
 								}}
 							/>
 						</div>
-						<div className="rd-step mt-2.5 text-xs font-semibold sm:text-sm" style={{ color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.2 + i * 0.12}s` }}>
+						<div className="rd-step mt-3 pl-0.5 text-xs font-semibold sm:text-sm" style={{ color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.2 + i * 0.12}s` }}>
 							{d.label}
 						</div>
-						<div className="rd-step tabular-nums" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animationDelay: `${0.25 + i * 0.12}s` }}>
+						<div className="rd-step pl-0.5 tabular-nums" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animationDelay: `${0.25 + i * 0.12}s` }}>
 							{d.text}
 						</div>
 					</div>
@@ -4208,8 +4445,10 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 // A substance's 3D structure (heavy atoms from PubChem's computed conformer), drawn as shaded spheres and bonds,
 // turning slowly. Drag to spin it.
 
+// One row for a single molecule; plants and brews have a row per main active compound (compound names it).
 const structureSQL = (name: string) => `
-SELECT formula, iupac_name, atoms, bonds, source_url FROM ${DB}."substance_structures" WHERE substance = '${esc(name)}'`;
+SELECT formula, iupac_name, atoms, bonds, source_url, compound FROM ${DB}."substance_structures" WHERE substance = '${esc(name)}'
+ORDER BY compound IS NOT NULL, rowid`;
 
 const ATOM_COLOR: Record<string, string> = { C: '#d9cfff', N: '#8ff4f7', O: '#ffa3b6', S: '#ffe082', P: '#ffb072', F: '#a6f2e4', Cl: '#a6f2e4', Br: '#a6f2e4', I: '#a6f2e4' };
 const ATOM_SIZE: Record<string, number> = { C: 0.44, N: 0.42, O: 0.42, S: 0.52, P: 0.52, F: 0.38, Cl: 0.5, Br: 0.54, I: 0.58 };
@@ -4306,7 +4545,9 @@ function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, numb
 }
 
 // The molecule with its formula (subscripted) and a link to PubChem, or nothing when there isn't one.
-function MoleculeCard({ r }: { r?: Record<string, unknown> }) {
+function MoleculeCard({ list }: { list: Record<string, unknown>[] }) {
+	const [i, setI] = useState(0);
+	const r = list[Math.min(i, list.length - 1)];
 	if (!r) return null;
 	let atoms: [string, number, number, number][] = [], bonds: [number, number, number][] = [];
 	try {
@@ -4319,8 +4560,18 @@ function MoleculeCard({ r }: { r?: Record<string, unknown> }) {
 	const formula = S(r.formula).split(/(\d+)/).map((part, i) => (/^\d+$/.test(part) ? <sub key={i}>{part}</sub> : <span key={i}>{part}</span>));
 	return (
 		<figure className="flex flex-col items-center" style={{ background: 'radial-gradient(circle at 50% 45%, rgba(217,207,255,.13), transparent 62%)' }}>
-			<Molecule3D atoms={atoms} bonds={bonds} size={300} />
+			{list.length > 1 && (
+				<div className="mt-3 flex flex-wrap justify-center gap-1.5" role="tablist" aria-label="Active compounds">
+					{list.map((m, j) => (
+						<button key={S(m.compound) || j} role="tab" aria-selected={j === i} className="rd-nav" aria-current={j === i ? 'page' : undefined} onClick={() => setI(j)} style={{ fontSize: 13, padding: '4px 12px', border: `1px solid ${C.line}` }}>
+							{S(m.compound) || 'Molecule'}
+						</button>
+					))}
+				</div>
+			)}
+			<Molecule3D key={i} atoms={atoms} bonds={bonds} size={270} />
 			<figcaption className="mt-2 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+				{list.length > 1 && <span className="text-sm font-semibold" style={{ color: '#fff' }}>{S(r.compound)}</span>}
 				<span className="text-sm" style={{ color: C.soft, fontFamily: SANS }}>{formula}</span>
 				<span>·</span>
 				<a href={S(r.source_url)} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
@@ -4981,7 +5232,8 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 								{ id: 'dosage', label: 'Dosage & Duration', icon: Clock },
 								{ id: 'feel', label: 'What People Feel', icon: Sparkles },
 								{ id: 'numbers', label: 'By the Numbers', icon: BarChart3 },
-								{ id: 'mixes', label: 'Often Mixed With', icon: Link2 },
+								{ id: 'mixes', label: 'Mixing', icon: Link2 },
+								{ id: 'risks', label: 'Known Risks', icon: AlertTriangle },
 								{ id: 'slang', label: 'Slang', icon: MessageCircle },
 								{ id: 'unfold', label: 'How It Unfolds', icon: Activity },
 								{ id: 'stories', label: 'Stories', icon: BookOpen },
@@ -4994,12 +5246,11 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 			{!withSub && <SubstanceNumbers name={sub} />}
 			{!withSub && (
 				<section id="mixes" className="mt-24" style={{ scrollMarginTop: 16 }}>
-					<ArticleH2 icon={Link2} sub="Tap a mix to see how it tends to go together.">Often Mixed With</ArticleH2>
-					<div className="rd-card mt-5 p-5">
-						<CombosList name={sub} onCombo={onCombo} bare />
-					</div>
+					<ArticleH2 icon={Link2} sub="What people mix it with, and how risky TripSit rates each mix.">Mixing</ArticleH2>
+					<MixingBoard name={sub} onCombo={onCombo} />
 				</section>
 			)}
+			{!withSub && <KnownRisks name={sub} />}
 			{!withSub && <SlangSection name={sub} />}
 			<div className={`${withSub ? "mt-4" : "mt-12"} flex flex-wrap items-center gap-2`}>
 				{[false, true].map((v) => (
@@ -6182,16 +6433,16 @@ export default function ReportTimelapse() {
 		clearReport();
 		setOpenItem(null);
 	};
-	// Tab title: re:dose // whatever page you're on.
+	// Tab title: the page you're on, then the site ("MDMA – re:dose").
 	useEffect(() => {
 		const page =
-			view === 'effects' ? effect || 'effects'
-			: view === 'about' ? 'about'
-			: view === 'reports' && reportId ? `story #${reportId.replace('erowid-', '')}`
+			view === 'effects' ? effect || 'Effects'
+			: view === 'about' ? 'About'
+			: view === 'reports' && reportId ? `Story #${reportId.replace('erowid-', '')}`
 			: view === 'reports' && sub ? (withSub ? `${short(sub)} + ${short(withSub)}` : short(sub))
-			: view === 'reports' ? 'stories'
-			: 'substances';
-		document.title = `re:dose // ${page}`;
+			: view === 'reports' ? 'Stories'
+			: 'Substances';
+		document.title = `${page} – re:dose`;
 	}, [view, sub, withSub, reportId, effect]);
 	// Which nav item is "here": a substance or pair page counts as Substances, a story as Stories.
 	const navHere = view === 'reports' ? (reportId || !sub ? 'reports' : 'substances') : view;
