@@ -7867,7 +7867,8 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 
 type Q = ReturnType<typeof useSQLQuery>;
 
-// The preview's connecting screen: Spunion bounces on the spot, white at first and his own cyan from his first landing. Each landing (the bounce animation's own loop event, so it stays in step) rolls a ring of
+// The preview's connecting screen: Spunion bounces on the spot, starting white and switching between white and his own
+// cyan each time he lands. Each landing (the bounce animation's own loop event, so it stays in step) rolls a ring of
 // colour out through the molecules from his feet.
 const START_FILLS = ['#ffffff', '#5cdfe4'];
 const START_RINGS = ['#fc6c84', '#5cdfe4', '#b3a8f0'];
@@ -7891,7 +7892,7 @@ export function StartScreen() {
 					return <div key={k} className="rd-ripple" style={{ color: START_RINGS[((k % 3) + 3) % 3], left: p.x + 280, top: p.y + 280 }} />;
 				})}
 			</div>
-			<div ref={me} className="rd-start-sp" onAnimationIteration={(e) => (e.animationName === 'rd-bounce' && n.current++, land(e))} style={{ '--sp-fill': START_FILLS[Math.min(n.current, 1)] } as React.CSSProperties}>
+			<div ref={me} className="rd-start-sp" onAnimationIteration={(e) => (e.animationName === 'rd-bounce' && n.current++, land(e))} style={{ '--sp-fill': START_FILLS[n.current % 2] } as React.CSSProperties}>
 				<BouncingSpunion size={88} />
 			</div>
 		</main>
