@@ -1719,6 +1719,23 @@ function SeiLogo({ width = 64 }: { width?: number }) {
 	);
 }
 
+// The credit line the SEI licence asks for: who made it, the licence, and that we changed it (shortened).
+function SeiLicence({ className = '' }: { className?: string }) {
+	return (
+		<p className={`text-xs ${className}`} style={{ color: C.faint, lineHeight: 1.6 }}>
+			Effect names, categories and descriptions ©{' '}
+			<a href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+				Effect Index
+			</a>{' '}
+			and contributors, used under{' '}
+			<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+				CC BY-NC-SA 4.0
+			</a>
+			. We shorten descriptions to their first sentence; those shortened versions are shared under the same licence.
+		</p>
+	);
+}
+
 // What each category of effect means, in plain words.
 const EFFECT_CATEGORY: Record<string, string> = {
 	Cognitive: 'Changes to thinking, feeling and sense of self: mood, memory, focus, ego, and how time and meaning feel.',
@@ -1764,32 +1781,41 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 			<p className="mt-2" style={{ color: C.soft }}>
 				Everything people described in their stories, grouped by kind. Each card says what the effect is, how many stories mention it, and how people usually felt about it.
 			</p>
-			<section className="rd-card mt-6 grid gap-5 p-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:p-7" style={{ maxWidth: 900 }}>
+			<section className="rd-card mt-6 grid gap-6 p-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:p-8">
 				<div style={{ color: '#fff' }}>
-					<SeiLogo width={92} />
+					<SeiLogo width={110} />
 				</div>
-				<div className="grid gap-3" style={{ color: C.soft, lineHeight: 1.6 }}>
-					<h2 className="text-xl font-semibold" style={{ color: '#fff' }}>About the Subjective Effect Index</h2>
-					<p>
-						The effects on this page, their names, categories and descriptions, come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b> (SEI), hosted at Effect Index. It’s a formal, structured documentation of the many distinct states people can experience under hallucinogens and other substances, each described on its own, apart from any one drug.
-					</p>
-					<p>
-						The aim is a shared vocabulary: words for experiences people used to call indescribable, so they can be talked about, compared and studied. Many effects there come with image, video or audio <i>replications</i> that show what they look or sound like.
-					</p>
-					<p>
-						Effect Index was founded in 2017 by Josie Kins, who also founded PsychonautWiki, and is built with its community. Its written material is shared under the Creative Commons <b style={{ color: '#fff' }}>CC BY-NC-SA 4.0</b> licence, which is how we can show it here, with credit and for non-commercial use.
-					</p>
-					<p>
-						How re:dose uses it: our close readings tag which of these effects show up in each story, and when. That’s where the story counts and the “mostly good / rough” come from. Each effect links to its full page on Effect Index.
-					</p>
-					<div className="flex flex-wrap gap-2 pt-1">
+				<div>
+					<h2 className="text-2xl font-semibold" style={{ color: '#fff' }}>About the Subjective Effect Index</h2>
+					<div className="mt-3 grid gap-x-10 gap-y-3 lg:grid-cols-2" style={{ color: C.soft, lineHeight: 1.6 }}>
+						<p>
+							The effects on this page, their names, categories and descriptions, come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b> (SEI), hosted at Effect Index. It’s a formal, structured documentation of the many distinct states people can experience under hallucinogens and other substances, each described on its own, apart from any one drug.
+						</p>
+						<p>
+							The aim is a shared vocabulary: words for experiences people used to call indescribable, so they can be talked about, compared and studied. Many effects there come with image, video or audio <i>replications</i> that show what they look or sound like, which you’ll only find on their site.
+						</p>
+						<p>
+							Effect Index was founded in 2017 by Josie Kins, who also founded PsychonautWiki, and is built by a community of contributors. It’s years of careful work, and it’s the reason this page can explain anything at all.
+						</p>
+						<p>
+							How re:dose uses it: our close readings tag which of these effects show up in each story, and when. That’s where the story counts and the “mostly good / rough” come from. Every effect links back to its full page on Effect Index.
+						</p>
+					</div>
+					<div className="mt-5 flex flex-wrap gap-2">
 						<a className="rd-btn text-sm" href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', background: '#fff', color: C.deep }}>
 							Visit Effect Index ↗
 						</a>
-						<a className="rd-btn text-sm" href="https://www.effectindex.com/about" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-							About the project ↗
+						<a className="rd-btn text-sm" href="https://www.effectindex.com/donate" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+							Support their work ↗
+						</a>
+						<a className="rd-btn text-sm" href="https://www.effectindex.com/discord" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+							Their Discord ↗
+						</a>
+						<a className="rd-btn text-sm" href="https://reddit.com/r/replications" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+							r/replications ↗
 						</a>
 					</div>
+					<SeiLicence className="mt-5" />
 				</div>
 			</section>
 			<input ref={searchRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search effects" className="rd-card mt-6 w-full px-5 py-3 text-base" style={{ borderRadius: 999, color: C.text, outline: 'none' }} />
@@ -1853,14 +1879,7 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 				</div>
 			)}
 			{!q.isLoading && (
-				<p className="mt-12 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
-					<img src={SEI_ICON} alt="" width={14} height={14} style={{ borderRadius: 3 }} />
-					Effect names, categories and descriptions:{' '}
-					<a href={SOURCES.sei.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
-						Subjective Effect Index
-					</a>
-					. “Mostly good / rough” is how the moments describing it felt in closely read stories.
-				</p>
+				<SeiLicence className="mt-12" />
 			)}
 			<Err q={q} />
 		</section>
@@ -3049,7 +3068,7 @@ function AboutPage() {
 
 			<Section title="Effects, substance details and shared tolerance">
 				<p>
-					Effect names and their descriptions come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b>; which effects appear in which stories comes from the close readings. Substance details (what kind of drug it is, tolerance, how habit-forming it is, safety notes) come from <b style={{ color: '#fff' }}>PsychonautWiki</b>. “Shares tolerance with” groups PsychonautWiki’s cross-tolerance notes into families like psychedelics, stimulants or opioids, and links substances in the same family.
+					Effect names and their descriptions come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b> at Effect Index, shared under CC BY-NC-SA 4.0 (we shorten descriptions to their first sentence, and share those under the same licence); which effects appear in which stories comes from the close readings. Substance details (what kind of drug it is, tolerance, how habit-forming it is, safety notes) come from <b style={{ color: '#fff' }}>PsychonautWiki</b>. “Shares tolerance with” groups PsychonautWiki’s cross-tolerance notes into families like psychedelics, stimulants or opioids, and links substances in the same family.
 				</p>
 			</Section>
 
@@ -3297,6 +3316,17 @@ function EffectPage({ name, onSubstance, onCombo, onEffect, onReport }: { name: 
 				<img src={fromPW ? PW_ICON : SEI_ICON} alt="" width={14} height={14} style={{ borderRadius: 3 }} />
 				<span style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Description from {fromPW ? 'PsychonautWiki' : 'the Subjective Effect Index'}</span> ↗
 			</a>
+			{!fromPW && (
+				<a href={S(r?.url) || SOURCES.sei.href} target="_blank" rel="noopener noreferrer" className="rd-card rd-hover mt-5 flex items-center gap-4 p-4" style={{ textDecoration: 'none', maxWidth: 640 }}>
+					<span style={{ color: '#fff' }}>
+						<SeiLogo width={52} />
+					</span>
+					<span className="text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
+						See the full write-up on the <b style={{ color: '#fff' }}>Subjective Effect Index</b>, often with image, video or audio replications of what it’s like.
+					</span>
+					<span className="ml-auto text-sm font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>Open ↗</span>
+				</a>
+			)}
 			{r && (
 				<div className="mt-6 flex flex-wrap gap-x-10 gap-y-4">
 					<div>
@@ -3398,6 +3428,7 @@ function EffectPage({ name, onSubstance, onCombo, onEffect, onReport }: { name: 
 			<p className="mt-12 text-xs" style={{ color: C.faint }}>
 				All numbers here come from closely read stories, where effects are tagged. They describe the people who wrote reports, not everyone who has taken something.
 			</p>
+			{!fromPW && <SeiLicence className="mt-2" />}
 		</section>
 	);
 }
