@@ -3864,7 +3864,7 @@ const structureSQL = (name: string) => `
 SELECT formula, iupac_name, atoms, bonds, source_url FROM ${DB}."substance_structures" WHERE substance = '${esc(name)}'`;
 
 const ATOM_COLOR: Record<string, string> = { C: '#d9cfff', N: '#8ff4f7', O: '#ffa3b6', S: '#ffe082', P: '#ffb072', F: '#a6f2e4', Cl: '#a6f2e4', Br: '#a6f2e4', I: '#a6f2e4' };
-const ATOM_SIZE: Record<string, number> = { C: 0.36, N: 0.34, O: 0.34, S: 0.44, P: 0.44, F: 0.3, Cl: 0.42, Br: 0.46, I: 0.5 };
+const ATOM_SIZE: Record<string, number> = { C: 0.44, N: 0.42, O: 0.42, S: 0.52, P: 0.52, F: 0.38, Cl: 0.5, Br: 0.54, I: 0.58 };
 
 function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, number, number][]; bonds: [number, number, number][]; size?: number }) {
 	const [rot, setRot] = useState({ y: 0.6, x: -0.35 });
