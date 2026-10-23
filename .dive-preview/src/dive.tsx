@@ -804,10 +804,13 @@ const CSS = `
 .rd-steps.go .rd-step { animation: rd-step-in .45s ease-out forwards; }
 .rd-steps .rd-fill-dot { transform: scale(.3); opacity: .25; }
 .rd-steps.go .rd-fill-dot { animation: rd-dot-in .25s ease-out forwards; }
+@keyframes rd-grow { to { transform: scaleX(1); } }
+.rd-steps .rd-grow { transform: scaleX(0); transform-origin: left center; }
+.rd-steps.go .rd-grow { animation: rd-grow .55s cubic-bezier(.3,.1,.3,1) forwards; }
 .rd-steps .rd-reveal { clip-path: inset(-12px 100% -12px -12px); }
 .rd-steps.go .rd-reveal { clip-path: inset(-12px -12px -12px -12px); transition: clip-path 1.7s cubic-bezier(.3,.1,.3,1); }
 @media (prefers-reduced-motion: reduce) {
-  .rd-steps .rd-step, .rd-steps .rd-fill-dot { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .rd-steps .rd-step, .rd-steps .rd-fill-dot, .rd-steps .rd-grow { opacity: 1 !important; transform: none !important; animation: none !important; }
   .rd-steps .rd-reveal { clip-path: none !important; transition: none !important; }
 }
 .rd-thanks { display: inline-flex; align-items: center; gap: 6px; color: ${C.soft}; font-size: 12.5px; font-weight: 500; white-space: nowrap; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .2s, color .2s; }
@@ -1600,6 +1603,11 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay, onEffect
 									</span>
 									↗
 								</a>
+								{!/psychonautwiki/i.test(S(r.url)) && (
+									<a href={S(r.url) || SOURCES.sei.href} target="_blank" rel="noopener noreferrer" className="ml-4 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: C.text, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+										See replications ↗
+									</a>
+								)}
 							</div>
 						)}
 						<div className="grid grid-cols-3 gap-3">
@@ -1830,20 +1838,20 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 			</div>
 			{seiOpen && (
 				<>
-					<div className="rd-scrim" onClick={() => setSeiOpen(false)} />
-					<div role="dialog" aria-label="About the Subjective Effect Index" className="rd-fade fixed left-1/2 top-1/2 overflow-y-auto rounded-3xl p-6 sm:p-8" style={{ zIndex: 41, width: 'min(640px, calc(100vw - 32px))', maxHeight: '86vh', transform: 'translate(-50%, -50%)', background: '#fbfaff', color: '#1d1440', boxShadow: '0 30px 80px rgba(10,4,40,.55)' }}>
+					<div className="rd-scrim" onClick={() => setSeiOpen(false)} style={{ background: 'rgba(12,7,32,.7)' }} />
+					<div role="dialog" aria-label="About the Subjective Effect Index" className="rd-fade fixed left-1/2 top-1/2 overflow-y-auto rounded-3xl p-6 sm:p-8" style={{ zIndex: 41, width: 'min(640px, calc(100vw - 32px))', maxHeight: '86vh', transform: 'translate(-50%, -50%)', background: '#221852', color: '#fff', border: '1px solid rgba(255,255,255,.14)', boxShadow: '0 30px 80px rgba(5,2,20,.6)' }}>
 						<div className="flex items-start justify-between gap-4">
-							<span style={{ color: '#1d1440' }}>
+							<span style={{ color: '#fff' }}>
 								<SeiLogo width={80} />
 							</span>
-							<button aria-label="Close" onClick={() => setSeiOpen(false)} className="rounded-full p-2" style={{ color: '#4a3f78', background: 'rgba(29,20,64,.06)' }}>
+							<button aria-label="Close" onClick={() => setSeiOpen(false)} className="rounded-full p-2" style={{ color: 'rgba(255,255,255,0.84)', background: 'rgba(255,255,255,.08)' }}>
 								<X size={16} />
 							</button>
 						</div>
 						<h2 className="mt-4 text-2xl font-semibold">About the Subjective Effect Index</h2>
-						<div className="mt-3 grid gap-3" style={{ color: '#4a3f78', lineHeight: 1.6 }}>
+						<div className="mt-3 grid gap-3" style={{ color: 'rgba(255,255,255,0.84)', lineHeight: 1.6 }}>
 							<p>
-								The effects on this page, their names, categories and descriptions, come from the <b style={{ color: '#1d1440' }}>Subjective Effect Index</b> (SEI), hosted at Effect Index. It’s a formal, structured documentation of the many distinct states people can experience under hallucinogens and other substances, each described on its own, apart from any one drug.
+								The effects on this page, their names, categories and descriptions, come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b> (SEI), hosted at Effect Index. It’s a formal, structured documentation of the many distinct states people can experience under hallucinogens and other substances, each described on its own, apart from any one drug.
 							</p>
 							<p>
 								The aim is a shared vocabulary: words for experiences people used to call indescribable, so they can be talked about, compared and studied. Many effects there come with image, video or audio <i>replications</i> that show what they look or sound like, which you’ll only find on their site.
@@ -1864,18 +1872,18 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 									['r/replications', 'https://reddit.com/r/replications', false],
 								] as const
 							).map(([label, href, main]) => (
-								<a key={label} href={href} target="_blank" rel="noopener noreferrer" className="rounded-full px-4 py-2" style={{ textDecoration: 'none', background: main ? '#1d1440' : 'transparent', color: main ? '#fff' : '#1d1440', border: `1px solid ${main ? '#1d1440' : 'rgba(29,20,64,.22)'}` }}>
+								<a key={label} href={href} target="_blank" rel="noopener noreferrer" className="rounded-full px-4 py-2" style={{ textDecoration: 'none', background: main ? '#fff' : 'transparent', color: main ? '#1d1440' : '#fff', border: `1px solid ${main ? '#fff' : 'rgba(255,255,255,.25)'}` }}>
 									{label} ↗
 								</a>
 							))}
 						</div>
-						<p className="mt-5 text-xs" style={{ color: '#6f6690', lineHeight: 1.6 }}>
+						<p className="mt-5 text-xs" style={{ color: 'rgba(255,255,255,0.58)', lineHeight: 1.6 }}>
 							Effect names, categories and descriptions ©{' '}
-							<a href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4a3f78', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+							<a href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.84)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
 								Effect Index
 							</a>{' '}
 							and contributors, used under{' '}
-							<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: '#4a3f78', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+							<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.84)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
 								CC BY-NC-SA 4.0
 							</a>
 							. We shorten descriptions to their first sentence; those shortened versions are shared under the same licence.
@@ -2530,8 +2538,8 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 
 // How one dose usually plays out, as a shape: nothing → first effects → strongest → fading. The three moments are
 // marked on the curve and spelled out underneath, so the numbers read as a timeline rather than three stats.
-function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
-	const span = end * 1.12;
+function PhaseStrip({ on, pk, end, span: shared }: { on: number; pk: number; end: number; span?: number }) {
+	const span = Math.max(shared ?? 0, end * 1.12);
 	const x = (v: number) => (100 * v) / span;
 	const pts: [number, number][] = [
 		[0, 0],
@@ -2594,6 +2602,7 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 // The top of a substance's own page: what it is (and what people call it), how a dose usually plays out, what to
 // watch for, what people feel. Tolerance and what it's mixed with sit in their own cards below.
 function SubstanceOverview({ name }: { name: string }) {
+	const structQ = useSQLQuery(structureSQL(name));
 	const detailQ = useSQLQuery(substanceDetailSQL(name));
 	const timingQ = useSQLQuery(timingSQL([name]));
 	const membersQ = useSQLQuery(groupMembersSQL(name), { enabled: isGroup(name) });
@@ -2667,10 +2676,11 @@ function SubstanceOverview({ name }: { name: string }) {
 		</div>
 	);
 	const cls = L(r.cls), chem = L(r.chem);
+	const molecule = rows(structQ)[0];
 	return (
 		<>
 			<section id="overview" className="rd-in" style={{ scrollMarginTop: 16 }}>
-				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+				<div className={`grid items-center gap-8 ${molecule ? 'lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]' : ''}`}>
 					<div className="min-w-0">
 						<div className="flex flex-wrap items-center gap-3">
 							<h1 className="flex items-center gap-3 text-4xl font-semibold sm:text-5xl">
@@ -2725,12 +2735,16 @@ function SubstanceOverview({ name }: { name: string }) {
 								)}
 							</div>
 						)}
+						<div className="mt-6">
+							<div className="rd-label mb-3">At a glance</div>
+							{glance}
+						</div>
 					</div>
-					<div className="min-w-0">
-						<MoleculeCard name={name} />
-						<div className="rd-label mb-3">At a glance</div>
-						{glance}
-					</div>
+					{molecule && (
+						<div className="min-w-0">
+							<MoleculeCard r={molecule} />
+						</div>
+					)}
 				</div>
 				<div className="my-6 h-px" style={{ background: C.line }} />
 				<div className="max-w-3xl" style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.6 }}>
@@ -3537,7 +3551,7 @@ function EffectPage({ name, onSubstance, onCombo, onEffect, onReport }: { name: 
 						<SeiLogo width={52} />
 					</span>
 					<span className="text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
-						See the full write-up on the <b style={{ color: '#fff' }}>Subjective Effect Index</b>, often with image, video or audio replications of what it’s like.
+						See the full write-up and its <b style={{ color: '#fff' }}>replications</b> (images, video or audio of what it’s like, made by their artists) on the <b style={{ color: '#fff' }}>Subjective Effect Index</b>.
 					</span>
 					<span className="ml-auto text-sm font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>Open ↗</span>
 				</a>
@@ -3722,6 +3736,114 @@ const pwDur = (v: unknown, minutes: boolean) => {
 	return `${range} ${minutes ? 'min' : Number(b || a) === 1 ? 'hour' : 'hours'}`;
 };
 
+// One bar for a route's dose ranges: Light, Common, Strong, Heavy as segments on a log scale (so small and large
+// doses both fit), names above, the boundary values below, units once.
+function DoseScale({ p }: { p: Record<string, unknown> }) {
+	const v = (k: string) => (p[k] == null ? null : N(p[k]));
+	const thr = v('dose_threshold'), heavy = v('dose_heavy');
+	const segs = [
+		{ label: 'Light', a: v('dose_light_min') ?? thr, b: v('dose_light_max'), color: C.mint },
+		{ label: 'Common', a: v('dose_common_min'), b: v('dose_common_max'), color: C.lav },
+		{ label: 'Strong', a: v('dose_strong_min'), b: v('dose_strong_max'), color: C.amber },
+		{ label: 'Heavy', a: heavy, b: heavy != null ? heavy * 1.7 : null, color: C.coral },
+	].filter((g) => g.a != null && g.b != null && (g.b as number) > (g.a as number) && (g.a as number) > 0) as { label: string; a: number; b: number; color: string }[];
+	if (!segs.length) return null;
+	const lo = Math.min(thr ?? segs[0].a, segs[0].a) * 0.7, hi = segs[segs.length - 1].b;
+	const pos = (x: number) => (100 * (Math.log(x) - Math.log(lo))) / (Math.log(hi) - Math.log(lo));
+	const last = segs[segs.length - 1];
+	const ticks = [...new Set([...(thr != null ? [thr] : []), ...segs.map((g) => g.a), ...segs.slice(0, -1).map((g) => g.b), ...(last.label !== 'Heavy' ? [last.b] : [])])].sort((a, b) => a - b);
+	const fmt = (x: number) => String(Math.round(x * 1000) / 1000);
+	return (
+		<div className="relative mt-4" style={{ height: 78 }}>
+			{segs.map((g, i) => (
+				<span key={g.label} className="rd-step absolute text-xs font-semibold" style={{ left: `${(pos(g.a) + pos(g.b)) / 2}%`, top: 0, transform: 'translateX(-50%)', color: g.color, whiteSpace: 'nowrap', animationDelay: `${0.15 + i * 0.18}s` }}>
+					{g.label}
+				</span>
+			))}
+			<div className="absolute left-0 right-0" style={{ top: 24, height: 12, borderRadius: 999, background: 'rgba(255,255,255,.07)' }}>
+				{segs.map((g, i) => (
+					<span
+						key={g.label}
+						className="rd-grow absolute top-0 h-full"
+						style={{
+							left: `${pos(g.a)}%`,
+							width: `calc(${pos(g.b) - pos(g.a)}% - 2px)`,
+							background: i === segs.length - 1 ? `linear-gradient(90deg, ${g.color}, ${g.color}00)` : g.color,
+							borderRadius: i === 0 ? '999px 3px 3px 999px' : i === segs.length - 1 ? '3px 999px 999px 3px' : 3,
+							animationDelay: `${i * 0.18}s`,
+						}}
+					/>
+				))}
+				{thr != null && (
+					<span className="absolute" title="Threshold: the least that may be noticed" style={{ left: `${pos(thr)}%`, top: -4, bottom: -4, width: 2, marginLeft: -1, background: '#fff', borderRadius: 2, opacity: 0.7 }} />
+				)}
+			</div>
+			{ticks.map((x, i) => (
+				<span key={x} className="rd-step absolute tabular-nums" style={{ left: `${pos(x)}%`, top: 46, transform: 'translateX(-50%)', fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12, color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.3 + i * 0.12}s` }}>
+					{fmt(x)}
+					{x === heavy ? '+' : ''}
+				</span>
+			))}
+			{thr != null && (
+				<span className="absolute text-xs" style={{ left: `${pos(thr)}%`, top: 63, transform: 'translateX(-50%)', color: C.faint, whiteSpace: 'nowrap' }}>
+					threshold
+				</span>
+			)}
+		</div>
+	);
+}
+
+// PsychonautWiki's phases as one band on the same time axis as the stories' curve: onset, come-up, peak, offset,
+// then after effects fading out. Names and ranges sit under each phase, alternating rows so they don't collide.
+const pwHours = (v: unknown, minutes: boolean) => {
+	const [a, b] = S(v).split('-').map(Number);
+	if (!Number.isFinite(a)) return 0;
+	const mid = Number.isFinite(b) ? (a + b) / 2 : a;
+	return minutes ? mid / 60 : mid;
+};
+const pwPhases = (p: Record<string, unknown>) =>
+	(
+		[
+			['Onset', pwHours(p.duration_onset, true), pwDur(p.duration_onset, true), 'rgba(217,207,255,.3)'],
+			['Come-up', pwHours(p.duration_comeup, true), pwDur(p.duration_comeup, true), 'rgba(217,207,255,.6)'],
+			['Peak', pwHours(p.duration_peak, false), pwDur(p.duration_peak, false), C.cyan],
+			['Offset', pwHours(p.duration_offset, false), pwDur(p.duration_offset, false), 'rgba(217,207,255,.55)'],
+		] as [string, number, string, string][]
+	).filter(([, h]) => h > 0);
+function DurationBand({ p, span }: { p: Record<string, unknown>; span: number }) {
+	const phases = pwPhases(p);
+	const after = pwHours(p.duration_aftereffects, false);
+	if (!phases.length) return null;
+	let t0 = 0;
+	const segs = phases.map(([label, h, text, color]) => {
+		const seg = { label, from: t0, to: t0 + h, text, color };
+		t0 += h;
+		return seg;
+	});
+	const x = (h: number) => Math.min(100, (100 * h) / span);
+	return (
+		<div className="relative" style={{ height: 92 }}>
+			<div className="absolute left-0 right-0 top-0" style={{ height: 12, borderRadius: 999, background: 'rgba(255,255,255,.06)' }}>
+				{segs.map((g, i) => (
+					<span key={g.label} className="rd-grow absolute top-0 h-full" style={{ left: `${x(g.from)}%`, width: `calc(${x(g.to) - x(g.from)}% - 2px)`, background: g.color, borderRadius: i === 0 ? '999px 3px 3px 999px' : 3, animationDelay: `${0.4 + i * 0.22}s` }} />
+				))}
+				{after > 0 && t0 < span && (
+					<span className="rd-grow absolute top-0 h-full" title={`After effects: ${pwDur(p.duration_aftereffects, false)}`} style={{ left: `${x(t0)}%`, width: `${x(Math.min(span, t0 + after)) - x(t0)}%`, background: 'linear-gradient(90deg, rgba(217,207,255,.35), rgba(217,207,255,0))', borderRadius: '3px 999px 999px 3px', animationDelay: `${0.4 + segs.length * 0.22}s` }} />
+				)}
+			</div>
+			{[...segs, ...(after > 0 && t0 < span ? [{ label: 'After effects', from: t0, to: t0 + after, text: pwDur(p.duration_aftereffects, false), color: 'rgba(217,207,255,.5)' }] : [])].map((g, i) => (
+				<div key={g.label} className="rd-step absolute" style={{ left: `${x(g.from)}%`, top: i % 2 ? 54 : 20, animationDelay: `${0.55 + i * 0.22}s`, maxWidth: '40%' }}>
+					<div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: C.soft, whiteSpace: 'nowrap' }}>
+						<span className="rd-dot" style={{ width: 7, height: 7, background: g.color }} />
+						{g.label}
+					</div>
+					<div style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 11.5, color: C.faint, whiteSpace: 'nowrap', paddingLeft: 13 }}>{g.text}</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
 // Dosage (PsychonautWiki, per route) next to duration (what the stories show, plus PsychonautWiki's figures).
 function DosageDuration({ name, timing }: { name: string; timing: Record<string, unknown>[] }) {
 	const q = useSQLQuery(dosageSQL(name));
@@ -3754,18 +3876,10 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 		const lo = p[`dose_${k}_min`], hi = p[`dose_${k}_max`];
 		return lo != null ? `${num(lo)}${hi != null && N(hi) !== N(lo) ? `–${num(hi)}` : ''} ${units}` : '';
 	};
-	const durRows: [string, string][] = p
-		? ([
-				['Onset', pwDur(p.duration_onset, true)],
-				['Come-up', pwDur(p.duration_comeup, true)],
-				['Peak', pwDur(p.duration_peak, false)],
-				['Offset', pwDur(p.duration_offset, false)],
-				['After effects', pwDur(p.duration_aftereffects, false)],
-			] as [string, string][]).filter(([, v]) => v)
-		: [];
 	const total = p && pwDur(p.duration_total, false) ? pwDur(p.duration_total, false) : t ? `~${fmtDur(N(t.end_m))}` : '';
-	const row = 'flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm';
-	const mono = { fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12.5 };
+	// The stories' curve and PsychonautWiki's phases share one time axis.
+	const coreH = p ? pwPhases(p).reduce((a, [, h]) => a + h, 0) : 0;
+	const span = Math.max(coreH * 1.08, t ? N(t.end_m) * 1.12 : 0, 0.5);
 	return (
 		<div className="mt-5">
 			{routes.length > 0 && (
@@ -3778,36 +3892,20 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 					))}
 				</div>
 			)}
-			<div ref={box} key={sel} className={`rd-steps ${go ? 'go' : ''} mt-4 grid gap-4 lg:grid-cols-2`}>
-				<div className="rd-card p-5">
-					<div className="flex items-center gap-2 font-semibold">
-						<BarChart3 size={17} color={ACCENT} /> Dosage
+			<div ref={box} key={sel} className={`rd-steps ${go ? 'go' : ''} rd-card mt-4 grid gap-7 p-6 sm:p-7`}>
+				<div>
+					<div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+						<span className="flex items-center gap-2 font-semibold">
+							<BarChart3 size={17} color={ACCENT} /> Dosage{units ? <span className="text-sm font-normal" style={{ color: C.faint }}>· {units}</span> : null}
+						</span>
+						<span className="flex items-center gap-1.5 text-xs" style={{ color: C.faint }}>
+							<AlertTriangle size={12} /> Population estimates that vary widely between people
+						</span>
 					</div>
 					{p && DOSE_ROWS.some((d) => dose(d.key)) ? (
 						<>
-							<p className="mt-2 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
-								<AlertTriangle size={13} /> Doses are population estimates that vary widely between people.
-							</p>
-							<div className="mt-3 grid gap-1.5">
-								{DOSE_ROWS.map((d, i) => ({ ...d, i })).filter((d) => dose(d.key)).map((d, k) => (
-									<div key={d.key} className={`${row} rd-step`} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${C.line}`, animationDelay: `${k * 0.14}s` }}>
-										<span className="flex items-center gap-3">
-											<span className="flex gap-1" aria-hidden>
-												{[0, 1, 2, 3, 4].map((j) => (
-													<span
-														key={j}
-														className={`rounded-full ${j <= d.i ? 'rd-fill-dot' : ''}`}
-														style={{ width: 6, height: 6, background: j <= d.i ? (d.i >= 4 ? C.coral : d.i >= 3 ? C.amber : C.lav) : 'rgba(255,255,255,.15)', animationDelay: `${k * 0.14 + 0.15 + j * 0.07}s` }}
-													/>
-												))}
-											</span>
-											{d.label}
-										</span>
-										<span style={mono}>{dose(d.key)}</span>
-									</div>
-								))}
-							</div>
-							<p className="mt-3 text-xs" style={{ color: C.faint }}>
+							<DoseScale p={p} />
+							<p className="mt-1 text-xs" style={{ color: C.faint }}>
 								From{' '}
 								<a href={SOURCES.pw.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
 									PsychonautWiki
@@ -3819,7 +3917,8 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 						<p className="mt-3 text-sm" style={{ color: C.faint }}>No dose ranges on file for this route.</p>
 					)}
 				</div>
-				<div className="rd-card p-5">
+				<div className="h-px" style={{ background: C.line }} />
+				<div>
 					<div className="flex items-center justify-between gap-3">
 						<span className="flex items-center gap-2 font-semibold">
 							<Clock size={17} color={ACCENT} /> Duration
@@ -3831,23 +3930,15 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 						)}
 					</div>
 					{t && (
-						<div className="mt-3">
-							<div className="rd-label mb-2">In the stories{tOwn ? '' : ' (all routes)'}</div>
-							<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} />
-							<p className="mt-2 text-xs" style={{ color: C.faint }}>From {N(t.n)} closely read stories.</p>
+						<div className="mt-4">
+							<div className="rd-label mb-2">In the stories{tOwn ? '' : ' (all routes)'} · {N(t.n)} closely read</div>
+							<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} span={span} />
 						</div>
 					)}
-					{durRows.length > 0 && (
-						<div className={t ? 'mt-5' : 'mt-3'}>
-							<div className="rd-label mb-2">PsychonautWiki</div>
-							<div className="grid gap-1.5">
-								{durRows.map(([k, v], i) => (
-									<div key={k} className={`${row} rd-step`} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${C.line}`, animationDelay: `${0.4 + i * 0.12}s` }}>
-										<span>{k}</span>
-										<span style={mono}>{v}</span>
-									</div>
-								))}
-							</div>
+					{p && pwPhases(p).length > 0 && (
+						<div className={t ? 'mt-7' : 'mt-4'}>
+							<div className="rd-label mb-3">PsychonautWiki</div>
+							<DurationBand p={p} span={span} />
 						</div>
 					)}
 				</div>
@@ -3905,7 +3996,7 @@ function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, numb
 		shapes.push({
 			z: (p.z + q.z) / 2 - 0.01,
 			node: (
-				<g key={`b${i}`} stroke="rgba(255,255,255,.55)" strokeWidth={Math.max(1.5, k * 0.07)} strokeLinecap="round">
+				<g key={`b${i}`} stroke="rgba(255,255,255,.72)" strokeWidth={Math.max(2, k * 0.085)} strokeLinecap="round">
 					{lines.map(([u, v], j) => (
 						<line key={j} x1={p.x + u} y1={p.y + v} x2={q.x + u} y2={q.y + v} />
 					))}
@@ -3916,7 +4007,7 @@ function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, numb
 	pts.forEach((p, i) =>
 		shapes.push({
 			z: p.z,
-			node: <circle key={`a${i}`} cx={p.x} cy={p.y} r={p.r} fill={`url(#mol-${ATOM_COLOR[p.el] ? p.el : 'X'})`} />,
+			node: <circle key={`a${i}`} cx={p.x} cy={p.y} r={p.r} fill={`url(#mol-${ATOM_COLOR[p.el] ? p.el : 'X'})`} stroke="rgba(20,12,50,.45)" strokeWidth={1} />,
 		}),
 	);
 	shapes.sort((a, b) => a.z - b.z);
@@ -3958,9 +4049,7 @@ function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, numb
 }
 
 // The molecule with its formula (subscripted) and a link to PubChem, or nothing when there isn't one.
-function MoleculeCard({ name }: { name: string }) {
-	const q = useSQLQuery(structureSQL(name));
-	const r = rows(q)[0];
+function MoleculeCard({ r }: { r?: Record<string, unknown> }) {
 	if (!r) return null;
 	let atoms: [string, number, number, number][] = [], bonds: [number, number, number][] = [];
 	try {
@@ -3972,8 +4061,8 @@ function MoleculeCard({ name }: { name: string }) {
 	if (atoms.length < 2) return null;
 	const formula = S(r.formula).split(/(\d+)/).map((part, i) => (/^\d+$/.test(part) ? <sub key={i}>{part}</sub> : <span key={i}>{part}</span>));
 	return (
-		<figure className="mb-6 flex flex-col items-center">
-			<Molecule3D atoms={atoms} bonds={bonds} size={230} />
+		<figure className="flex flex-col items-center" style={{ background: 'radial-gradient(circle at 50% 45%, rgba(217,207,255,.13), transparent 62%)' }}>
+			<Molecule3D atoms={atoms} bonds={bonds} size={300} />
 			<figcaption className="mt-2 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
 				<span className="text-sm" style={{ color: C.soft, fontFamily: SANS }}>{formula}</span>
 				<span>·</span>
