@@ -1522,7 +1522,7 @@ function SubstanceTag({ name, note }: { name: string; note?: string }) {
 	);
 }
 
-function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item: Open; onClose: () => void; effectQ: Q; subQ: Q; timingQ: Q; onReplay: (s: string) => void }) {
+function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay, onEffectPage }: { item: Open; onClose: () => void; effectQ: Q; subQ: Q; timingQ: Q; onReplay: (s: string) => void; onEffectPage: (e: string) => void }) {
 	useEffect(() => {
 		const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
 		window.addEventListener('keydown', k);
@@ -1601,6 +1601,9 @@ function DetailPanel({ item, onClose, effectQ, subQ, timingQ, onReplay }: { item
 							</div>
 						)}
 						<Sources className="" list={[S(r.url) ? [/psychonautwiki/i.test(S(r.url)) ? 'pw' : 'sei', S(r.url)] : 'sei', 'erowid']} />
+						<button className="rd-btn" style={{ background: '#fff', color: C.deep, justifySelf: 'start' }} onClick={() => onEffectPage(item.name)}>
+							Open full page
+						</button>
 					</div>
 				) : (
 					<div className="rd-in mt-5 grid gap-6">
@@ -1703,6 +1706,19 @@ function DoseChip({ d, latest, count = 1 }: { d: { sub: string; amount: string; 
 
 // ── Browse: effects ───────────────────────────────────────────────
 
+// The Effect Index eye mark (from effectindex.com/effectindex/logo.svg, the eye without the wordmark), drawn in
+// the current colour.
+function SeiLogo({ width = 64 }: { width?: number }) {
+	return (
+		<svg viewBox="143 1.5 271 150" width={width} height={(width * 150) / 271} role="img" aria-label="Effect Index" style={{ display: 'block', flexShrink: 0 }}>
+			<g fill="currentColor" transform="translate(0,388) scale(0.1,-0.1)">
+				<path d="m2544,3841c-283,-59 -565,-199 -809,-402c-95,-79 -225,-213 -271,-280l-27,-39l29,-42c45,-66 217,-240 305,-310c364,-286 777,-427 1139,-388c373,40 751,216 1021,477c59,57 130,138 159,179c61,88 62,80 -30,202c-121,161 -315,315 -540,431c-153,78 -267,121 -420,158c-146,35 -420,42 -556,14zm396,-188c353,-97 518,-525 320,-833c-45,-70 -148,-163 -222,-199c-69,-34 -178,-61 -248,-61c-70,0 -179,27 -248,61c-123,60 -242,198 -282,325c-63,207 -15,408 135,560c147,150 344,203 545,147z" />
+				<path d="m2673,3506c-104,-34 -204,-123 -251,-224c-24,-50 -27,-69 -27,-162c0,-97 2,-110 32,-172c39,-83 108,-154 188,-194c56,-27 68,-29 175,-29c111,0 117,1 178,33c84,44 146,108 185,190c30,62 32,75 32,172c0,89 -4,113 -23,155l-23,50l-14,-38c-16,-46 -30,-64 -66,-83c-114,-59 -236,73 -169,183c21,34 48,53 95,63c30,7 29,8 -30,36c-50,23 -76,29 -150,31c-57,2 -106,-2 -132,-11z" />
+			</g>
+		</svg>
+	);
+}
+
 // What each category of effect means, in plain words.
 const EFFECT_CATEGORY: Record<string, string> = {
 	Cognitive: 'Changes to thinking, feeling and sense of self: mood, memory, focus, ego, and how time and meaning feel.',
@@ -1715,7 +1731,7 @@ const EFFECT_CATEGORY: Record<string, string> = {
 	Other: 'Effects that don’t fit neatly anywhere else.',
 };
 
-function EffectsBrowse({ q }: { q: Q }) {
+function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void }) {
 	const searchRef = useRef<HTMLInputElement | null>(null);
 	useFindKey(searchRef);
 	const { open, effectInfo } = useContext(OpenCtx);
@@ -1748,13 +1764,34 @@ function EffectsBrowse({ q }: { q: Q }) {
 			<p className="mt-2" style={{ color: C.soft }}>
 				Everything people described in their stories, grouped by kind. Each card says what the effect is, how many stories mention it, and how people usually felt about it.
 			</p>
-			<a href={SOURCES.sei.href} target="_blank" rel="noopener noreferrer" className="rd-card rd-hover mt-5 flex items-center gap-4 p-4" style={{ textDecoration: 'none', maxWidth: 760 }}>
-				<img src={SEI_ICON} alt="" width={36} height={36} style={{ borderRadius: 8, flexShrink: 0 }} />
-				<span className="text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>
-					Effect names, categories and descriptions come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b>, a community project carefully documenting what each effect feels like. Which effects show up in which stories comes from our close readings.
-				</span>
-				<span className="ml-auto text-sm font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>Visit ↗</span>
-			</a>
+			<section className="rd-card mt-6 grid gap-5 p-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:p-7" style={{ maxWidth: 900 }}>
+				<div style={{ color: '#fff' }}>
+					<SeiLogo width={92} />
+				</div>
+				<div className="grid gap-3" style={{ color: C.soft, lineHeight: 1.6 }}>
+					<h2 className="text-xl font-semibold" style={{ color: '#fff' }}>About the Subjective Effect Index</h2>
+					<p>
+						The effects on this page, their names, categories and descriptions, come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b> (SEI), hosted at Effect Index. It’s a formal, structured documentation of the many distinct states people can experience under hallucinogens and other substances, each described on its own, apart from any one drug.
+					</p>
+					<p>
+						The aim is a shared vocabulary: words for experiences people used to call indescribable, so they can be talked about, compared and studied. Many effects there come with image, video or audio <i>replications</i> that show what they look or sound like.
+					</p>
+					<p>
+						Effect Index was founded in 2017 by Josie Kins, who also founded PsychonautWiki, and is built with its community. Its written material is shared under the Creative Commons <b style={{ color: '#fff' }}>CC BY-NC-SA 4.0</b> licence, which is how we can show it here, with credit and for non-commercial use.
+					</p>
+					<p>
+						How re:dose uses it: our close readings tag which of these effects show up in each story, and when. That’s where the story counts and the “mostly good / rough” come from. Each effect links to its full page on Effect Index.
+					</p>
+					<div className="flex flex-wrap gap-2 pt-1">
+						<a className="rd-btn text-sm" href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', background: '#fff', color: C.deep }}>
+							Visit Effect Index ↗
+						</a>
+						<a className="rd-btn text-sm" href="https://www.effectindex.com/about" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+							About the project ↗
+						</a>
+					</div>
+				</div>
+			</section>
 			<input ref={searchRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search effects" className="rd-card mt-6 w-full px-5 py-3 text-base" style={{ borderRadius: 999, color: C.text, outline: 'none' }} />
 			{!q.isLoading && groups.length > 1 && (
 				<nav className="mt-4 flex flex-wrap gap-2" aria-label="Kinds of effect">
@@ -1782,7 +1819,7 @@ function EffectsBrowse({ q }: { q: Q }) {
 										const felt = feltOf(e.name);
 										const blurb = blurbOf(e.name);
 										return (
-											<button key={e.name} onClick={() => open({ kind: 'effect', name: e.name })} className="rd-card rd-hover grid content-start gap-2 p-4 text-left">
+											<button key={e.name} onClick={() => onEffect(e.name)} className="rd-card rd-hover grid content-start gap-2 p-4 text-left">
 												<span className="flex items-center gap-2 font-semibold">
 													<span className="rd-dot" style={{ background: TONE_DOT[effectTone(effectInfo.get(e.name.toLowerCase()))] }} />
 													{e.name}
@@ -1982,6 +2019,26 @@ function FocusPanel({ name, onPick, onCombo, onClose }: { name: string; onPick: 
 	);
 }
 
+// Kinds of substance for the Substances index, with what each kind generally does, in plain words.
+const SUBSTANCE_KIND: Record<string, { label: string; about: string }> = {
+	psychedelic: { label: 'Psychedelics', about: 'Change perception, thinking and sense of self: visuals, meaning, and time running strangely.' },
+	stimulant: { label: 'Stimulants', about: 'Raise energy, alertness and heart rate, and often cut appetite and sleep.' },
+	depressant: { label: 'Depressants', about: 'Slow the nervous system down: relaxation, sedation, lowered inhibitions. Mixing depressants is especially risky.' },
+	hypnotic: { label: 'Depressants', about: 'Slow the nervous system down: relaxation, sedation, lowered inhibitions. Mixing depressants is especially risky.' },
+	dissociative: { label: 'Dissociatives', about: 'Create distance from the body and surroundings, from numbness to full detachment.' },
+	opioid: { label: 'Opioids', about: 'Relieve pain and bring warmth and calm, but slow breathing, especially with other depressants.' },
+	entactogen: { label: 'Entactogens', about: 'Bring feelings of closeness, empathy and openness, often with stimulation.' },
+	cannabinoid: { label: 'Cannabinoids', about: 'Cannabis and related compounds: relaxation, euphoria and shifts in perception.' },
+	deliriant: { label: 'Deliriants', about: 'Cause confusion and very real-seeming hallucinations that are hard to tell from reality; rarely enjoyable.' },
+	hallucinogen: { label: 'Other hallucinogens', about: 'Hallucinogens that don’t follow the classic psychedelic pattern.' },
+	nootropic: { label: 'Nootropics', about: 'Taken for focus, memory or staying awake.' },
+	eugeroic: { label: 'Nootropics', about: 'Taken for focus, memory or staying awake.' },
+	other: { label: 'Other', about: 'Substances that don’t fall under one main kind, groups of drugs, or ones not classified yet.' },
+};
+
+// Substances whose class is missing in the data but obvious.
+const KIND_OVERRIDE: Record<string, string> = { Cannabis: 'cannabinoid', Tetrahydrocannabinol: 'cannabinoid' };
+
 function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) => void; onCombo: (a: string, b: string) => void }) {
 	const [filter, setFilter] = useState('');
 	const [focus, setFocusState] = useState<string | null>(null);
@@ -1999,6 +2056,21 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 		.map((r) => ({ ...r, hit: matchOf(r) }))
 		.filter((r) => r.hit.rank >= 0)
 		.sort((a, b) => b.hit.rank - a.hit.rank);
+	// Browsing (not searching): one section per kind of substance, biggest first.
+	const grouped = useMemo(() => {
+		const g = new Map<string, typeof list>();
+		for (const r of list) {
+			const own = KIND_OVERRIDE[S(r.s)] ?? classKey(classOf(S(r.s)));
+			const k = SUBSTANCE_KIND[own] ? own : 'other';
+			const label = SUBSTANCE_KIND[k].label;
+			if (!g.has(label)) g.set(label, []);
+			g.get(label)!.push(r);
+		}
+		return [...g.entries()]
+			.sort((a, b) => (a[0] === 'Other' ? 1 : b[0] === 'Other' ? -1 : b[1].reduce((x, y) => x + N(y.n), 0) - a[1].reduce((x, y) => x + N(y.n), 0)))
+			.map(([label, items]) => [label, Object.values(SUBSTANCE_KIND).find((v) => v.label === label)!.about, items] as [string, string, typeof list]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [q.data, needle, classOf]);
 	const searchRef = useRef<HTMLInputElement | null>(null);
 	useFindKey(searchRef);
 	useEffect(() => {
@@ -2022,6 +2094,15 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 				)}
 			</p>
 			<Sources className="mt-3" list={['erowid', 'pw', 'tripsit']} />
+			{!focus && !needle && grouped.length > 1 && (
+				<nav className="mt-4 flex flex-wrap gap-2" aria-label="Kinds of substance">
+					{grouped.map(([label, , items]) => (
+						<button key={label} className="rd-nav" style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }} onClick={(e) => (e.stopPropagation(), document.getElementById(`kind-${label}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))}>
+							{label} <span style={{ color: C.faint }}>{items.length}</span>
+						</button>
+					))}
+				</nav>
+			)}
 			<input
 				ref={searchRef}
 				value={filter}
@@ -2035,8 +2116,19 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 			{q.isLoading ? (
 				<Loading height={240} className="mt-6" />
 			) : (
-				<div className="mt-6 grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
-					{list.map((r) => {
+				<>
+					{(focus || needle ? [['', '', list]] as [string, string, typeof list][] : grouped).map(([label, about, items]) => (
+						<section key={label || 'all'} id={label ? `kind-${label}` : undefined} className={label ? 'mt-10' : 'mt-6'} style={{ scrollMarginTop: 16 }}>
+							{label && (
+								<>
+									<h2 className="text-2xl font-semibold">
+										{label} <span className="text-base font-normal" style={{ color: C.faint }}>{items.length}</span>
+									</h2>
+									<p className="mt-1 max-w-3xl text-sm" style={{ color: C.soft }}>{about}</p>
+								</>
+							)}
+							<div className="mt-4 grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
+								{items.map((r) => {
 						const name = S(r.s);
 						const isFocus = focus === name;
 						const together = co.get(name);
@@ -2098,8 +2190,11 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 								</div>
 							</div>
 						);
-					})}
-				</div>
+								})}
+							</div>
+						</section>
+					))}
+				</>
 			)}
 			<Err q={q} />
 		</section>
@@ -3087,6 +3182,222 @@ function StoriesBrowse({ onOpen }: { onOpen: (id: string, sub: string) => void }
 				</div>
 			)}
 			<Err q={q} />
+		</section>
+	);
+}
+
+// ── Effect pages ──────────────────────────────────────────────────
+// Everything below is over closely read stories, since those are the ones where effects are tagged.
+
+// Reports where this effect is tagged (medium or high confidence).
+const effReportsCTE = (name: string) => `eff AS (
+  SELECT DISTINCT report_id FROM ${DB}."llm_observation_effects" WHERE effect_name = '${esc(name)}' AND confidence <> 'low'
+)`;
+// Each closely read report with each substance in it.
+const readSubsCTE = `base AS (
+  SELECT DISTINCT d.report_id, d.canonical_substance AS s
+  FROM ${DB}."report_doses" d JOIN ${DB}."llm_extractions" x USING (report_id)
+  WHERE d.canonical_substance IS NOT NULL
+)`;
+
+// Headline numbers: how many stories, how the moments felt, and when it first shows up after the first dose.
+const effectSummarySQL = (name: string) => `
+WITH ${effReportsCTE(name)},
+moments AS (
+  SELECT o.report_id, o.sentiment,
+    TRY_CAST(regexp_extract(o.time_relative, '^T\\+~?(\\d+):(\\d{2})', 1) AS INTEGER)
+      + TRY_CAST(regexp_extract(o.time_relative, '^T\\+~?(\\d+):(\\d{2})', 2) AS INTEGER) / 60.0 AS hrs
+  FROM ${DB}."llm_observation_effects" e JOIN ${DB}."llm_observations" o USING (report_id, obs_index)
+  WHERE e.effect_name = '${esc(name)}' AND e.confidence <> 'low'
+),
+firsts AS (SELECT report_id, min(hrs) AS h FROM moments WHERE hrs IS NOT NULL AND hrs < 48 GROUP BY 1)
+SELECT
+  (SELECT count(*) FROM eff) AS n,
+  (SELECT count(*) FROM ${DB}."llm_extractions") AS total,
+  (SELECT avg((sentiment = 'positive')::INT) FROM moments) AS pos,
+  (SELECT avg((sentiment = 'negative')::INT) FROM moments) AS neg,
+  (SELECT median(h) FROM firsts) AS first_h,
+  (SELECT count(*) FROM firsts) AS n_timed,
+  (SELECT any_value(category) FROM ${DB}."effects" WHERE lower(name) = lower('${esc(name)}')) AS category,
+  (SELECT any_value(url) FROM ${DB}."effects" WHERE lower(name) = lower('${esc(name)}')) AS url`;
+
+// Substances whose stories mention it most, with the share of that substance's stories and how that compares with
+// the share across all closely read stories ("lift").
+const effectSubstancesSQL = (name: string) => `
+WITH ${effReportsCTE(name)}, ${readSubsCTE},
+rate AS (SELECT (SELECT count(*) FROM eff)::DOUBLE / (SELECT count(*) FROM ${DB}."llm_extractions") AS r)
+SELECT b.s, count(*) AS n, count(e.report_id) AS hits, count(e.report_id) / count(*) AS share,
+  (count(e.report_id) / count(*)) / (SELECT r FROM rate) AS lift
+FROM base b LEFT JOIN eff e USING (report_id)
+GROUP BY 1 HAVING count(e.report_id) >= 3 AND count(*) >= 8
+ORDER BY hits DESC, lift DESC LIMIT 12`;
+
+// Pairs of substances taken together in stories that mention it.
+const effectPairsSQL = (name: string) => `
+WITH ${effReportsCTE(name)}, ${readSubsCTE},
+pairs AS (SELECT a.report_id, a.s AS a, b.s AS b FROM base a JOIN base b ON a.report_id = b.report_id AND a.s < b.s),
+rate AS (SELECT (SELECT count(*) FROM eff)::DOUBLE / (SELECT count(*) FROM ${DB}."llm_extractions") AS r)
+SELECT p.a, p.b, count(*) AS n, count(e.report_id) AS hits, count(e.report_id) / count(*) AS share,
+  (count(e.report_id) / count(*)) / (SELECT r FROM rate) AS lift
+FROM pairs p LEFT JOIN eff e USING (report_id)
+GROUP BY 1, 2 HAVING count(e.report_id) >= 3 AND count(*) >= 5
+ORDER BY hits DESC, lift DESC LIMIT 8`;
+
+// Other effects that show up in the same stories.
+const effectCompanionsSQL = (name: string) => `
+WITH ${effReportsCTE(name)}
+SELECT o.effect_name AS name, count(DISTINCT o.report_id) AS n
+FROM ${DB}."llm_observation_effects" o JOIN eff USING (report_id)
+WHERE o.effect_name <> '${esc(name)}' AND o.confidence <> 'low'
+GROUP BY 1 ORDER BY n DESC, 1 LIMIT 14`;
+
+// Stories where it shows up, each with the writer's words from that moment.
+const effectStoriesSQL = (name: string) => `
+WITH m AS (
+  SELECT o.report_id, arg_max(o.description, length(o.description)) AS quote
+  FROM ${DB}."llm_observation_effects" e JOIN ${DB}."llm_observations" o USING (report_id, obs_index)
+  WHERE e.effect_name = '${esc(name)}' AND e.confidence <> 'low' AND o.description LIKE '"%' AND length(o.description) BETWEEN 40 AND 240
+  GROUP BY 1
+)
+SELECT r.id, array_to_string(list_distinct(r.substances), ' · ') AS subs, r.experience_year AS yr, trim(both '"' FROM m.quote) AS quote,
+  (SELECT canonical_substance FROM ${DB}."report_doses" d WHERE d.report_id = r.id AND canonical_substance IS NOT NULL LIMIT 1) AS first_sub
+FROM m JOIN ${DB}."experience_reports" r ON r.id = m.report_id
+ORDER BY hash(r.id) LIMIT 9`;
+
+function EffectPage({ name, onSubstance, onCombo, onEffect, onReport }: { name: string; onSubstance: (s: string) => void; onCombo: (a: string, b: string) => void; onEffect: (e: string) => void; onReport: (id: string, sub: string) => void }) {
+	const { effectInfo, classOf } = useContext(OpenCtx);
+	const sumQ = useSQLQuery(effectSummarySQL(name));
+	const subsQ = useSQLQuery(effectSubstancesSQL(name));
+	const pairsQ = useSQLQuery(effectPairsSQL(name));
+	const compQ = useSQLQuery(effectCompanionsSQL(name));
+	const storiesQ = useSQLQuery(effectStoriesSQL(name));
+	const r = rows(sumQ)[0];
+	const info = effectInfo.get(name.toLowerCase());
+	if (sumQ.isLoading) return <Loading height={360} />;
+	const share = r ? N(r.n) / Math.max(1, N(r.total)) : 0;
+	const felt = r && r.pos != null ? (N(r.pos) >= 0.6 ? { w: 'mostly felt good', c: C.mint } : N(r.neg) >= 0.55 ? { w: 'mostly felt rough', c: C.coral } : { w: 'felt mixed', c: C.lav }) : null;
+	const fromPW = /psychonautwiki/i.test(S(r?.url));
+	const liftWord = (l: number) => (l >= 1.15 ? `${l.toFixed(1)}× the usual` : l <= 0.85 ? 'less than usual' : 'about usual');
+	const H2 = ({ children, sub }: { children: React.ReactNode; sub?: string }) => (
+		<div className="mt-12">
+			<h2 className="text-2xl font-semibold">{children}</h2>
+			{sub && <p className="mt-1 text-sm" style={{ color: C.faint }}>{sub}</p>}
+		</div>
+	);
+	return (
+		<section className="rd-in">
+			<div className="rd-label">{S(r?.category) || 'Effect'}</div>
+			<h1 className="mt-1 text-4xl font-semibold" style={{ letterSpacing: '-0.02em', textWrap: 'balance' as never }}>{name}</h1>
+			{info?.blurb && (
+				<p className="mt-4 max-w-3xl" style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1.5 }}>
+					{info.blurb}
+				</p>
+			)}
+			<a href={S(r?.url) || SOURCES.sei.href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-2 text-xs" style={{ color: C.soft, textDecoration: 'none' }}>
+				<img src={fromPW ? PW_ICON : SEI_ICON} alt="" width={14} height={14} style={{ borderRadius: 3 }} />
+				<span style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Description from {fromPW ? 'PsychonautWiki' : 'the Subjective Effect Index'}</span> ↗
+			</a>
+			{r && (
+				<div className="mt-6 flex flex-wrap gap-x-10 gap-y-4">
+					<div>
+						<div className="text-3xl font-light tabular-nums">{N(r.n).toLocaleString()}</div>
+						<div className="rd-label mt-1">stories ({Math.round(100 * share)}% of closely read)</div>
+					</div>
+					{felt && (
+						<div>
+							<div className="text-3xl font-light" style={{ color: felt.c }}>{felt.w.replace(/^(mostly )?felt /, '')}</div>
+							<div className="rd-label mt-1">{felt.w.startsWith('mostly') ? 'mostly, in the moment' : 'in the moment'}</div>
+						</div>
+					)}
+					{r.first_h != null && N(r.n_timed) >= 5 && (
+						<div>
+							<div className="text-3xl font-light">~{fmtDur(N(r.first_h))}</div>
+							<div className="rd-label mt-1">after the first dose, usually</div>
+						</div>
+					)}
+				</div>
+			)}
+
+			<H2 sub="Substances whose closely read stories mention it most. The share is of that substance’s stories; “× the usual” compares it with all stories.">What tends to bring it on</H2>
+			{subsQ.isLoading ? (
+				<Loading height={200} className="mt-4" quiet />
+			) : rows(subsQ).length ? (
+				<div className="rd-card mt-4 grid p-2">
+					{rows(subsQ).map((x) => (
+						<button key={S(x.s)} onClick={() => onSubstance(S(x.s))} className="rd-hover grid items-center gap-3 rounded-xl px-3 py-2.5 text-left" style={{ gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.4fr) auto' }}>
+							<span className="flex items-center gap-2 font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+								<ClassIcon cls={classOf(S(x.s))} size={16} color={C.coral} />
+								{short(S(x.s))}
+							</span>
+							<span className="flex items-center gap-3 text-xs" style={{ color: C.faint }}>
+								<span className="flex-1 rounded-full" style={{ height: 6, background: 'rgba(255,255,255,.1)' }}>
+									<span className="block h-full rounded-full" style={{ width: `${Math.min(100, 100 * N(x.share))}%`, background: C.lav }} />
+								</span>
+								<span className="tabular-nums" style={{ whiteSpace: 'nowrap' }}>
+									{Math.round(100 * N(x.share))}% of {N(x.n)}
+								</span>
+							</span>
+							<span className="text-xs font-semibold" style={{ color: N(x.lift) >= 1.15 ? C.mint : C.faint, whiteSpace: 'nowrap' }}>{liftWord(N(x.lift))}</span>
+						</button>
+					))}
+				</div>
+			) : (
+				<p className="mt-3 text-sm" style={{ color: C.faint }}>Not enough closely read stories to say.</p>
+			)}
+
+			{rows(pairsQ).length > 0 && (
+				<>
+					<H2 sub="Pairs of substances taken together in stories that mention it.">In mixes</H2>
+					<div className="mt-4 grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+						{rows(pairsQ).map((x) => (
+							<button key={`${S(x.a)}|${S(x.b)}`} onClick={() => onCombo(S(x.a), S(x.b))} className="rd-card rd-hover grid gap-1 p-4 text-left">
+								<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+									{short(S(x.a))} + {short(S(x.b))}
+								</span>
+								<span className="text-xs" style={{ color: C.faint }}>
+									in {Math.round(100 * N(x.share))}% of {N(x.n)} stories · <span style={{ color: N(x.lift) >= 1.15 ? C.mint : C.faint }}>{liftWord(N(x.lift))}</span>
+								</span>
+							</button>
+						))}
+					</div>
+				</>
+			)}
+
+			{rows(compQ).length > 0 && (
+				<>
+					<H2 sub="Other effects that show up in the same stories.">Often felt with</H2>
+					<div className="mt-4 flex flex-wrap gap-2">
+						{rows(compQ).map((x) => (
+							<button key={S(x.name)} className="rd-tag" onClick={() => onEffect(S(x.name))}>
+								<span className="rd-dot" style={{ background: TONE_DOT[effectTone(effectInfo.get(S(x.name).toLowerCase()))] }} />
+								{S(x.name)}
+								<span style={{ color: C.faint, fontWeight: 500 }}>{N(x.n)}</span>
+							</button>
+						))}
+					</div>
+				</>
+			)}
+
+			{rows(storiesQ).length > 0 && (
+				<>
+					<H2 sub="In the writers’ own words, at the moment it showed up.">Stories where it shows up</H2>
+					<div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+						{rows(storiesQ).map((x) => (
+							<button key={S(x.id)} onClick={() => onReport(S(x.id), S(x.first_sub))} className="rd-card rd-hover grid content-start gap-3 p-5 text-left">
+								<p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 17, lineHeight: 1.45, color: C.text }}>“{S(x.quote)}”</p>
+								<div className="text-sm font-semibold" style={{ color: C.soft }}>{S(x.subs)}</div>
+								<div className="flex text-xs" style={{ color: C.faint }}>
+									{x.yr != null && <span>{N(x.yr)}</span>}
+									<span className="ml-auto">#{S(x.id).replace('erowid-', '')}</span>
+								</div>
+							</button>
+						))}
+					</div>
+				</>
+			)}
+			<p className="mt-12 text-xs" style={{ color: C.faint }}>
+				All numbers here come from closely read stories, where effects are tagged. They describe the people who wrote reports, not everyone who has taken something.
+			</p>
 		</section>
 	);
 }
@@ -4753,6 +5064,7 @@ export default function ReportTimelapse() {
 	const [withSub, setWithSub] = useDiveState<string | null>('with', null);
 	const [only, setOnly] = useDiveState<boolean>('only', false);
 	const [openItem, setOpenItemState] = useDiveState<Open>('open', null);
+	const [effect, setEffect] = useDiveState<string | null>('effect', null);
 	const setOpenItem = (o: Open) => setOpenItemState((o ?? undefined) as Open);
 	const [, setAtLink] = useDiveState<number | null>('at', null);
 
@@ -4858,8 +5170,15 @@ export default function ReportTimelapse() {
 		setOpenItem(null);
 		setReportId(id);
 	};
+	const goEffect = (e: string) => {
+		setView('effects');
+		setEffect(e);
+		setOpenItem(null);
+		window.scrollTo?.({ top: 0 });
+	};
 	const goView = (v: 'reports' | 'substances' | 'effects' | 'about') => {
 		setView(v);
+		setEffect(undefined as unknown as null);
 		setSub(undefined as unknown as null);
 		setWithSub(undefined as unknown as null);
 		clearReport();
@@ -4898,7 +5217,7 @@ export default function ReportTimelapse() {
 						<GlobalSearch
 							subs={rows(pickQ)}
 							onSubstance={goSubstance}
-							onEffect={(e) => setOpenItem({ kind: 'effect', name: e })}
+							onEffect={goEffect}
 							onReport={goReport}
 						/>
 						<nav className="flex items-center gap-1">
@@ -4943,7 +5262,17 @@ export default function ReportTimelapse() {
 					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} onCombo={goCombo} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
 					{onReport && <TimelapseStep id={reportId!} reportQ={reportQ} marksQ={marksQ} dosesQ={dosesQ} obsQ={obsQ} timingQ={timingQ} pairsQ={pairsQ} frozen={!!openItem} />}
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
-					{view === 'effects' && <EffectsBrowse q={effectsQ} />}
+					{view === 'effects' && effect && (
+						<nav className="mb-6 flex items-center gap-2 text-sm" style={{ color: C.faint, position: 'relative', zIndex: 2 }}>
+							<button onClick={() => setEffect(undefined as unknown as null)} style={{ color: C.soft }}>
+								All effects
+							</button>
+							<ChevronRight size={14} />
+							<span style={{ color: C.text, fontWeight: 600 }}>{effect}</span>
+						</nav>
+					)}
+					{view === 'effects' && effect && <EffectPage name={effect} onSubstance={goSubstance} onCombo={goCombo} onEffect={goEffect} onReport={goReport} />}
+					{view === 'effects' && !effect && <EffectsBrowse q={effectsQ} onEffect={goEffect} />}
 
 					<footer className="mt-16 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-t pt-6 text-sm" style={{ borderColor: C.line, color: C.soft }}>
 						{(
@@ -4965,7 +5294,7 @@ export default function ReportTimelapse() {
 						</div>
 					</footer>
 				</div>
-				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} />
+				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} onEffectPage={goEffect} />
 				{!openItem && <Spunion tips={spunionTips} lift={onReport} autoOpen={spunionSpeaks} />}
 			</main>
 		</OpenCtx.Provider>
