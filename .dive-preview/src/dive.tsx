@@ -1,6 +1,6 @@
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
-import { AlertTriangle, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, Link2, Search, Pause, Play, Repeat, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, BookOpen, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, FileText, FlaskConical, Link2, MessageSquareQuote, Search, Sparkles, Pause, Play, Repeat, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
 
@@ -793,6 +793,10 @@ const CSS = `
 .rd-ts:hover { background: rgba(10,6,30,.55); border-color: rgba(255,255,255,.32); }
 .rd-ts b { color: #fff; font-weight: 700; }
 .rd-ts img { display: block; border-radius: 999px; }
+.rd-contents { position: sticky; top: 16px; }
+.rd-article { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; align-items: start; }
+@media (max-width: 1100px) { .rd-article { grid-template-columns: minmax(0, 1fr); } .rd-contents { display: none; } }
+.rd-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 10px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.06); border: 1px solid ${C.line}; white-space: nowrap; }
 .rd-thanks { display: inline-flex; align-items: center; gap: 6px; color: ${C.soft}; font-size: 12.5px; font-weight: 500; white-space: nowrap; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .2s, color .2s; }
 .rd-thanks:hover { color: #fff; border-color: rgba(255,255,255,.5); }
 .rd-thanks img { display: block; border-radius: 4px; }
@@ -1754,6 +1758,12 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 	const { open, effectInfo } = useContext(OpenCtx);
 	const [filter, setFilter] = useState('');
 	const [more, setMore] = useState<Record<string, boolean>>({});
+	const [seiOpen, setSeiOpen] = useState(false);
+	useEffect(() => {
+		const k = (e: KeyboardEvent) => e.key === 'Escape' && setSeiOpen(false);
+		window.addEventListener('keydown', k);
+		return () => window.removeEventListener('keydown', k);
+	}, []);
 	const groups = useMemo(() => {
 		const g = new Map<string, { name: string; n: number }[]>();
 		for (const r of rows(q)) {
@@ -1781,13 +1791,39 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 			<p className="mt-2" style={{ color: C.soft }}>
 				Everything people described in their stories, grouped by kind. Each card says what the effect is, how many stories mention it, and how people usually felt about it.
 			</p>
-			<section className="rd-card mt-6 grid gap-6 p-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:p-8">
-				<div style={{ color: '#fff' }}>
-					<SeiLogo width={110} />
+			{/* A slim credit strip; the full story of the Subjective Effect Index opens in a pop-up. */}
+			<div className="rd-card mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4">
+				<span style={{ color: '#fff' }}>
+					<SeiLogo width={58} />
+				</span>
+				<p className="min-w-0 flex-1 text-sm" style={{ color: C.soft, lineHeight: 1.5, minWidth: 240 }}>
+					Effect names, categories and descriptions come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b>, years of careful community work documenting what each effect feels like.
+				</p>
+				<div className="flex flex-wrap gap-2">
+					<button className="rd-btn text-sm" onClick={() => setSeiOpen(true)}>
+						About the SEI
+					</button>
+					<a className="rd-btn text-sm" href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', background: '#fff', color: C.deep }}>
+						Visit ↗
+					</a>
 				</div>
+			</div>
+			{seiOpen && (
+				<>
+					<div className="rd-scrim" onClick={() => setSeiOpen(false)} />
+					<div role="dialog" aria-label="About the Subjective Effect Index" className="rd-fade fixed left-1/2 top-1/2 overflow-y-auto rounded-3xl p-6 sm:p-8" style={{ zIndex: 41, width: 'min(680px, calc(100vw - 32px))', maxHeight: '86vh', transform: 'translate(-50%, -50%)', background: C.panel, border: `1px solid ${C.line}`, boxShadow: '0 30px 80px rgba(10,4,40,.6)' }}>
+						<div className="flex items-start justify-between gap-4">
+							<span style={{ color: '#fff' }}>
+								<SeiLogo width={86} />
+							</span>
+							<button className="rd-btn" aria-label="Close" style={{ padding: 8 }} onClick={() => setSeiOpen(false)}>
+								<X size={16} />
+							</button>
+						</div>
+						<div className="mt-4">
 				<div>
 					<h2 className="text-2xl font-semibold" style={{ color: '#fff' }}>About the Subjective Effect Index</h2>
-					<div className="mt-3 grid gap-x-10 gap-y-3 lg:grid-cols-2" style={{ color: C.soft, lineHeight: 1.6 }}>
+					<div className="mt-3 grid gap-x-10 gap-y-3 sm:grid-cols-1" style={{ color: C.soft, lineHeight: 1.6 }}>
 						<p>
 							The effects on this page, their names, categories and descriptions, come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b> (SEI), hosted at Effect Index. It’s a formal, structured documentation of the many distinct states people can experience under hallucinogens and other substances, each described on its own, apart from any one drug.
 						</p>
@@ -1817,7 +1853,10 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 					</div>
 					<SeiLicence className="mt-5" />
 				</div>
-			</section>
+						</div>
+					</div>
+				</>
+			)}
 			<input ref={searchRef} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search effects" className="rd-card mt-6 w-full px-5 py-3 text-base" style={{ borderRadius: 999, color: C.text, outline: 'none' }} />
 			{!q.isLoading && groups.length > 1 && (
 				<nav className="mt-4 flex flex-wrap gap-2" aria-label="Kinds of effect">
@@ -2517,41 +2556,103 @@ function SubstanceOverview({ name }: { name: string }) {
 			))}
 		</div>
 	);
+	const cls = L(r.cls), chem = L(r.chem);
 	return (
 		<>
-			{aka.length > 0 && (
-				<p className="mt-3 text-lg" style={{ color: C.soft }}>
-					Also called{' '}
-					{aka.map((a, i) => (
-						<span key={a}>
-							{i > 0 && <span style={{ color: C.faint }}>{i === aka.length - 1 ? ' or ' : ', '}</span>}
-							<span style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{a}</span>
-						</span>
-					))}
-				</p>
-			)}
-			<StreetNames name={name} known={[name, ...aka]} />
-			<div className="rd-in mt-6">
-				{warning && (
-					<div className="mb-8 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
-						<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
-						<span>{warning}</span>
+			<section id="overview" className="rd-card rd-in p-6 sm:p-8" style={{ scrollMarginTop: 16 }}>
+				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+					<div className="min-w-0">
+						<div className="flex flex-wrap items-center gap-3">
+							<h1 style={{ fontSize: 'clamp(40px, 6vw, 62px)', fontWeight: 750, letterSpacing: '-0.035em', lineHeight: 1.02, background: `linear-gradient(90deg, ${ACCENT}, #c7a8ff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+								{short(name)}
+							</h1>
+							{isGroup(name) && <GroupBadge />}
+						</div>
+						<div className="mt-4 grid gap-2.5" style={{ color: C.soft }}>
+							{short(name) !== name && (
+								<div className="flex items-center gap-3">
+									<BookOpen size={17} color={ACCENT} style={{ flexShrink: 0 }} />
+									<span>{name}</span>
+								</div>
+							)}
+							{aka.length > 0 && (
+								<div className="flex items-start gap-3">
+									<MessageSquareQuote size={17} color={ACCENT} style={{ flexShrink: 0, marginTop: 3 }} />
+									<span>{aka.join(', ')}</span>
+								</div>
+							)}
+						</div>
+						<StreetNames name={name} known={[name, ...aka]} />
+						{(cls.length > 0 || chem.length > 0) && (
+							<div className="mt-5 grid gap-4">
+								{cls.length > 0 && (
+									<div>
+										<div className="rd-label mb-2 flex items-center gap-2">
+											<Sparkles size={13} /> Psychoactive class
+										</div>
+										<div className="flex flex-wrap gap-2">
+											{cls.map((c) => (
+												<span key={c} className="rd-chip">
+													<ClassIcon cls={c} size={14} color={ACCENT} />
+													{c.replace(/s$/, '')}
+												</span>
+											))}
+										</div>
+									</div>
+								)}
+								{chem.length > 0 && (
+									<div>
+										<div className="rd-label mb-2 flex items-center gap-2">
+											<FlaskConical size={13} /> Chemical class
+										</div>
+										<div className="flex flex-wrap gap-2">
+											{chem.map((c) => (
+												<span key={c} className="rd-chip">{c}</span>
+											))}
+										</div>
+									</div>
+								)}
+							</div>
+						)}
 					</div>
-				)}
-				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-					<div className="min-w-0">{about}</div>
 					<div className="min-w-0">
 						<div className="rd-label mb-3">At a glance</div>
 						{glance}
 					</div>
 				</div>
-				{L(r.effects).length > 0 && (
-					<div className="mt-8 border-t pt-6" style={{ borderColor: C.line }}>
-						<div className="rd-label mb-3">What people mostly feel</div>
-						{feel}
+				<div className="my-6 h-px" style={{ background: C.line }} />
+				<div className="max-w-3xl" style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.6 }}>
+					{kindLine && <p>{kindLine}</p>}
+					{group && members.length > 0 && (
+						<p className="mt-3" style={{ color: C.soft }}>
+							Reports filed here sometimes name the drug:{' '}
+							{members.map((m, i) => (
+								<span key={m}>
+									{i > 0 && ', '}
+									<b style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{m}</b>
+								</span>
+							))}
+							. Others just say “{short(name).toLowerCase()}”.
+						</p>
+					)}
+				</div>
+				{warning && (
+					<div className="mt-5 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
+						<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
+						<span>{warning}</span>
 					</div>
 				)}
-			</div>
+			</section>
+			<section id="dosage" className="mt-14" style={{ scrollMarginTop: 16 }}>
+				<ArticleH2 icon={Clock}>Dosage &amp; duration</ArticleH2>
+				<DosageDuration name={name} timing={rows(timingQ)} />
+			</section>
+			{L(r.effects).length > 0 && (
+				<section id="feel" className="mt-14" style={{ scrollMarginTop: 16 }}>
+					<ArticleH2 icon={Sparkles} sub="The effects closely read stories mention most. Tap one for what it is.">What people feel</ArticleH2>
+					<div className="mt-5">{feel}</div>
+				</section>
+			)}
 		</>
 	);
 }
@@ -2648,9 +2749,8 @@ function SubstanceNumbers({ name }: { name: string }) {
 	const men = N(r.men), women = N(r.women), people = men + women;
 	const tile = 'rd-card p-5 grid content-start gap-3';
 	return (
-		<section className="mt-12">
-			<h2 className="text-2xl font-semibold">By the numbers</h2>
-			<p className="mt-1 text-sm" style={{ color: C.faint }}>Across all {N(r.n).toLocaleString()} reports that mention it.</p>
+		<section id="numbers" className="mt-14" style={{ scrollMarginTop: 16 }}>
+			<ArticleH2 icon={BarChart3} sub={`Across all ${N(r.n).toLocaleString()} reports that mention it.`}>By the numbers</ArticleH2>
 			<div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<div className={tile}>
 					<span className="rd-label">How it went</span>
@@ -3436,6 +3536,189 @@ function EffectPage({ name, onSubstance, onCombo, onEffect, onReport }: { name: 
 	);
 }
 
+// ── Substance article layout ──────────────────────────────────────
+// A substance page reads like an article: a sticky contents list on the left, a hero card, then sections with
+// accent headings.
+
+const ACCENT = '#e6b8ff';
+
+function ArticleH2({ icon: Icon, children, sub }: { icon: typeof Clock; children: React.ReactNode; sub?: string }) {
+	return (
+		<div>
+			<div className="flex items-center gap-3">
+				<Icon size={26} color={ACCENT} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+				<h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: ACCENT, whiteSpace: 'nowrap' }}>{children}</h2>
+				<span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, rgba(230,184,255,.35), transparent)' }} />
+			</div>
+			{sub && <p className="mt-1.5 text-sm" style={{ color: C.faint }}>{sub}</p>}
+		</div>
+	);
+}
+
+// Sticky list of the page's sections; the one you're reading is highlighted.
+function ContentsNav({ items }: { items: { id: string; label: string; icon: typeof Clock }[] }) {
+	const [here, setHere] = useState(items[0]?.id);
+	useEffect(() => {
+		const els = items.map((it) => document.getElementById(it.id)).filter(Boolean) as HTMLElement[];
+		if (!els.length || typeof IntersectionObserver === 'undefined') return;
+		const seen = new Map<string, boolean>();
+		const io = new IntersectionObserver(
+			(entries) => {
+				for (const e of entries) seen.set(e.target.id, e.isIntersecting);
+				const first = items.find((it) => seen.get(it.id));
+				if (first) setHere(first.id);
+			},
+			{ rootMargin: '-15% 0px -60% 0px' },
+		);
+		els.forEach((el) => io.observe(el));
+		return () => io.disconnect();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [items.map((i) => i.id).join(',')]);
+	return (
+		<nav className="rd-contents" aria-label="Contents">
+			<div className="rd-label mb-3 px-3">Contents</div>
+			{items.map((it) => (
+				<button
+					key={it.id}
+					onClick={() => document.getElementById(it.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+					className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm"
+					style={{ background: here === it.id ? 'rgba(255,255,255,.1)' : 'transparent', color: here === it.id ? '#fff' : C.soft, transition: 'background .2s, color .2s' }}
+				>
+					<it.icon size={15} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.85 }} />
+					{it.label}
+				</button>
+			))}
+		</nav>
+	);
+}
+
+// PsychonautWiki's dose ranges and durations per route.
+const dosageSQL = (name: string) => `
+SELECT r.* FROM ${DB}."routes_of_administration" r JOIN ${DB}."substances" s ON s.id = r.substance_id
+WHERE s.name = '${esc(name)}'`;
+
+const DOSE_ROWS: { key: string; label: string; tint: string }[] = [
+	{ key: 'threshold', label: 'Threshold', tint: 'rgba(72,190,150,.42)' },
+	{ key: 'light', label: 'Light', tint: 'rgba(70,150,210,.42)' },
+	{ key: 'common', label: 'Common', tint: 'rgba(205,170,60,.42)' },
+	{ key: 'strong', label: 'Strong', tint: 'rgba(215,120,60,.42)' },
+	{ key: 'heavy', label: 'Heavy', tint: 'rgba(210,70,90,.45)' },
+];
+const num = (v: unknown) => (v == null ? '' : String(Math.round(N(v) * 1000) / 1000));
+// PsychonautWiki stores durations as "15.0-30.0" without units: onset and come-up are minutes, the rest hours.
+const pwDur = (v: unknown, minutes: boolean) => {
+	const t = S(v).trim();
+	if (!t) return '';
+	const [a, b] = t.split('-').map((x) => num(x));
+	const range = b && b !== a ? `${a}–${b}` : a;
+	return `${range} ${minutes ? 'min' : Number(b || a) === 1 ? 'hour' : 'hours'}`;
+};
+
+// Dosage (PsychonautWiki, per route) next to duration (what the stories show, plus PsychonautWiki's figures).
+function DosageDuration({ name, timing }: { name: string; timing: Record<string, unknown>[] }) {
+	const q = useSQLQuery(dosageSQL(name));
+	const pw = rows(q);
+	const ours = timing.filter((t) => S(t.sub) === name);
+	const routes = [...new Set([...ours.filter((t) => S(t.route) !== '*').map((t) => S(t.route)), ...pw.map((r) => normRoute(S(r.route)))])];
+	const [route, setRoute] = useState<string | null>(null);
+	const sel = route && routes.includes(route) ? route : routes[0] ?? '*';
+	const p = pw.find((r) => normRoute(S(r.route)) === sel);
+	const t = ours.find((x) => S(x.route) === sel) ?? ours.find((x) => S(x.route) === '*');
+	const tOwn = ours.find((x) => S(x.route) === sel);
+	if (q.isLoading) return <Loading height={260} className="mt-5" quiet />;
+	if (!p && !t) return <p className="mt-4 text-sm" style={{ color: C.faint }}>No dose or timing information on file yet.</p>;
+	const units = S(p?.dose_units);
+	const dose = (k: string) => {
+		if (!p) return '';
+		if (k === 'threshold') return p.dose_threshold != null ? `~${num(p.dose_threshold)} ${units}` : '';
+		if (k === 'heavy') return p.dose_heavy != null ? `${num(p.dose_heavy)}+ ${units}` : '';
+		const lo = p[`dose_${k}_min`], hi = p[`dose_${k}_max`];
+		return lo != null ? `${num(lo)}${hi != null && N(hi) !== N(lo) ? `–${num(hi)}` : ''} ${units}` : '';
+	};
+	const durRows: [string, string][] = p
+		? ([
+				['Onset', pwDur(p.duration_onset, true)],
+				['Come-up', pwDur(p.duration_comeup, true)],
+				['Peak', pwDur(p.duration_peak, false)],
+				['Offset', pwDur(p.duration_offset, false)],
+				['After effects', pwDur(p.duration_aftereffects, false)],
+				['Total', pwDur(p.duration_total, false)],
+			] as [string, string][]).filter(([, v]) => v)
+		: [];
+	const row = 'flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm';
+	const mono = { fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12.5 };
+	return (
+		<div className="mt-5">
+			{routes.length > 0 && (
+				<div className="flex flex-wrap gap-2">
+					{routes.map((r) => (
+						<button key={r} onClick={() => setRoute(r)} className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold" style={{ background: sel === r ? 'rgba(230,184,255,.18)' : 'rgba(255,255,255,.05)', border: `1px solid ${sel === r ? 'rgba(230,184,255,.5)' : C.line}`, color: sel === r ? '#fff' : C.soft }}>
+							<RouteIcon route={r} size={15} color={sel === r ? ACCENT : C.soft} />
+							{r[0].toUpperCase() + r.slice(1)}
+						</button>
+					))}
+				</div>
+			)}
+			<div className="mt-4 grid gap-4 lg:grid-cols-2">
+				<div className="rd-card p-5">
+					<div className="flex items-center gap-2 font-semibold">
+						<BarChart3 size={17} color={ACCENT} /> Dosage
+					</div>
+					{p && DOSE_ROWS.some((d) => dose(d.key)) ? (
+						<>
+							<p className="mt-2 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+								<AlertTriangle size={13} /> Doses are population estimates that vary widely between people.
+							</p>
+							<div className="mt-3 grid gap-1.5">
+								{DOSE_ROWS.filter((d) => dose(d.key)).map((d) => (
+									<div key={d.key} className={row} style={{ background: `linear-gradient(90deg, ${d.tint}, rgba(255,255,255,.03) 70%)`, border: `1px solid ${C.line}` }}>
+										<span>{d.label}</span>
+										<span style={mono}>{dose(d.key)}</span>
+									</div>
+								))}
+							</div>
+							<p className="mt-3 text-xs" style={{ color: C.faint }}>
+								From{' '}
+								<a href={SOURCES.pw.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+									PsychonautWiki
+								</a>
+								.
+							</p>
+						</>
+					) : (
+						<p className="mt-3 text-sm" style={{ color: C.faint }}>No dose ranges on file for this route.</p>
+					)}
+				</div>
+				<div className="rd-card p-5">
+					<div className="flex items-center gap-2 font-semibold">
+						<Clock size={17} color={ACCENT} /> Duration
+					</div>
+					{t && (
+						<div className="mt-3">
+							<div className="rd-label mb-2">In the stories{tOwn ? '' : ' (all routes)'}</div>
+							<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} />
+							<p className="mt-2 text-xs" style={{ color: C.faint }}>From {N(t.n)} closely read stories.</p>
+						</div>
+					)}
+					{durRows.length > 0 && (
+						<div className={t ? 'mt-5' : 'mt-3'}>
+							<div className="rd-label mb-2">PsychonautWiki</div>
+							<div className="grid gap-1.5">
+								{durRows.map(([k, v]) => (
+									<div key={k} className={row} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${C.line}` }}>
+										<span>{k}</span>
+										<span style={mono}>{v}</span>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
 // ── Small pieces ──────────────────────────────────────────────────
 
 const TRIPSIT_COMBOS = 'https://wiki.tripsit.me/wiki/Drug_combinations';
@@ -4025,24 +4308,47 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	return (
 		<section className="rd-fade" style={{ position: 'relative', zIndex: 0 }}>
 			{risk >= 2 && <div aria-hidden className="rd-tint" style={{ background: RISK_TINT[risk] }} />}
+			{withSub && (
+				<div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
 			<h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-4xl font-semibold sm:text-5xl">
-				{[sub, ...(withSub ? [withSub] : [])].map((n, i) => (
-					<span key={n} className="inline-flex items-center gap-3" style={{ whiteSpace: 'nowrap' }}>
-						{i > 0 && <span style={{ color: risk >= 2 ? RISK[risk].c : C.faint, fontWeight: 300 }}>+</span>}
-						<button title={n} onClick={() => open({ kind: 'substance', name: n })} className="inline-flex items-center gap-3">
-							<SubstanceIcon name={n} />
-							{short(n)}
-						</button>
-						{isGroup(n) && <GroupBadge />}
-					</span>
-				))}
-			</h1>
+						{[sub, ...(withSub ? [withSub] : [])].map((n, i) => (
+							<span key={n} className="inline-flex items-center gap-3" style={{ whiteSpace: 'nowrap' }}>
+								{i > 0 && <span style={{ color: risk >= 2 ? RISK[risk].c : C.faint, fontWeight: 300 }}>+</span>}
+								<button title={n} onClick={() => open({ kind: 'substance', name: n })} className="inline-flex items-center gap-3">
+									<SubstanceIcon name={n} />
+									{short(n)}
+								</button>
+								{isGroup(n) && <GroupBadge />}
+							</span>
+						))}
+					</h1>
+					<Sources className="pb-1.5" list={['erowid', 'sei', 'pw', 'tripsit']} />
+				</div>
+			)}
+			{/* Substance pages read like an article: contents on the left, sections on the right. */}
+			<div className={withSub ? '' : 'rd-article'}>
+				{!withSub && (
+					<div className="rd-contents">
+						<ContentsNav
+							items={[
+								{ id: 'overview', label: 'Overview', icon: FileText },
+								{ id: 'dosage', label: 'Dosage & duration', icon: Clock },
+								{ id: 'feel', label: 'What people feel', icon: Sparkles },
+								{ id: 'numbers', label: 'By the numbers', icon: BarChart3 },
+								{ id: 'mixes', label: 'Often mixed with', icon: Link2 },
+								{ id: 'unfold', label: 'How it unfolds', icon: Activity },
+								{ id: 'stories', label: 'Stories', icon: BookOpen },
+							]}
+						/>
+						<Sources className="mt-6 px-3" list={['erowid', 'pw', 'sei', 'tripsit']} />
+					</div>
+				)}
+				<div className="min-w-0">
 			{!withSub && <SubstanceOverview name={sub} />}
 			{!withSub && <SubstanceNumbers name={sub} />}
 			{!withSub && (
-				<section className="mt-12">
-					<h2 className="text-2xl font-semibold">Often mixed with</h2>
-					<p className="mt-1 text-sm" style={{ color: C.faint }}>Tap a mix to see how it tends to go together.</p>
+				<section id="mixes" className="mt-14" style={{ scrollMarginTop: 16 }}>
+					<ArticleH2 icon={Link2} sub="Tap a mix to see how it tends to go together.">Often mixed with</ArticleH2>
 					<div className="rd-card mt-5 p-5">
 						<CombosList name={sub} onCombo={onCombo} bare />
 					</div>
@@ -4056,7 +4362,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				))}
 				<span className="text-xs" style={{ color: C.faint }}>{only ? 'Nothing else taken' : 'May include other substances'}</span>
 			</div>
-			<Sources className="mt-4" list={['erowid', 'sei', 'pw', ...(withSub ? ['tripsit' as const] : [])]} />
 			{withSub &&
 				(pairQ.isLoading ? (
 					<div className="rd-card mt-6 p-5" style={{ color: C.faint }}>Checking interaction notes…</div>
@@ -4100,11 +4405,15 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					{N(rows(denQ)[0]?.total) >= 20 && series.length > 0 && <div className="rd-card mt-4 p-5 text-sm" style={{ color: C.faint }}>Based on {N(rows(denQ)[0]?.total)} closely read reports with both.</div>}
 				</>
 			) : series.length > 0 ? (
-				<section className="mt-10 border-t pt-7" style={{ borderColor: C.line }}>
-					<div className="flex flex-wrap items-baseline justify-between gap-2">
-						<h2 className="text-2xl font-semibold">{withSub ? 'How it tends to unfold together' : 'How it tends to unfold'}</h2>
-						<span className="text-sm" style={{ color: C.faint }}>From {N(rows(denQ)[0]?.total)} closely read reports · % mentioning each effect · drag across</span>
-					</div>
+				<section id="unfold" className={withSub ? 'mt-10 border-t pt-7' : 'mt-14'} style={{ borderColor: C.line, scrollMarginTop: 16 }}>
+					{withSub ? (
+						<div className="flex flex-wrap items-baseline justify-between gap-2">
+							<h2 className="text-2xl font-semibold">How it tends to unfold together</h2>
+							<span className="text-sm" style={{ color: C.faint }}>From {N(rows(denQ)[0]?.total)} closely read reports · % mentioning each effect · drag across</span>
+						</div>
+					) : (
+						<ArticleH2 icon={Activity} sub={`From ${N(rows(denQ)[0]?.total)} closely read reports · % mentioning each effect · drag across`}>How it unfolds</ArticleH2>
+					)}
 					<div className="mt-5">
 						<ScrubChart
 							id="sub"
@@ -4136,10 +4445,16 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 
 			{(
 				<>
-			<div className="mt-10 flex flex-wrap items-end justify-between gap-3">
-				<div>
-					<h2 className="text-2xl font-semibold">{withSub ? 'Stories with both' : 'Stories'}</h2>
-					<p className="mt-1 text-sm" style={{ color: C.faint }}>What people went through, in their own words. Closely read ones first.</p>
+			<div id="stories" className={`${withSub ? 'mt-10' : 'mt-14'} flex flex-wrap items-end justify-between gap-3`} style={{ scrollMarginTop: 16 }}>
+				<div className="min-w-0 flex-1">
+					{withSub ? (
+						<>
+							<h2 className="text-2xl font-semibold">Stories with both</h2>
+							<p className="mt-1 text-sm" style={{ color: C.faint }}>What people went through, in their own words. Closely read ones first.</p>
+						</>
+					) : (
+						<ArticleH2 icon={BookOpen} sub="What people went through, in their own words. Closely read ones first.">Stories</ArticleH2>
+					)}
 				</div>
 				<button onClick={shuffle} className="rd-btn flex items-center gap-2">
 					<Shuffle size={15} /> Random
@@ -4165,6 +4480,8 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 			)}
 				</>
 			)}
+				</div>
+			</div>
 			<Err q={q} />
 		</section>
 	);
