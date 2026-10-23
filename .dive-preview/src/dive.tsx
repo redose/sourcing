@@ -781,15 +781,20 @@ const CSS = `
 @keyframes rd-letter { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(var(--dx), var(--dy)) rotate(var(--r)); } }
 /* The background molecules slowly cycle through the rainbow. */
 @keyframes rd-mol-hue { from { filter: sepia(1) saturate(3.2) hue-rotate(0deg); } to { filter: sepia(1) saturate(3.2) hue-rotate(360deg); } }
-.rd-tripping .rd-molecules { opacity: .11; animation: rd-drift 240s linear infinite, rd-mol-hue 16s linear infinite; }
-.rd-tripping .rd-molecules.b { opacity: .07; animation: rd-drift 340s linear infinite reverse, rd-mol-hue 22s linear infinite reverse; }
+.rd-fx-rainbow .rd-molecules { opacity: .11; animation: rd-drift 240s linear infinite, rd-mol-hue 16s linear infinite; }
+.rd-fx-rainbow .rd-molecules.b { opacity: .07; animation: rd-drift 340s linear infinite reverse, rd-mol-hue 22s linear infinite reverse; }
 .rd-tripping :is(h1, h2, h3, p, li):not([data-rd-letters]):not([data-rd-safe] *) { animation: rd-wave 5.5s ease-in-out infinite, rd-tint 17s linear infinite; }
 /* Different lengths and starting points per element, so the text seems to drift at random rather than in step. */
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 6.7s, 23s; animation-delay: -1.3s, -9s; }
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-duration: 4.9s, 19s; animation-delay: -2.9s, -4s; animation-direction: reverse, normal; }
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(5n) { animation-duration: 7.3s, 29s; animation-delay: -4.1s, -17s; }
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(7n) { animation-duration: 5.1s, 13s; animation-delay: -0.6s, -11s; animation-direction: alternate-reverse, normal; }
-@media (prefers-reduced-motion: reduce) { .rd-tripping :is(h1, h2, h3, p, li), .rd-tripping .rd-molecules { animation: none; } }
+/* Effect previews: occasional colour glow on text, or colour drained away. */
+.rd-fx-tint :is(h1, h2, h3, p, li):not([data-rd-safe] *) { animation: rd-tint 17s linear infinite; }
+.rd-fx-tint :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 23s; animation-delay: -9s; }
+.rd-fx-tint :is(h1, h2, h3, p, li):nth-child(3n) { animation-duration: 13s; animation-delay: -5s; }
+.rd-fx-desat { filter: saturate(.2); transition: filter 1.2s; }
+@media (prefers-reduced-motion: reduce) { .rd-tripping :is(h1, h2, h3, p, li), .rd-fx-rainbow .rd-molecules, .rd-fx-tint :is(h1, h2, h3, p, li) { animation: none; } }
 /* The accent is the logo coral, except on cannabis pages, where it goes green (safety colours stay as they are). */
 .rd { --rd-accent: ${C.coral}; --rd-select: rgba(252,108,132,.45); }
 .rd.rd-green { --rd-accent: #8fe3a4; --rd-select: rgba(120,220,140,.45); }
@@ -879,6 +884,9 @@ const CSS = `
 .rd-stretches > li { padding-right: 14px; }
 .rd-legal summary::-webkit-details-marker { display: none; }
 .rd-legal:hover, .rd-legal[open] { background: rgba(255,255,255,.06); }
+.rd-mixbtn { opacity: 0; transition: opacity .2s; }
+.rd-subcard:hover .rd-mixbtn, .rd-mixbtn:focus-visible { opacity: 1; }
+@media (hover: none) { .rd-mixbtn { opacity: .7; } }
 .rd-glance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 32px; }
 @media (min-width: 1024px) { .rd-glance.wide { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .rd-glance > li { display: grid; align-content: start; gap: 3px; }
@@ -2530,7 +2538,7 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 								</>
 							)}
 							<div className="mt-4 grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
-								{items.map((r) => {
+								{(label && !focus && !needle ? items.slice(0, 8) : items).map((r) => {
 						const name = S(r.s);
 						const isFocus = focus === name;
 						const together = co.get(name);
@@ -2547,7 +2555,7 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 									else onPick(name);
 								}}
 								onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLElement).click()}
-								className="rd-card rd-hover px-4 py-3"
+								className="rd-card rd-hover rd-subcard px-4 py-3"
 								title={name}
 								style={{
 									cursor: 'pointer',
@@ -2560,13 +2568,12 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 							>
 								{/* The name gets its own line so it never gets squeezed; everything else sits small underneath. */}
 								<div className="flex items-center gap-2.5">
-									<ClassIcon cls={classOf(name)} size={20} color={isFocus ? C.text : C.lav} />
 									<span className="font-semibold" style={{ whiteSpace: 'nowrap' }} title={name}>
 										{short(name)}
 									</span>
 									{!focus && (
 										<button
-											className="rd-btn ml-auto"
+											className="rd-btn rd-mixbtn ml-auto"
 											title={`What ${short(name)} was mixed with`}
 											aria-label={`What ${short(name)} was mixed with`}
 											onClick={(e) => {
@@ -2579,7 +2586,7 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 										</button>
 									)}
 								</div>
-								<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style={{ paddingLeft: 30, color: C.faint }}>
+								<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style={{ color: C.faint }}>
 									<span className="tabular-nums" style={{ whiteSpace: 'nowrap' }}>
 										{focus && !isFocus && together != null ? `${together} together` : `${N(r.n)} reports`}
 									</span>
@@ -2594,6 +2601,16 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 						);
 								})}
 							</div>
+							{label && !focus && !needle && items.length > 8 && (
+								<div className="mt-4 grid gap-x-6 gap-y-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
+									{items.slice(8).map((r) => (
+										<button key={S(r.s)} onClick={() => onPick(S(r.s))} className="rd-hover flex min-w-0 items-baseline justify-between gap-2 rounded-lg px-2 py-1 text-left text-sm" style={{ marginLeft: -8 }} title={S(r.s)}>
+											<span style={{ color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{short(S(r.s))}</span>
+											<span className="text-xs tabular-nums" style={{ color: C.faint }}>{N(r.n)}</span>
+										</button>
+									))}
+								</div>
+							)}
 						</section>
 					))}
 				</>
@@ -3316,7 +3333,16 @@ function SlangSection({ name }: { name: string }) {
 // "By the numbers": four small tiles summarising every report that mentions the substance.
 function SubstanceNumbers({ name }: { name: string }) {
 	const q = useSQLQuery(substanceStatsSQL(name));
+	const effQ = useSQLQuery(substanceEffectsSQL(name));
+	const { effectInfo } = useContext(OpenCtx);
 	const r = rows(q)[0];
+	// What people felt: how many effects, how many in the body, and how many tend to feel good or rough.
+	const effs = rows(effQ);
+	const nPhys = effs.filter((e) => /physical/i.test(S(e.category))).length;
+	const nMind = effs.filter((e) => /cognitive/i.test(S(e.category))).length;
+	const nSense = effs.filter((e) => /visual|auditory|tactile|multisensory|smell/i.test(S(e.category))).length;
+	const nGood = effs.filter((e) => effectTone(effectInfo.get(S(e.name).toLowerCase())) === 'positive').length;
+	const nRough = effs.filter((e) => effectTone(effectInfo.get(S(e.name).toLowerCase())) === 'negative').length;
 	if (q.isLoading) return <Loading height={180} className="mt-6" quiet />;
 	if (!r || !N(r.n)) return null;
 	// Lists arrive as plain arrays locally and as Arrow vectors from MotherDuck; L() reads both.
@@ -3328,9 +3354,27 @@ function SubstanceNumbers({ name }: { name: string }) {
 	const men = N(r.men), women = N(r.women), people = men + women;
 	const tile = 'rd-card p-5 grid content-start gap-3';
 	return (
-		<section id="numbers" className="mt-24" style={{ scrollMarginTop: 16 }}>
-			<ArticleH2 icon={BarChart3} sub={`Across all ${N(r.n).toLocaleString()} reports that mention it.`}>How It Went</ArticleH2>
-			<div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+		<section id="numbers" className="mt-5">
+			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				{effs.length > 0 && (
+					<div className={tile}>
+						<span className="rd-label">What people felt</span>
+						<div className="text-3xl font-light tabular-nums" style={{ letterSpacing: '-0.02em' }}>
+							{effs.length} <span className="text-base" style={{ color: C.soft }}>effects</span>
+						</div>
+						<div className="text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
+							{nPhys} in the body · {nMind} in the mind · {nSense} in the senses
+						</div>
+						<div className="flex overflow-hidden rounded-full" style={{ height: 6, background: 'rgba(255,255,255,.08)' }}>
+							<span style={{ width: `${(100 * nGood) / effs.length}%`, background: C.mint }} />
+							<span style={{ flex: 1 }} />
+							<span style={{ width: `${(100 * nRough) / effs.length}%`, background: C.coral }} />
+						</div>
+						<div className="text-xs" style={{ color: C.faint }}>
+							<span style={{ color: C.mint }}>{nGood} mostly good</span> · <span style={{ color: C.coral }}>{nRough} mostly rough</span>
+						</div>
+					</div>
+				)}
 				<div className={tile}>
 					<span className="rd-label">How it went</span>
 					{N(r.n_x) >= 3 ? (
@@ -4867,6 +4911,60 @@ function EffectReplications({ name }: { name: string }) {
 	);
 }
 
+// Effects that get a gentle preview on their own page: letters drift, molecules go rainbow, text catches a glow
+// now and then, or colour drains away.
+const EFFECT_FX: Record<string, string[]> = {
+	drifting: ['letters'], breathing: ['letters'], melting: ['letters'], morphing: ['letters'],
+	'colour enhancement': ['rainbow'], 'colour shifting': ['rainbow'], 'colour replacement': ['rainbow'], synaesthesia: ['rainbow', 'tint'],
+	geometry: ['rainbow'], 'environmental patterning': ['rainbow'], 'symmetrical texture repetition': ['rainbow'],
+	tracers: ['tint'], 'brightness alteration': ['tint'],
+	'colour suppression': ['desat'],
+};
+
+let spunionGreeted = false;
+
+// ── Privacy ──────────────────────────────────────────────────────
+function PrivacyPage() {
+	const li = 'grid gap-1';
+	return (
+		<section className="rd-fade" style={{ maxWidth: 760 }}>
+			<h1 className="text-4xl font-semibold">Privacy</h1>
+			<p className="mt-3" style={{ color: C.soft, lineHeight: 1.7 }}>The short version: we don’t track you, we don’t log you, and we don’t store anything on your device.</p>
+			<div className="mt-8 grid gap-6" style={{ lineHeight: 1.7 }}>
+				<div className={li}>
+					<h2 className="text-xl font-semibold">No cookies</h2>
+					<p style={{ color: C.soft }}>re:dose sets no cookies of any kind, and stores nothing else in your browser either (no local storage, no tracking pixels, no fingerprinting).</p>
+				</div>
+				<div className={li}>
+					<h2 className="text-xl font-semibold">No logging, no analytics</h2>
+					<p style={{ color: C.soft }}>We don’t log your visits, what you search for, or what you read. There are no analytics, advertising or third-party trackers on the site.</p>
+				</div>
+				<div className={li}>
+					<h2 className="text-xl font-semibold">Nothing to sign up for</h2>
+					<p style={{ color: C.soft }}>There are no accounts and no forms, so we never ask for your name, email or anything else.</p>
+				</div>
+				<div className={li}>
+					<h2 className="text-xl font-semibold">Links out</h2>
+					<p style={{ color: C.soft }}>When you follow a link to another site (Erowid, TripSit, Effect Index and so on), that site’s own privacy policy applies.</p>
+				</div>
+				<div className={li}>
+					<h2 className="text-xl font-semibold">Hosting</h2>
+					<p style={{ color: C.soft }}>The pages and data are served by our hosting provider, which may keep standard technical logs to run its service under its own policy. We don’t ask for or use them. While re:dose runs inside MotherDuck, MotherDuck’s own sign-in and its cookies apply to their app, not to anything re:dose does.</p>
+				</div>
+				<div className={li}>
+					<h2 className="text-xl font-semibold">Questions</h2>
+					<p style={{ color: C.soft }}>
+						Ask us on{' '}
+						<a href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3 }}>Discord</a>
+						, or through the{' '}
+						<a href="https://ajar.org" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3 }}>AJAr Foundation</a>.
+					</p>
+				</div>
+			</div>
+		</section>
+	);
+}
+
 // ── Resources ────────────────────────────────────────────────────
 // Where to get help, get drugs checked, read up and find people. Help lines first, in their own safe box.
 const RESOURCE_GROUPS: { title: string; about: string; items: { name: string; href?: string; detail: string; where?: string }[] }[] = [
@@ -5815,7 +5913,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 								{ id: 'overview', label: 'Overview', icon: FileText },
 								{ id: 'dosage', label: 'Dosage & Duration', icon: Clock },
 								{ id: 'effects', label: 'Effects', icon: Sparkles },
-								{ id: 'numbers', label: 'How It Went', icon: BarChart3 },
 								{ id: 'mixes', label: 'Combinations', icon: Link2 },
 								{ id: 'risks', label: 'Health Risks', icon: AlertTriangle },
 								{ id: 'legal', label: 'Legal Status', icon: Scale },
@@ -5828,7 +5925,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				)}
 				<div className="min-w-0">
 			{!withSub && <SubstanceOverview name={sub} afterDosage={curveQ.isLoading || kq.isLoading ? <Loading height={320} className="mt-24" quiet /> : enoughToChart || rows(effectsListQ).length > 0 ? unfoldSection : null} />}
-			{!withSub && <SubstanceNumbers name={sub} />}
 			{!withSub && <MixingBoard name={sub} onCombo={onCombo} />}
 			{!withSub && <KnownRisks name={sub} />}
 			{!withSub && <SubstanceLegality name={sub} />}
@@ -5892,6 +5988,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					<Shuffle size={15} /> Random
 				</button>
 			</div>
+			{!withSub && <SubstanceNumbers name={sub} />}
 			{q.isLoading ? (
 				<Loading height={260} className="mt-4" quiet />
 			) : list.length === 0 ? (
@@ -6800,7 +6897,7 @@ function SpunionSvg() {
 // Trip mode's drifting letters. For the headings and paragraphs on screen, every letter is copied into an overlay
 // at its exact spot and drifts on its own small random path; the original text goes invisible meanwhile (by a data
 // attribute React doesn't manage) and comes back untouched when it ends. Rebuilt after scrolling or resizing.
-function TripLetters({ scope }: { scope: React.RefObject<HTMLElement | null> }) {
+function TripLetters({ scope, gentle }: { scope: React.RefObject<HTMLElement | null>; gentle?: boolean }) {
 	const box = useRef<HTMLDivElement | null>(null);
 	useEffect(() => {
 		const layer = box.current, root = scope.current;
@@ -6837,7 +6934,7 @@ function TripLetters({ scope }: { scope: React.RefObject<HTMLElement | null> }) 
 						const sp = document.createElement('span');
 						sp.textContent = ch;
 						const far = Math.random() < 0.03;
-						const amp = far ? 3 : 0.4 + Math.random() * 1.1;
+						const amp = (far ? 3 : 0.4 + Math.random() * 1.1) * (gentle ? 0.6 : 1);
 						sp.style.cssText = `left:${b.left - origin.left}px;top:${b.top - origin.top}px;font:${cs.font};letter-spacing:${cs.letterSpacing};color:${cs.color};--dx:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--dy:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--r:${((Math.random() - 0.5) * (far ? 8 : 3)).toFixed(1)}deg;animation-duration:${(3.2 + Math.random() * 4).toFixed(2)}s,${(14 + Math.random() * 20).toFixed(1)}s;animation-delay:-${(Math.random() * 6).toFixed(2)}s,-${(Math.random() * 30).toFixed(1)}s`;
 						frag.appendChild(sp);
 						count++;
@@ -6862,7 +6959,7 @@ function TripLetters({ scope }: { scope: React.RefObject<HTMLElement | null> }) 
 			window.removeEventListener('resize', later);
 			clear();
 		};
-	}, [scope]);
+	}, [scope, gentle]);
 	return <div ref={box} className="rd-letters" aria-hidden />;
 }
 
@@ -7077,7 +7174,7 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 type Q = ReturnType<typeof useSQLQuery>;
 
 export default function ReportTimelapse() {
-	const [savedView, setView] = useDiveState<'reports' | 'substances' | 'effects' | 'resources'>('view', 'substances');
+	const [savedView, setView] = useDiveState<'reports' | 'substances' | 'effects' | 'resources' | 'privacy'>('view', 'substances');
 	// Easter egg: copy the word "psychedelic" from anywhere on the page, or poke the corner Spunion five times
 	// quickly. Esc comes down; it wears off by itself after 30 seconds.
 	const [trip, setTrip] = useState(false);
@@ -7116,6 +7213,16 @@ export default function ReportTimelapse() {
 	const [only, setOnly] = useDiveState<boolean>('only', false);
 	const [openItem, setOpenItemState] = useDiveState<Open>('open', null);
 	const [effect, setEffect] = useDiveState<string | null>('effect', null);
+	// On an effect's own page, a gentle taste of that effect (see EFFECT_FX); trip mode turns them all on.
+	const [fxOff, setFxOff] = useState(false);
+	useEffect(() => setFxOff(false), [effect]);
+	const pageFx = view === 'effects' && effect ? EFFECT_FX[effect.toLowerCase()] ?? [] : [];
+	// Synaesthesia lingers: once you've visited it, its colours stay on as you browse until you turn them off.
+	const [synOn, setSynOn] = useState(false);
+	useEffect(() => {
+		if (effect?.toLowerCase() === 'synaesthesia') setSynOn(true);
+	}, [effect]);
+	const fx = trip ? ['letters', 'rainbow', 'sway'] : [...(fxOff ? [] : pageFx), ...(synOn ? ['rainbow', 'tint'] : [])];
 	const setOpenItem = (o: Open) => setOpenItemState((o ?? undefined) as Open);
 	const [, setAtLink] = useDiveState<number | null>('at', null);
 
@@ -7188,19 +7295,10 @@ export default function ReportTimelapse() {
 		setOpenItem(null);
 	};
 	// Spunion only speaks up when it matters: a risky pair or a first hello. On reports he delivers the mix banner.
-	const [greeted] = useState(() => {
-		try {
-			return window.localStorage.getItem('rd-spunion-hi') === '1';
-		} catch {
-			return true;
-		}
-	});
+	// Remembered for this visit only: nothing is stored in the browser (see the privacy page).
+	const [greeted] = useState(() => spunionGreeted);
 	useEffect(() => {
-		try {
-			window.localStorage.setItem('rd-spunion-hi', '1');
-		} catch {
-			/* private mode: he'll just say hi again next time */
-		}
+		spunionGreeted = true;
 	}, []);
 	const pairSev = onSub && withSub ? N(rows(comboPairQ)[0]?.sev) : 0;
 	// On a substance page his tip comes from its own timing (the same numbers as the page's dose curve), and only when
@@ -7242,7 +7340,7 @@ export default function ReportTimelapse() {
 		setOpenItem(null);
 		window.scrollTo?.({ top: 0 });
 	};
-	const goView = (v: 'reports' | 'substances' | 'effects' | 'resources') => {
+	const goView = (v: 'reports' | 'substances' | 'effects' | 'resources' | 'privacy') => {
 		window.scrollTo?.({ top: 0 });
 		setView(v);
 		setRoutePick(undefined as unknown as null);
@@ -7255,7 +7353,8 @@ export default function ReportTimelapse() {
 	// Tab title: the page you're on, then the site ("MDMA – re:dose").
 	useEffect(() => {
 		const page =
-			view === 'resources' ? 'Resources'
+			view === 'privacy' ? 'Privacy'
+			: view === 'resources' ? 'Resources'
 			: view === 'effects' ? effect || 'Effects'
 			: view === 'reports' && reportId ? `Story #${reportId.replace('erowid-', '')}`
 			: view === 'reports' && sub ? (withSub ? `${short(sub)} + ${short(withSub)}` : short(sub))
@@ -7279,15 +7378,20 @@ export default function ReportTimelapse() {
 		<OpenCtx.Provider value={{ open: setOpenItem, effectInfo, classOf: (n: string) => classMap.get(n) }}>
 			<main className={`rd ${onSub && !withSub && sub === 'Cannabis' ? 'rd-green' : ''}`} style={{ minHeight: '100vh', background: BG, color: C.text, position: 'relative' }}>
 				<style>{CSS}</style>
+				{fx.includes('letters') && <TripLetters scope={pageRef} gentle={!trip} />}
+				{synOn && !(view === 'effects' && effect?.toLowerCase() === 'synaesthesia') && (
+					<button className="rd-btn text-xs" onClick={() => setSynOn(false)} style={{ position: 'fixed', left: 16, bottom: 16, zIndex: 50, padding: '6px 12px' }}>
+						Synaesthesia is on · Turn off
+					</button>
+				)}
 				{trip && (
 					<>
-						<TripLetters scope={pageRef} />
 						<button className="rd-btn text-sm" onClick={() => setTrip(false)} style={{ position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 70, background: '#fff', color: C.deep }}>
 							Come down (Esc)
 						</button>
 					</>
 				)}
-				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${trip ? 'rd-tripping' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 110 }}>
+				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${fx.includes('sway') ? 'rd-tripping' : ''} ${fx.includes('rainbow') ? 'rd-fx-rainbow' : ''} ${fx.includes('tint') ? 'rd-fx-tint' : ''} ${fx.includes('desat') ? 'rd-fx-desat' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 110 }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '90px 140px' }} />
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
@@ -7359,15 +7463,25 @@ export default function ReportTimelapse() {
 							<span style={{ color: C.text, fontWeight: 600 }}>{effect}</span>
 						</nav>
 					)}
+					{view === 'effects' && effect && pageFx.length > 0 && (
+						<div className="mb-4 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint }}>
+							<Sparkles size={13} />
+							{fxOff ? 'Preview off.' : 'Showing a gentle taste of this effect on the page.'}
+							<button onClick={() => setFxOff(!fxOff)} style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+								{fxOff ? 'Turn on' : 'Turn off'}
+							</button>
+						</div>
+					)}
 					{view === 'effects' && effect && <EffectPage name={effect} onSubstance={goSubstance} onCombo={goCombo} onEffect={goEffect} onReport={goReport} />}
 					{view === 'effects' && !effect && <EffectsBrowse q={effectsQ} onEffect={goEffect} />}
 					{view === 'resources' && <ResourcesPage />}
+					{view === 'privacy' && <PrivacyPage />}
 
 					<footer className="mt-16 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-t pt-6 text-sm" style={{ borderColor: C.line, color: C.soft }}>
 						{(
 							<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 								<span className="text-xs" style={{ color: C.faint }}>With thanks to</span>
-								{(Object.keys(SOURCES) as (keyof typeof SOURCES)[]).filter((k) => k !== 'motherduck').map((k) => (
+								{(Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map((k) => (
 									<a key={k} className="rd-thanks" href={SOURCES[k].href} target="_blank" rel="noopener noreferrer" title={SOURCES[k].gives} style={{ color: C.soft }}>
 										<img src={SOURCES[k].logo} alt="" width={15} height={15} />
 										{SOURCES[k].name}
@@ -7378,24 +7492,23 @@ export default function ReportTimelapse() {
 						<div className="flex flex-wrap items-center gap-4">
 							<a className="rd-thanks" href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" title="Talk things through with the re:dose community" style={{ color: C.soft }}>
 								<DiscordIcon size={15} />
-								Join us on Discord
+								Discord
 							</a>
 							<a className="rd-thanks" href={REDOSE_GITHUB} target="_blank" rel="noopener noreferrer" title="The code behind re:dose" style={{ color: C.soft }}>
 								<GitHubIcon size={15} />
 								GitHub
-							</a>
-							<a className="rd-thanks" href={SOURCES.motherduck.href} target="_blank" rel="noopener noreferrer" title="MotherDuck hosts the database behind re:dose. Not affiliated with re:dose." style={{ color: C.soft }}>
-								<img src={SOURCES.motherduck.logo} alt="" width={15} height={15} />
-								Thanks to MotherDuck
 							</a>
 						</div>
 						<p className="w-full text-xs" style={{ color: C.faint, lineHeight: 1.6, maxWidth: 860 }}>
 							<b style={{ color: C.soft }}>Not medical advice.</b> re:dose is for information and harm reduction only. It can’t tell you whether a substance, dose or combination is safe for you: bodies, health conditions, medications and tolerance differ, and drugs bought on the street often aren’t what they’re sold as. Experiences here are self-reported and may be wrong. Talk to a doctor or pharmacist before combining anything with prescribed medication. If you or someone with you is in danger, call your local emergency number right away.
 						</p>
 						<p className="w-full text-xs" style={{ color: C.faint, lineHeight: 1.6, maxWidth: 860 }}>
-							Except where otherwise indicated, re:dose is dedicated to the public domain by the AJAr Foundation under{' '}
+							Except where otherwise indicated, re:dose is dedicated to the public domain by the{' '}
+							<a href="https://ajar.org" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>AJAr Foundation</a> under{' '}
 							<a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>CC0 1.0</a>
-							. Material from our sources (experiences from Erowid, effect descriptions from the Subjective Effect Index, combination ratings from TripSit, replications by their artists) keeps its own terms.
+							. Material from our sources (experiences from Erowid, combination ratings from TripSit, replications by their artists) keeps its own terms. Effect names, categories and descriptions © Effect Index and contributors, used under{' '}
+							<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>CC BY-NC-SA 4.0</a>; we shorten descriptions to their first sentence, and those shortened versions are shared under the same licence.{' '}
+							<button onClick={() => goView('privacy')} style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>Privacy</button>
 						</p>
 					</footer>
 				</div>
