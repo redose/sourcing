@@ -2680,15 +2680,18 @@ function SubstanceOverview({ name }: { name: string }) {
 	return (
 		<>
 			<section id="overview" className="rd-in" style={{ scrollMarginTop: 16 }}>
-				<div className={`grid items-center gap-8 ${molecule ? 'lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]' : ''}`}>
+				<div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+					<div className="flex flex-wrap items-center gap-3">
+						<h1 className="flex items-center gap-3 text-4xl font-semibold sm:text-5xl">
+							<SubstanceIcon name={name} />
+							{short(name)}
+						</h1>
+						{isGroup(name) && <GroupBadge />}
+					</div>
+					<Sources className="pt-3" list={['erowid', 'pw', 'sei', 'tripsit']} />
+				</div>
+				<div className={`mt-2 grid items-center gap-8 ${molecule ? 'lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]' : ''}`}>
 					<div className="min-w-0">
-						<div className="flex flex-wrap items-center gap-3">
-							<h1 className="flex items-center gap-3 text-4xl font-semibold sm:text-5xl">
-								<SubstanceIcon name={name} />
-								{short(name)}
-							</h1>
-							{isGroup(name) && <GroupBadge />}
-						</div>
 						<div className="mt-4 grid gap-2.5" style={{ color: C.soft }}>
 							{short(name) !== name && (
 								<div className="flex items-center gap-3">
@@ -3996,7 +3999,7 @@ function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, numb
 		shapes.push({
 			z: (p.z + q.z) / 2 - 0.01,
 			node: (
-				<g key={`b${i}`} stroke="rgba(255,255,255,.72)" strokeWidth={Math.max(2, k * 0.085)} strokeLinecap="round">
+				<g key={`b${i}`} stroke="rgba(255,255,255,.58)" strokeWidth={Math.max(2, k * 0.08)} strokeLinecap="round">
 					{lines.map(([u, v], j) => (
 						<line key={j} x1={p.x + u} y1={p.y + v} x2={q.x + u} y2={q.y + v} />
 					))}
@@ -4007,7 +4010,7 @@ function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, numb
 	pts.forEach((p, i) =>
 		shapes.push({
 			z: p.z,
-			node: <circle key={`a${i}`} cx={p.x} cy={p.y} r={p.r} fill={`url(#mol-${ATOM_COLOR[p.el] ? p.el : 'X'})`} stroke="rgba(20,12,50,.45)" strokeWidth={1} />,
+			node: <circle key={`a${i}`} cx={p.x} cy={p.y} r={p.r} fill={`url(#mol-${ATOM_COLOR[p.el] ? p.el : 'X'})`} fillOpacity={0.85} stroke="rgba(20,12,50,.35)" strokeWidth={1} />,
 		}),
 	);
 	shapes.sort((a, b) => a.z - b.z);
@@ -4038,7 +4041,7 @@ function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, numb
 						<radialGradient key={el} id={`mol-${el}`} cx="35%" cy="32%" r="70%">
 							<stop offset="0%" stopColor="#ffffff" />
 							<stop offset="35%" stopColor={c} />
-							<stop offset="100%" stopColor={c} stopOpacity="0.45" />
+							<stop offset="100%" stopColor={c} stopOpacity="0.3" />
 						</radialGradient>
 					);
 				})}
@@ -4696,7 +4699,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 								{ id: 'stories', label: 'Stories', icon: BookOpen },
 							]}
 						/>
-						<Sources className="mt-6 px-3" list={['erowid', 'pw', 'sei', 'tripsit']} />
 					</div>
 				)}
 				<div className="min-w-0">
@@ -5675,7 +5677,7 @@ function SpunionSvg() {
 			<g className="sp-body">
 				<path
 					d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
-					fill="#7ffcc4"
+					fill="#5ae0e4"
 					stroke="#000"
 					strokeWidth="18"
 					strokeLinejoin="round"
