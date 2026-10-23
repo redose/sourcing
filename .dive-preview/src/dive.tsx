@@ -758,6 +758,21 @@ const SERIF = '"Iowan Old Style", "Charter", "Palatino Linotype", Palatino, Geor
 const BG = 'linear-gradient(170deg, #3a2e74 0%, #4f42a0 55%, #6152b4 100%)';
 
 const CSS = `
+/* Easter egg: trip mode. Slow, smooth changes only (nothing flashes): the page warps and breathes, colours drift. */
+@keyframes rd-trip-hue { from { filter: url(#rd-trip-warp) saturate(1.5) hue-rotate(0deg); } to { filter: url(#rd-trip-warp) saturate(1.5) hue-rotate(360deg); } }
+@keyframes rd-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
+@keyframes rd-spin { to { transform: rotate(360deg); } }
+@keyframes rd-rings { 0%, 100% { transform: scale(1); opacity: .08; } 50% { transform: scale(1.18); opacity: .16; } }
+.rd-tripping { animation: rd-trip-hue 18s linear infinite, rd-breathe 5s ease-in-out infinite; transform-origin: 50% 30%; }
+.rd-trip-mandala { position: fixed; inset: -30%; pointer-events: none; z-index: 60; mix-blend-mode: screen; opacity: .15;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, #fc6c84 0deg 8deg, #5ae0e4 8deg 16deg, #8a7ddc 16deg 24deg, #58e2d8 24deg 32deg);
+  -webkit-mask-image: radial-gradient(circle, transparent 12%, #000 65%); mask-image: radial-gradient(circle, transparent 12%, #000 65%); animation: rd-spin 80s linear infinite; }
+.rd-trip-rings { position: fixed; inset: -20%; pointer-events: none; z-index: 61; mix-blend-mode: screen;
+  background: repeating-radial-gradient(circle at 50% 45%, rgba(255,255,255,.0) 0 26px, rgba(217,207,255,.5) 26px 28px); animation: rd-rings 7s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .rd-tripping { animation: none; filter: saturate(1.4) hue-rotate(40deg); }
+  .rd-trip-mandala, .rd-trip-rings { animation: none; opacity: .08; }
+}
 ::selection { background: rgba(252,108,132,.45); color: #fff; }
 /* Headings in serif (editorial, matches the serif lead line); everything else stays sans for reading data. */
 .rd h1, .rd h2 { font-family: ${SERIF}; letter-spacing: -0.01em; font-weight: 600; }
@@ -5032,44 +5047,40 @@ function TripSitBadge() {
 	);
 }
 
-// Loading: one Spunion bouncing per page. The first loader on a page shows him; the others just hold their space.
-// When his loader finishes and another is still waiting, he hands off to it (and hops over, see BouncingSpunion).
+// Loading: one Spunion per page. The first loader on a page shows him; the others are plain skeletons.
 let pillOwner: object | null = null;
 let pillPage = ''; // the page that has already had its pill
 let currentPage = ''; // set by the main view on every render
-let handoffUntil = 0; // briefly after he's freed, a waiting loader on the same page may take him
-const pillListeners = new Set<() => void>();
 function Loading({ height = 200, className = '', quiet }: { height?: number; className?: string; quiet?: boolean }) {
 	const me = useRef<object>({});
-	const [, bump] = useState(0);
-	const handoff = Date.now() < handoffUntil && pillPage === currentPage;
-	if (pillOwner == null && ((!quiet && pillPage !== currentPage) || handoff)) {
+	if (!quiet && pillOwner == null && pillPage !== currentPage) {
 		pillOwner = me.current;
 		pillPage = currentPage;
 	}
-	useEffect(() => {
-		const wake = () => bump((n) => n + 1);
-		pillListeners.add(wake);
-		return () => {
-			pillListeners.delete(wake);
-			if (pillOwner === me.current) {
-				pillOwner = null;
-				handoffUntil = Date.now() + 400;
-				// Let a loader that's still waiting take him; deferred so it doesn't update others mid-render.
-				setTimeout(() => pillListeners.forEach((l) => l()), 0);
-			}
-		};
-	}, []);
-	if (pillOwner !== me.current) return <div className={className} style={{ height }} aria-busy="true" />;
-	// He bounces on a faint placeholder of what's loading, which squashes a little each time he lands.
-	const sz = Math.min(84, Math.round(height * 0.4));
+	useEffect(
+		() => () => {
+			if (pillOwner === me.current) pillOwner = null;
+		},
+		[],
+	);
+	// Every loader is a skeleton the size of what's coming: a faint card of shimmering lines. The one that has
+	// Spunion shows him bouncing on its top edge (it gives a little each time he lands).
+	const has = pillOwner === me.current;
+	const sz = Math.min(72, Math.round(height * 0.32));
+	const top = has ? Math.round(sz * 1.45) : 0;
+	const lines = Math.max(2, Math.floor((height - top - 28) / 24));
 	return (
-		<div className={`flex flex-col items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
-			<BouncingSpunion size={sz} style={{ marginTop: Math.round(sz * 0.7) }} />
-			<div className="rd-pad" style={{ width: Math.min(260, sz * 3.2) }}>
-				<span style={{ width: '72%' }} />
-				<span style={{ width: '48%' }} />
+		<div className={`relative ${className}`} style={{ height }} role="status" aria-label="Loading" aria-busy="true">
+			<div className={`rd-skel ${has ? 'pounded' : ''}`} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top }}>
+				{Array.from({ length: lines }, (_, i) => (
+					<span key={i} style={{ width: `${[86, 64, 92, 48, 78, 58][i % 6]}%` }} />
+				))}
 			</div>
+			{has && (
+				<div style={{ position: 'absolute', left: '50%', top: top - sz, transform: 'translateX(-50%)' }}>
+					<BouncingSpunion size={sz} style={{ marginTop: 0 }} />
+				</div>
+			)}
 		</div>
 	);
 }
@@ -6559,42 +6570,30 @@ const BOUNCE_CSS = `
   100% { transform: translateY(0) scale(1.22, .76); }
 }
 /* The loader: Spunion stays white; each landing sends out a ring from the floor in the next colour (coral, cyan,
-   lavender), and a floor shadow breathes with the bounce. One bounce is .52s; colours cycle over three. */
+   lavender), and a floor shadow breathes with the bounce. One bounce is .62s; colours cycle over three. */
 .rd-loader { position: relative; display: block; margin-top: 60px; pointer-events: none; }
-.rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .52s infinite; transform-origin: 50% 100%; }
+.rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; }
 @keyframes rd-shadow { 0%, 100% { transform: translateX(-50%) scale(1.15, 1); opacity: .45; } 50% { transform: translateX(-50%) scale(.55, .7); opacity: .15; } }
-.rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .52s infinite; }
+.rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
 @keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
 @keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5ae0e4; } 66.667% { border-color: #b3a8f0; } }
 @keyframes rd-exude { 0% { transform: scale(1.06); opacity: .4; } 60% { transform: scale(.94); opacity: .15; } 100% { transform: scale(1.06); opacity: .4; } }
 @keyframes rd-glow-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #b3a8f0; } }
 .rd-halo { position: absolute; inset: -10%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, currentColor, transparent 70%); filter: blur(6px); animation: rd-exude .62s ease-out infinite, rd-glow-hue 1.86s steps(1, end) infinite; }
-@keyframes rd-pound { 0%, 100% { transform: translateY(3px) scale(1.02, .9); } 18% { transform: none; } }
-.rd-pad { display: grid; gap: 7px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); transform-origin: 50% 0; animation: rd-pound .52s infinite; }
-.rd-pad > span { display: block; height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); }
-.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .52s ease-out infinite, rd-ring-hue 1.56s steps(1, end) infinite; }
-@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-pad { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5ae0e4; opacity: .4; } }
+@keyframes rd-pound { 0%, 100% { transform: translateY(2px) scaleY(.985); } 18% { transform: none; } }
+@keyframes rd-shimmer { from { background-position: 120% 0; } to { background-position: -20% 0; } }
+.rd-skel { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; overflow: hidden; border-radius: 20px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); transform-origin: 50% 0; }
+.rd-skel.pounded { animation: rd-pound .62s infinite; }
+.rd-skel > span { display: block; height: 10px; border-radius: 5px; flex-shrink: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.16) 50%, rgba(255,255,255,.08) 100%); background-size: 220% 100%; animation: rd-shimmer 1.8s ease-in-out infinite; }
+.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
+@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5ae0e4; opacity: .4; } }
 `;
 
 // The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
 // preview's startup screen.
 export function BouncingSpunion({ size = 96, style }: { size?: number; style?: React.CSSProperties }) {
 	const ref = useRef<HTMLSpanElement | null>(null);
-	// He drops in from above, lands with a squash, then gets bouncing.
-	useEffect(() => {
-		const el = ref.current;
-		if (!el || typeof el.animate !== 'function' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-		el.animate(
-			[
-				{ transform: 'translateY(-140px) scale(.92, 1.1)', opacity: 0 },
-				{ transform: 'translateY(-140px) scale(.92, 1.1)', opacity: 1, offset: 0.05 },
-				{ transform: 'translateY(0) scale(1.22, .76)', offset: 0.7 },
-				{ transform: 'translateY(-10px) scale(.96, 1.05)', offset: 0.86 },
-				{ transform: 'translateY(0) scale(1, 1)' },
-			],
-			{ duration: 520, easing: 'cubic-bezier(.5,0,.75,.45)' },
-		);
-	}, []);
 	return (
 		<span ref={ref} className="rd-loader" style={{ width: size, height: size, ...style }}>
 			<style>{BOUNCE_CSS}</style>
@@ -6792,7 +6791,7 @@ function SpunionDizzy({ size = 64 }: { size?: number }) {
 	);
 }
 
-function Spunion({ tips, lift, autoOpen }: { tips: string[]; lift: boolean; autoOpen: boolean }) {
+function Spunion({ tips, lift, autoOpen, onPoke }: { tips: string[]; lift: boolean; autoOpen: boolean; onPoke?: () => void }) {
 	const [i, setI] = useState(0);
 	const [open, setOpen] = useState(autoOpen);
 	const meRef = useRef<HTMLButtonElement | null>(null);
@@ -6814,6 +6813,7 @@ function Spunion({ tips, lift, autoOpen }: { tips: string[]; lift: boolean; auto
 		return () => clearInterval(timer);
 	}, []);
 	const next = () => {
+		onPoke?.();
 		setHop(true);
 		setTimeout(() => setHop(false), 950);
 		if (open) setI(i + 1);
@@ -6864,6 +6864,36 @@ type Q = ReturnType<typeof useSQLQuery>;
 
 export default function ReportTimelapse() {
 	const [savedView, setView] = useDiveState<'reports' | 'substances' | 'effects'>('view', 'substances');
+	// Easter egg: type "trip" (outside a text box) or poke the corner Spunion five times quickly. Esc comes down;
+	// it wears off by itself after 30 seconds.
+	const [trip, setTrip] = useState(false);
+	const pokes = useRef<number[]>([]);
+	const poke = () => {
+		const now = Date.now();
+		pokes.current = [...pokes.current.filter((t) => now - t < 2500), now];
+		if (pokes.current.length >= 5) {
+			pokes.current = [];
+			setTrip(true);
+		}
+	};
+	useEffect(() => {
+		let typed = '';
+		const key = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') return setTrip(false);
+			const t = e.target as HTMLElement | null;
+			if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+			if (e.key.length !== 1) return;
+			typed = (typed + e.key.toLowerCase()).slice(-4);
+			if (typed === 'trip') setTrip(true);
+		};
+		window.addEventListener('keydown', key);
+		return () => window.removeEventListener('keydown', key);
+	}, []);
+	useEffect(() => {
+		if (!trip) return;
+		const timer = setTimeout(() => setTrip(false), 30000);
+		return () => clearTimeout(timer);
+	}, [trip]);
 	// Old links may still say "about", a page that's gone; they land on the home page.
 	const view = (savedView as string) === 'about' ? 'substances' : savedView;
 	const [sub, setSub] = useDiveState<string | null>('substance', null);
@@ -7035,7 +7065,24 @@ export default function ReportTimelapse() {
 		<OpenCtx.Provider value={{ open: setOpenItem, effectInfo, classOf: (n: string) => classMap.get(n) }}>
 			<main className="rd" style={{ minHeight: '100vh', background: BG, color: C.text }}>
 				<style>{CSS}</style>
-				<div className="px-4 py-6 sm:px-8 sm:py-8" style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 110 }}>
+				{trip && (
+					<>
+						<svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+							<filter id="rd-trip-warp">
+								<feTurbulence type="fractalNoise" baseFrequency="0.006 0.01" numOctaves="2" seed="7">
+									<animate attributeName="baseFrequency" dur="16s" values="0.006 0.01;0.013 0.006;0.006 0.01" repeatCount="indefinite" />
+								</feTurbulence>
+								<feDisplacementMap in="SourceGraphic" scale="16" xChannelSelector="R" yChannelSelector="G" />
+							</filter>
+						</svg>
+						<div className="rd-trip-mandala" aria-hidden />
+						<div className="rd-trip-rings" aria-hidden />
+						<button className="rd-btn text-sm" onClick={() => setTrip(false)} style={{ position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 70, background: '#fff', color: C.deep }}>
+							Come down (Esc)
+						</button>
+					</>
+				)}
+				<div className={`px-4 py-6 sm:px-8 sm:py-8 ${trip ? 'rd-tripping' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 110 }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '90px 140px' }} />
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
@@ -7135,7 +7182,7 @@ export default function ReportTimelapse() {
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} onEffectPage={goEffect} />
-				{!openItem && <Spunion tips={spunionTips} lift={onReport} autoOpen={spunionSpeaks} />}
+				{!openItem && <Spunion tips={trip ? ['Whoa… is the page breathing? Press Esc to come down.', ...spunionTips] : spunionTips} lift={onReport} autoOpen={spunionSpeaks || trip} onPoke={poke} />}
 			</main>
 		</OpenCtx.Provider>
 		</GoCtx.Provider>
