@@ -804,6 +804,8 @@ const CSS = `
 @media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
 @media (min-width: 1024px) { .rd-g-dose { grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); } }
 @media (min-width: 1024px) { .rd-g-hero { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.rd-glance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 32px; }
+@media (min-width: 1024px) { .rd-glance.wide { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .rd-glance > li { display: grid; align-content: start; gap: 3px; }
 .rd-glance .v { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; margin-top: 4px; }
 .rd-glance .s { font-size: 13px; color: ${C.soft}; line-height: 1.45; }
@@ -2906,7 +2908,7 @@ function SubstanceOverview({ name }: { name: string }) {
 	const tolZero = S(r.tolerance_zero).replace(/\s*-\s*/g, '–');
 	const tolFull = S(r.tolerance_full);
 	const glance = (
-		<ul className={`rd-glance grid gap-x-8 gap-y-6 sm:grid-cols-2 ${molecule ? '' : 'lg:grid-cols-4'}`}>
+		<ul className={`rd-glance ${molecule ? '' : 'wide'}`}>
 			{habit && (
 				<li title={S(r.addiction)}>
 					<span className="rd-label">Habit-forming</span>
@@ -3891,11 +3893,13 @@ function DoseSteps({ p }: { p: Record<string, unknown> }) {
 		const lo = v(`dose_${k}_min`), hi = v(`dose_${k}_max`);
 		return lo ? (hi && hi !== lo ? `${lo}–${hi}` : lo) : '';
 	};
-	const steps = DOSE_ROWS.map((d) => ({ ...d, text: range(d.key) })).filter((d) => d.text);
+	const steps = DOSE_ROWS.filter((d) => d.key !== 'threshold').map((d) => ({ ...d, text: range(d.key) })).filter((d) => d.text);
 	if (!steps.length) return null;
 	const H = 64;
+	const units = S(p.dose_units);
 	return (
-		<div className="mt-5 grid" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))`, columnGap: 3 }}>
+		<>
+		<div className="mt-5 grid" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))`, columnGap: 4 }}>
 			{steps.map((d, i) => {
 				const h = Math.round(H * (0.22 + (0.78 * (i + 1)) / steps.length));
 				const c = DOSE_STEP_COLOR[d.key];
@@ -3922,6 +3926,12 @@ function DoseSteps({ p }: { p: Record<string, unknown> }) {
 				);
 			})}
 		</div>
+		{v('dose_threshold') && (
+			<p className="rd-step mt-4 text-sm" style={{ color: C.soft, animationDelay: '.7s' }}>
+				First noticeable around <span className="tabular-nums" style={{ color: '#fff', fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13 }}>{v('dose_threshold')} {units}</span>
+			</p>
+		)}
+		</>
 	);
 }
 
@@ -4059,7 +4069,8 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	const total = p && S(p.duration_total) ? pwDur(p.duration_total, pwIsMin(p, 'duration_total')) : t ? `~${fmtDur(N(t.end_m))}` : '';
 	// The stories' curve and PsychonautWiki's phases share one time axis.
 	const coreH = p ? pwPhases(p).reduce((a, [, h]) => a + h, 0) : 0;
-	const span = Math.max(coreH * 1.08, t ? N(t.end_m) * 1.12 : 0, 0.5);
+	const totalLow = p && S(p.duration_total) ? Number(S(p.duration_total).split('-')[0]) / (pwIsMin(p, 'duration_total') ? 60 : 1) : 0;
+	const span = Math.max(coreH * 1.08, t ? N(t.end_m) * 1.12 : 0, Number.isFinite(totalLow) ? totalLow : 0, 0.5);
 	// A time-lapse: a playhead sweeps from the dose to the end, and the caption says which stage you'd be in.
 	const stages = (() => {
 		if (p && pwPhases(p).length) {
@@ -4183,11 +4194,11 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 							</button>
 							<div key={waiting ? 'wait' : stage?.label ?? 'end'} className="rd-fade min-w-0 flex-1">
 								<div className="flex flex-wrap items-baseline gap-x-3">
-									<span className="text-xl font-semibold">{waiting ? 'Waiting for it to kick in' : stage?.label ?? (pt >= span ? 'Back to baseline' : 'Dose taken')}</span>
+									<span className="text-xl font-semibold">{waiting ? 'Waiting for it to kick in' : stage?.label ?? (pt >= span ? 'Back to baseline' : pt > 0 ? 'Winding down' : 'Dose taken')}</span>
 									<span className="text-sm tabular-nums" style={{ color: C.faint }}>{pt > 0 ? `${fmtT(pt)} in` : ''}</span>
 								</div>
 								<div className="text-sm" style={{ color: C.soft }}>
-									{waiting ? 'Effects can take a while to show. Don’t redose yet.' : stage ? STAGE_NOTE[stage.label] ?? '' : pt >= span ? 'Press replay to watch it again.' : 'Press play to watch a typical dose unfold.'}
+									{waiting ? 'Effects can take a while to show. Don’t redose yet.' : stage ? STAGE_NOTE[stage.label] ?? '' : pt >= span ? 'Press replay to watch it again.' : pt > 0 ? `Effects fade out slowly${total ? `; the whole thing usually lasts ${total}` : ''}.` : 'Press play to watch a typical dose unfold.'}
 								</div>
 							</div>
 						</div>
