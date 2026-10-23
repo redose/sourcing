@@ -5047,40 +5047,16 @@ function TripSitBadge() {
 	);
 }
 
-// Loading: one Spunion per page. The first loader on a page shows him; the others are plain skeletons.
-let pillOwner: object | null = null;
-let pillPage = ''; // the page that has already had its pill
-let currentPage = ''; // set by the main view on every render
-function Loading({ height = 200, className = '', quiet }: { height?: number; className?: string; quiet?: boolean }) {
-	const me = useRef<object>({});
-	if (!quiet && pillOwner == null && pillPage !== currentPage) {
-		pillOwner = me.current;
-		pillPage = currentPage;
-	}
-	useEffect(
-		() => () => {
-			if (pillOwner === me.current) pillOwner = null;
-		},
-		[],
-	);
-	// Every loader is a skeleton the size of what's coming: a faint card of shimmering lines. The one that has
-	// Spunion shows him bouncing on its top edge (it gives a little each time he lands).
-	const has = pillOwner === me.current;
-	const sz = Math.min(72, Math.round(height * 0.32));
-	const top = has ? Math.round(sz * 1.45) : 0;
-	const lines = Math.max(2, Math.floor((height - top - 28) / 24));
+// Loading: a skeleton the size of what's coming, a faint card of gently shimmering lines.
+function Loading({ height = 200, className = '' }: { height?: number; className?: string; quiet?: boolean }) {
+	const lines = Math.max(2, Math.floor((height - 36) / 24));
 	return (
-		<div className={`relative ${className}`} style={{ height }} role="status" aria-label="Loading" aria-busy="true">
-			<div className={`rd-skel ${has ? 'pounded' : ''}`} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top }}>
+		<div className={className} style={{ height }} role="status" aria-label="Loading" aria-busy="true">
+			<div className="rd-skel" style={{ height: '100%' }}>
 				{Array.from({ length: lines }, (_, i) => (
 					<span key={i} style={{ width: `${[86, 64, 92, 48, 78, 58][i % 6]}%` }} />
 				))}
 			</div>
-			{has && (
-				<div style={{ position: 'absolute', left: '50%', top: top - sz, transform: 'translateX(-50%)' }}>
-					<BouncingSpunion size={sz} style={{ marginTop: 0 }} />
-				</div>
-			)}
 		</div>
 	);
 }
@@ -6580,10 +6556,8 @@ const BOUNCE_CSS = `
 @keyframes rd-exude { 0% { transform: scale(1.06); opacity: .4; } 60% { transform: scale(.94); opacity: .15; } 100% { transform: scale(1.06); opacity: .4; } }
 @keyframes rd-glow-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #b3a8f0; } }
 .rd-halo { position: absolute; inset: -10%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, currentColor, transparent 70%); filter: blur(6px); animation: rd-exude .62s ease-out infinite, rd-glow-hue 1.86s steps(1, end) infinite; }
-@keyframes rd-pound { 0%, 100% { transform: translateY(2px) scaleY(.985); } 18% { transform: none; } }
 @keyframes rd-shimmer { from { background-position: 120% 0; } to { background-position: -20% 0; } }
 .rd-skel { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; overflow: hidden; border-radius: 20px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); transform-origin: 50% 0; }
-.rd-skel.pounded { animation: rd-pound .62s infinite; }
 .rd-skel > span { display: block; height: 10px; border-radius: 5px; flex-shrink: 0;
   background: linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.16) 50%, rgba(255,255,255,.08) 100%); background-size: 220% 100%; animation: rd-shimmer 1.8s ease-in-out infinite; }
 .rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
@@ -6916,7 +6890,6 @@ export default function ReportTimelapse() {
 		return m;
 	}, [effectInfoQ.data, effectToneQ.data]);
 
-	currentPage = [view, sub, withSub, reportId].join('|');
 	const onSub = view === 'reports' && !!sub && !reportId;
 	const onReport = view === 'reports' && !!reportId;
 	const listQ = useSQLQuery(reportListSQL(sub ?? '', withSub, only), { enabled: onSub });
