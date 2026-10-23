@@ -6211,7 +6211,11 @@ export default function ReportTimelapse() {
 	const subDetailQ = useSQLQuery(substanceDetailSQL(openItem?.name ?? ''), { enabled: openItem?.kind === 'substance' });
 	const subTimingQ = useSQLQuery(timingSQL(openItem?.kind === 'substance' ? [openItem.name] : []), { enabled: openItem?.kind === 'substance' });
 
-	const clearReport = () => setReportId(undefined as unknown as null);
+	// Leaving a story also drops its moment, so links to other pages don't carry a stray time.
+	const clearReport = () => {
+		setReportId(undefined as unknown as null);
+		setAtLink(undefined as unknown as null);
+	};
 	const goSubstance = (s: string) => {
 		setView('reports');
 		setSub(s);
