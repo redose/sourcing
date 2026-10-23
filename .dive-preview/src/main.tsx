@@ -1,11 +1,8 @@
 import { createRoot } from 'react-dom/client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { MotherDuckSDKProvider, useConnectionStatus } from './md-sdk';
 import { AlertCircle } from 'lucide-react';
 import Dive, { StartScreen } from './dive';
-
-// Keep the start screen up long enough to see Spunion land a couple of times.
-const INTRO_MS = 1600;
 
 // ?intro shows just the intro, on a loop you can replay by clicking, to look at it properly.
 function IntroOnly() {
@@ -19,12 +16,8 @@ function IntroOnly() {
 
 function ConnectionGate({ children }: { children: React.ReactNode }) {
 	const { isConnected, isConnecting, error } = useConnectionStatus();
-	const [introDone, setIntroDone] = useState(false);
-	useEffect(() => {
-		const t = setTimeout(() => setIntroDone(true), INTRO_MS);
-		return () => clearTimeout(t);
-	}, []);
-	if (isConnecting || (!introDone && !error)) return <StartScreen />;
+	// The Dive itself keeps Spunion bouncing until its first data arrives, so here we only cover the connection.
+	if (isConnecting) return <StartScreen />;
 	if (error)
 		return (
 			<div className="flex items-center justify-center h-screen gap-2 text-red-600">
