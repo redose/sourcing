@@ -3798,6 +3798,7 @@ function EffectPage({ name, onSubstance, onCombo, onEffect, onReport }: { name: 
 					<span className="ml-auto text-sm font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap' }}>Open ↗</span>
 				</a>
 			)}
+			<EffectReplications name={name} />
 			{r && (
 				<div className="mt-6 flex flex-wrap gap-x-10 gap-y-4">
 					<div>
@@ -4829,9 +4830,153 @@ function SubstanceLegality({ name }: { name: string }) {
 	);
 }
 
+// Replications of an effect: title, artist and kind, each opening on Effect Index (the art stays with its artists).
+const replicationsSQL = (effect: string) => `
+SELECT title, artist, media, url FROM ${DB}."effect_replications" WHERE lower(effect) = lower('${esc(effect)}') ORDER BY media, title`;
+function EffectReplications({ name }: { name: string }) {
+	const q = useSQLQuery(replicationsSQL(name));
+	const [all, setAll] = useState(false);
+	const list = q.isError ? [] : rows(q);
+	if (!list.length) return null;
+	const shown = all ? list : list.slice(0, 12);
+	return (
+		<div className="mt-8">
+			<div className="flex items-baseline gap-2">
+				<h3 className="text-lg font-semibold">Replications</h3>
+				<span className="text-sm tabular-nums" style={{ color: C.faint }}>{list.length}</span>
+			</div>
+			<p className="mt-1 text-sm" style={{ color: C.faint }}>Art, video and audio made to show what it’s like. They open on Effect Index; rights stay with each artist.</p>
+			<div className="mt-4 grid gap-x-6 gap-y-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+				{shown.map((r) => (
+					<a key={S(r.url)} href={S(r.url)} target="_blank" rel="noopener noreferrer" className="rd-hover min-w-0 rounded-lg px-2 py-1.5" style={{ marginLeft: -8, textDecoration: 'none' }}>
+						<div className="font-semibold" style={{ color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={S(r.title)}>
+							{S(r.title)} <span style={{ color: C.faint, fontWeight: 400 }}>↗</span>
+						</div>
+						<div className="text-xs" style={{ color: C.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+							{S(r.media)} · {S(r.artist)}
+						</div>
+					</a>
+				))}
+			</div>
+			{list.length > 12 && (
+				<button className="rd-btn mt-3 text-sm" onClick={() => setAll(!all)}>
+					{all ? 'Show fewer' : `Show all ${list.length}`}
+				</button>
+			)}
+		</div>
+	);
+}
+
+// ── Resources ────────────────────────────────────────────────────
+// Where to get help, get drugs checked, read up and find people. Help lines first, in their own safe box.
+const RESOURCE_GROUPS: { title: string; about: string; items: { name: string; href?: string; detail: string; where?: string }[] }[] = [
+	{
+		title: 'Information',
+		about: 'Careful, community-written references.',
+		items: [
+			{ name: 'TripSit', href: 'https://tripsit.me', detail: 'Factsheets, the combinations chart, and live chat with trained volunteers.' },
+			{ name: 'PsychonautWiki', href: 'https://psychonautwiki.org', detail: 'Doses, durations, tolerance and interactions for hundreds of substances.' },
+			{ name: 'Effect Index', href: 'https://www.effectindex.com', detail: 'What each effect feels like, with replications made by artists.' },
+			{ name: 'Erowid', href: 'https://erowid.org', detail: 'Decades of experience reports and reference material.' },
+			{ name: 'Drug Science', href: 'https://www.drugscience.org.uk', detail: 'Independent, evidence-based drug information.', where: 'UK' },
+		],
+	},
+	{
+		title: 'Drug checking',
+		about: 'Find out what’s actually in it. Street drugs are often not what they’re sold as.',
+		items: [
+			{ name: 'DanceSafe', href: 'https://dancesafe.org', detail: 'Test kits, fentanyl strips and event services.', where: 'US' },
+			{ name: 'The Loop', href: 'https://wearetheloop.org', detail: 'Drug checking at festivals and in city centres.', where: 'UK' },
+			{ name: 'WEDINOS', href: 'https://www.wedinos.org', detail: 'Free, anonymous postal testing with public results.', where: 'Wales / UK' },
+			{ name: 'Energy Control', href: 'https://energycontrol-international.org', detail: 'Drug checking and international testing service.', where: 'Spain / international' },
+			{ name: 'Know Your Stuff', href: 'https://knowyourstuff.nz', detail: 'Free drug checking clinics and events.', where: 'New Zealand' },
+			{ name: 'DrugsData', href: 'https://www.drugsdata.org', detail: 'Lab results for pills and powders people sent in.' },
+		],
+	},
+	{
+		title: 'Naloxone',
+		about: 'Naloxone reverses opioid overdoses. Carry it if you or anyone around you uses opioids, or anything that might contain them.',
+		items: [
+			{ name: 'NEXT Distro', href: 'https://nextdistro.org', detail: 'Free naloxone and supplies by mail, and where to find them locally.', where: 'US' },
+		],
+	},
+];
+function ResourcesPage() {
+	const link = { color: '#fff', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.35)', textUnderlineOffset: 3 } as const;
+	return (
+		<section className="rd-fade">
+			<h1 className="text-4xl font-semibold">Resources</h1>
+			<p className="mt-2" style={{ color: C.soft, maxWidth: 720 }}>Where to get help, get your drugs checked, read up, and find people who get it.</p>
+
+			<div data-rd-safe="" className="mt-8 rounded-2xl p-5 sm:p-6" style={{ background: 'rgba(255,110,130,.12)', border: '1px solid rgba(255,125,142,.4)' }}>
+				<div className="flex items-center gap-2 text-lg font-semibold">
+					<AlertTriangle size={18} color={RISK[3].c} /> Get help now
+				</div>
+				<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
+					If someone is unresponsive, struggling to breathe, overheating, having a seizure or you’re worried at all, <b style={{ color: '#fff' }}>call your local emergency number</b> (911 in the US and Canada, 999 or 112 in the UK and Europe, 000 in Australia, 111 in New Zealand). Stay with them. Many places have laws protecting people who call for help in an overdose.
+				</p>
+				<div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+					{(
+						[
+							['Poison Help', '1-800-222-1222', 'Free, confidential advice on any exposure, 24/7.', 'US'],
+							['988 Suicide & Crisis Lifeline', 'Call or text 988', 'For any crisis, including substance use.', 'US'],
+							['SAMHSA National Helpline', '1-800-662-4357', 'Treatment referrals and information, 24/7.', 'US'],
+							['Fireside Project', '62-FIRESIDE (623-473-7433)', 'Peer support during or after a psychedelic experience.', 'US'],
+							['Never Use Alone', '1-800-484-3731', 'Stays on the line while you use; sends help if you stop responding.', 'US & Canada'],
+							['National Overdose Response Service', '1-888-688-6677', 'Overdose prevention line, 24/7.', 'Canada'],
+							['Talk to FRANK', '0300 123 6600', 'Free, confidential drug information.', 'UK'],
+							['DrugInfo (Alcohol and Drug Foundation)', '1300 85 85 84', 'Information and support.', 'Australia'],
+						] as const
+					).map(([name, num, what, where]) => (
+						<div key={name} className="min-w-0">
+							<div className="flex flex-wrap items-baseline gap-x-2">
+								<span className="font-semibold">{name}</span>
+								<span className="text-xs" style={{ color: C.faint }}>{where}</span>
+							</div>
+							<div className="tabular-nums" style={{ color: '#fff' }}>{num}</div>
+							<div className="text-sm" style={{ color: C.soft }}>{what}</div>
+						</div>
+					))}
+				</div>
+				<p className="mt-4 text-xs" style={{ color: C.faint }}>Numbers change; check the service’s own site for your area.</p>
+			</div>
+
+			{RESOURCE_GROUPS.map((g) => (
+				<div key={g.title} className="mt-14">
+					<h2 className="text-2xl font-semibold">{g.title}</h2>
+					<p className="mt-1 text-sm" style={{ color: C.faint }}>{g.about}</p>
+					<div className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+						{g.items.map((it) => (
+							<div key={it.name} className="min-w-0">
+								<div className="flex flex-wrap items-baseline gap-x-2">
+									<a href={it.href} target="_blank" rel="noopener noreferrer" className="font-semibold" style={link}>{it.name} ↗</a>
+									{it.where && <span className="text-xs" style={{ color: C.faint }}>{it.where}</span>}
+								</div>
+								<p className="mt-0.5 text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>{it.detail}</p>
+							</div>
+						))}
+					</div>
+				</div>
+			))}
+
+			<div className="mt-14">
+				<h2 className="text-2xl font-semibold">Community</h2>
+				<p className="mt-2" style={{ color: C.soft, maxWidth: 720, lineHeight: 1.6 }}>
+					Talk something through with people who get it, ask before you try something, or help make re:dose better.
+				</p>
+				<a href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" className="rd-btn mt-4 inline-flex items-center gap-2 text-sm" style={{ background: '#fff', color: C.deep, textDecoration: 'none' }}>
+					<DiscordIcon size={16} /> Join re:dose on Discord
+				</a>
+			</div>
+		</section>
+	);
+}
+
 // ── Small pieces ──────────────────────────────────────────────────
 
 const TRIPSIT_COMBOS = 'https://wiki.tripsit.me/wiki/Drug_combinations';
+// DuckDB's mark (their 32 px favicon, duckdb.org), for the "Powered by DuckDB" credit.
+const DUCKDB_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABDlBMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQAfHQBbVgCEfQCMhABxawA4NQAIBwAKCQBrZQDYzAD87wD/9QD/8wDv4gCjmgAoJgAHBwCIgAD57QD/9AD/8QD/8gDMwQAtKgBdWAD26gCyqQAODQAREADEuwD46wBSTQATEgBaVQBhWwBPSwAUEwA6NwDy5QCWjwAxLgDu4QD87gCupABYUwD98AC3rgADAwD57gBOSgD47QBMSADt4AD+8AD57ACmnQAQDwAREQBVUABJRQD///9zSTj0AAAAG3RSTlMAFEmGttThH3XI8v4MZtYeo/knvwtnINXH0+AUQiD4AAAAAWJLR0RZmrL0GAAAAAd0SU1FB+QGCg8JOr1uwzYAAAEjSURBVDjLhZPpVsIwEIXTBShla9khWnesokjiioq474C7vv+TkKQBCjZn7p+Zc+53kslkBqGJNN0wY/F4zDR0Df1XwkraKSyUspNWYs5OZ7LSlUw2kw77OcfFc3Kd3NTPF3CECvnJ9ZE+I2QhRQcr5BQFUHJVgFvifrmClaqUGWAF+cKit7S8sro2S1isf1WRrW80Nn1/a7u5MwNUNaTbPNlt7bUJE/X3D8KArSNDJIdHlATyj0/ChIFMHjqnbekTenaOuxe93uWVAExU4+H6ZnwAO+IW391T8vDY5U4N1Xl4eiZT4OWVA7Q/4E5dDQzfAiDyinfy8fn1HVwRVeTPr+f9dWSR4DPBRoGtBj8L/m5wYOCRA4cWHnt4ceDVg5dXvf4jk69mFjrEqsUAAAAldEVYdGRhdGU6Y3JlYXRlADIwMjAtMDYtMTBUMTU6MDk6NTgrMDI6MDC71VeFAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDIwLTA2LTEwVDE1OjA5OjU4KzAyOjAwyojvOQAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAABXelRYdFJhdyBwcm9maWxlIHR5cGUgaXB0YwAAeJzj8gwIcVYoKMpPy8xJ5VIAAyMLLmMLEyMTS5MUAxMgRIA0w2QDI7NUIMvY1MjEzMQcxAfLgEigSi4A6hcRdPJCNZUAAAAASUVORK5CYII=';
 const REDOSE_DISCORD = 'https://discord.com/invite/WzWc5MQSnW';
 const DiscordIcon = ({ size = 16 }: { size?: number }) => (
 	<svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -6927,7 +7072,7 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 type Q = ReturnType<typeof useSQLQuery>;
 
 export default function ReportTimelapse() {
-	const [savedView, setView] = useDiveState<'reports' | 'substances' | 'effects'>('view', 'substances');
+	const [savedView, setView] = useDiveState<'reports' | 'substances' | 'effects' | 'resources'>('view', 'substances');
 	// Easter egg: type "trip" (outside a text box) or poke the corner Spunion five times quickly. Esc comes down;
 	// it wears off by itself after 30 seconds.
 	const [trip, setTrip] = useState(false);
@@ -7093,7 +7238,7 @@ export default function ReportTimelapse() {
 		setOpenItem(null);
 		window.scrollTo?.({ top: 0 });
 	};
-	const goView = (v: 'reports' | 'substances' | 'effects') => {
+	const goView = (v: 'reports' | 'substances' | 'effects' | 'resources') => {
 		window.scrollTo?.({ top: 0 });
 		setView(v);
 		setRoutePick(undefined as unknown as null);
@@ -7106,7 +7251,8 @@ export default function ReportTimelapse() {
 	// Tab title: the page you're on, then the site ("MDMA – re:dose").
 	useEffect(() => {
 		const page =
-			view === 'effects' ? effect || 'Effects'
+			view === 'resources' ? 'Resources'
+			: view === 'effects' ? effect || 'Effects'
 			: view === 'reports' && reportId ? `Story #${reportId.replace('erowid-', '')}`
 			: view === 'reports' && sub ? (withSub ? `${short(sub)} + ${short(withSub)}` : short(sub))
 			: view === 'reports' ? 'Experiences'
@@ -7165,6 +7311,7 @@ export default function ReportTimelapse() {
 									['substances', 'Substances'],
 									['reports', 'Experiences'],
 									['effects', 'Effects'],
+									['resources', 'Resources'],
 								] as const
 							).map(([v, label]) => (
 								<button key={v} className="rd-nav" aria-current={navHere === v ? 'page' : undefined} onClick={() => goView(v)} style={{ whiteSpace: 'nowrap' }}>
@@ -7210,6 +7357,7 @@ export default function ReportTimelapse() {
 					)}
 					{view === 'effects' && effect && <EffectPage name={effect} onSubstance={goSubstance} onCombo={goCombo} onEffect={goEffect} onReport={goReport} />}
 					{view === 'effects' && !effect && <EffectsBrowse q={effectsQ} onEffect={goEffect} />}
+					{view === 'resources' && <ResourcesPage />}
 
 					<footer className="mt-16 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-t pt-6 text-sm" style={{ borderColor: C.line, color: C.soft }}>
 						{(
@@ -7229,6 +7377,7 @@ export default function ReportTimelapse() {
 								Join us on Discord
 							</a>
 							<a className="rd-thanks" href="https://duckdb.org" target="_blank" rel="noopener noreferrer" title="Every number here is a DuckDB query. Not affiliated with re:dose." style={{ color: C.soft }}>
+								<img src={DUCKDB_ICON} alt="" width={15} height={15} />
 								Powered by DuckDB
 							</a>
 						</div>
