@@ -1476,8 +1476,8 @@ function ClassIcon({ cls, size = 16, color = 'currentColor' }: { cls?: string; s
 
 const ROUTE: Record<string, { label: string; icon: JSX.Element }> = {
 	oral: { label: 'swallowed', icon: <><circle cx="12" cy="12" r="7.5" /><path d="M7.5 12h9" /></> },
-	smoked: { label: 'smoked', icon: <><path d="M8 21c0-3 3-3.5 3-7s-3-3.5-3-7" /><path d="M14 21c0-3 3-3.5 3-7s-3-3.5-3-7" /></> },
-	inhaled: { label: 'inhaled / vaped', icon: <path d="M3 9h11a3 3 0 1 0-3-3M3 15h14a3 3 0 1 1-3 3" /> },
+	smoked: { label: 'inhaled (smoked or vaped)', icon: <><path d="M12 3v6.5M12 9.5 9.8 11M12 9.5l2.2 1.5" /><path d="M9.2 6.6C6.6 7.3 4 11.2 4 16.6c0 1.9 1.2 2.9 2.8 2.9 2.2 0 3.2-1.5 3.2-4V8.8" /><path d="M14.8 6.6c2.6.7 5.2 4.6 5.2 10 0 1.9-1.2 2.9-2.8 2.9-2.2 0-3.2-1.5-3.2-4V8.8" /></> },
+	inhaled: { label: 'inhaled (smoked or vaped)', icon: <><path d="M12 3v6.5M12 9.5 9.8 11M12 9.5l2.2 1.5" /><path d="M9.2 6.6C6.6 7.3 4 11.2 4 16.6c0 1.9 1.2 2.9 2.8 2.9 2.2 0 3.2-1.5 3.2-4V8.8" /><path d="M14.8 6.6c2.6.7 5.2 4.6 5.2 10 0 1.9-1.2 2.9-2.8 2.9-2.2 0-3.2-1.5-3.2-4V8.8" /></> },
 	insufflated: { label: 'snorted', icon: <><path d="M10 3c.6 4-4 7.5-4 11.5a3.5 3.5 0 0 0 3.5 3.5c1.3 0 1.8-.8 2.5-.8s1.2.8 2.5.8a3.5 3.5 0 0 0 3.5-3.5C18 10.5 13.4 7 14 3" /><circle cx="9.6" cy="15.2" r="1" /><circle cx="14.4" cy="15.2" r="1" /></> },
 	sublingual: { label: 'under the tongue', icon: <><path d="M5 8.5h14v3.5a7 7 0 0 1-14 0z" /><path d="M12 8.5v6" /></> },
 	injected: { label: 'injected', icon: <path d="M18 2l4 4M16.5 5.5l2 2M19 9l-9.5 9.5H5.5v-4L15 5zM5.5 18.5 2 22M9 13l2 2M12 10l2 2" /> },
@@ -1489,6 +1489,13 @@ const ROUTE_ALIAS: Record<string, string> = {
 	buccal: 'sublingual', iv: 'injected', im: 'injected', sc: 'injected', intravenous: 'injected', intramuscular: 'injected',
 	subcutaneous: 'injected', swallowed: 'oral', eaten: 'oral', drunk: 'oral',
 };
+// Plain names for routes: smoking, vaping and inhaling are all "Inhaled".
+const ROUTE_NAME: Record<string, string> = { oral: 'Oral', smoked: 'Inhaled', inhaled: 'Inhaled', insufflated: 'Snorted', injected: 'Injected', sublingual: 'Under the tongue', transdermal: 'Patch', rectal: 'Rectal' };
+const routeName = (r: string) => {
+	const k = r.toLowerCase().trim();
+	return ROUTE_NAME[ROUTE_ALIAS[k] ?? k] ?? r[0].toUpperCase() + r.slice(1);
+};
+
 function RouteIcon({ route, size = 14, color = C.faint }: { route: string; size?: number; color?: string }) {
 	const k = route.toLowerCase().trim();
 	const r = ROUTE[ROUTE_ALIAS[k] ?? k];
@@ -2397,6 +2404,90 @@ function GroupBadge() {
 	);
 }
 
+// Every effect in a substance's closely read stories: how many stories, the share of its stories, and how that
+// compares with all closely read stories.
+const substanceEffectsSQL = (name: string) => `
+WITH ids AS (
+  SELECT DISTINCT d.report_id FROM ${DB}."report_doses" d JOIN ${DB}."llm_extractions" x USING (report_id)
+  WHERE d.canonical_substance = '${esc(name)}'
+),
+total AS (SELECT count(*) AS n FROM ${DB}."llm_extractions"),
+everywhere AS (
+  SELECT effect_name, count(DISTINCT report_id)::DOUBLE / (SELECT n FROM total) AS r
+  FROM ${DB}."llm_observation_effects" WHERE confidence <> 'low' GROUP BY 1
+)
+SELECT e.effect_name AS name, coalesce(any_value(ef.category), 'Other') AS category, count(DISTINCT e.report_id) AS hits,
+  count(DISTINCT e.report_id)::DOUBLE / (SELECT count(*) FROM ids) AS share,
+  (count(DISTINCT e.report_id)::DOUBLE / (SELECT count(*) FROM ids)) / any_value(a.r) AS lift,
+  (SELECT count(*) FROM ids) AS n_stories
+FROM ${DB}."llm_observation_effects" e
+JOIN ids USING (report_id)
+LEFT JOIN ${DB}."effects" ef ON lower(ef.name) = lower(e.effect_name)
+LEFT JOIN everywhere a ON a.effect_name = e.effect_name
+WHERE e.confidence <> 'low'
+GROUP BY e.effect_name
+HAVING count(DISTINCT e.report_id) >= 2
+ORDER BY hits DESC, name`;
+
+function SubstanceEffects({ name }: { name: string }) {
+	const { open, effectInfo } = useContext(OpenCtx);
+	const q = useSQLQuery(substanceEffectsSQL(name));
+	const [all, setAll] = useState<Record<string, boolean>>({});
+	const list = rows(q);
+	if (q.isLoading) return <Loading height={220} className="mt-5" quiet />;
+	if (!list.length) return <p className="mt-4 text-sm" style={{ color: C.faint }}>Not enough closely read stories to say yet.</p>;
+	const n = N(list[0].n_stories);
+	const groups = new Map<string, Record<string, unknown>[]>();
+	for (const r of list) {
+		const c = S(r.category).replace(' Effects', '') || 'Other';
+		if (!groups.has(c)) groups.set(c, []);
+		groups.get(c)!.push(r);
+	}
+	const ordered = [...groups.entries()].sort((a, b) => b[1].reduce((x, y) => x + N(y.hits), 0) - a[1].reduce((x, y) => x + N(y.hits), 0));
+	const top = Math.max(...list.map((r) => N(r.share)));
+	return (
+		<div className="mt-5">
+			<p className="text-sm" style={{ color: C.faint }}>
+				{list.length} effects across {n} closely read stories. The bar is the share of those stories that mention it; “×” marks effects that show up much more often than across all stories.
+			</p>
+			<div className="mt-5 grid gap-x-10 gap-y-8 lg:grid-cols-2">
+				{ordered.map(([cat, items]) => {
+					const shown = all[cat] ? items : items.slice(0, 8);
+					return (
+						<div key={cat}>
+							<div className="rd-label mb-2">
+								{cat} · {items.length}
+							</div>
+							<div className="grid gap-0.5">
+								{shown.map((r) => (
+									<button key={S(r.name)} onClick={() => open({ kind: 'effect', name: S(r.name) })} className="rd-hover grid items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm" style={{ gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr) 44px' }}>
+										<span className="flex items-center gap-2" style={{ minWidth: 0 }}>
+											<span className="rd-dot" style={{ background: TONE_DOT[effectTone(effectInfo.get(S(r.name).toLowerCase()))] }} />
+											<span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={S(r.name)}>{S(r.name)}</span>
+										</span>
+										<span className="flex items-center gap-2">
+											<span className="flex-1 rounded-full" style={{ height: 5, background: 'rgba(255,255,255,.08)' }}>
+												<span className="block h-full rounded-full" style={{ width: `${(100 * N(r.share)) / top}%`, background: C.lav }} />
+											</span>
+											<span className="tabular-nums text-xs" style={{ color: C.faint, width: 30, textAlign: 'right' }}>{Math.round(100 * N(r.share))}%</span>
+										</span>
+										<span className="text-right text-xs font-semibold tabular-nums" style={{ color: C.mint }}>{N(r.lift) >= 1.5 ? `${N(r.lift).toFixed(1)}×` : ''}</span>
+									</button>
+								))}
+							</div>
+							{items.length > 8 && (
+								<button className="mt-1 px-2 text-xs font-semibold" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={() => setAll({ ...all, [cat]: !all[cat] })}>
+									{all[cat] ? 'Show fewer' : `Show all ${items.length}`}
+								</button>
+							)}
+						</div>
+					);
+				})}
+			</div>
+		</div>
+	);
+}
+
 // A plain description built from the structured fields and the reports. PsychonautWiki "summaries" are mostly
 // page furniture ("Summary sheet: …", "Not to be confused with …"); what's left of them is usually a safety note.
 function describeSubstance(name: string, r: Record<string, unknown>, timing: Record<string, unknown>[], allNames = false) {
@@ -2658,8 +2749,8 @@ function SubstanceOverview({ name }: { name: string }) {
 			</section>
 			{L(r.effects).length > 0 && (
 				<section id="feel" className="mt-14" style={{ scrollMarginTop: 16 }}>
-					<ArticleH2 icon={Sparkles} sub="The effects closely read stories mention most. Tap one for what it is.">What people feel</ArticleH2>
-					<div className="mt-5">{feel}</div>
+					<ArticleH2 icon={Sparkles}>What people feel</ArticleH2>
+					<SubstanceEffects name={name} />
 				</section>
 			)}
 		</>
@@ -2789,7 +2880,7 @@ function SubstanceNumbers({ name }: { name: string }) {
 								<div key={k} className="grid items-center gap-2 text-sm" style={{ gridTemplateColumns: '18px minmax(0,1fr) 38px' }}>
 									<RouteIcon route={k} size={15} color={C.soft} />
 									<span className="flex items-center gap-2" style={{ minWidth: 0 }}>
-										<span style={{ whiteSpace: 'nowrap' }}>{k[0].toUpperCase() + k.slice(1)}</span>
+										<span style={{ whiteSpace: 'nowrap' }}>{routeName(k)}</span>
 										<span className="flex-1 rounded-full" style={{ height: 5, background: 'rgba(255,255,255,.1)', minWidth: 20 }}>
 											<span className="block h-full rounded-full" style={{ width: `${(100 * routeN[i]) / routeTotal}%`, background: C.lav }} />
 										</span>
@@ -3602,12 +3693,12 @@ const dosageSQL = (name: string) => `
 SELECT r.* FROM ${DB}."routes_of_administration" r JOIN ${DB}."substances" s ON s.id = r.substance_id
 WHERE s.name = '${esc(name)}'`;
 
-const DOSE_ROWS: { key: string; label: string; tint: string }[] = [
-	{ key: 'threshold', label: 'Threshold', tint: 'rgba(72,190,150,.42)' },
-	{ key: 'light', label: 'Light', tint: 'rgba(70,150,210,.42)' },
-	{ key: 'common', label: 'Common', tint: 'rgba(205,170,60,.42)' },
-	{ key: 'strong', label: 'Strong', tint: 'rgba(215,120,60,.42)' },
-	{ key: 'heavy', label: 'Heavy', tint: 'rgba(210,70,90,.45)' },
+const DOSE_ROWS: { key: string; label: string }[] = [
+	{ key: 'threshold', label: 'Threshold' },
+	{ key: 'light', label: 'Light' },
+	{ key: 'common', label: 'Common' },
+	{ key: 'strong', label: 'Strong' },
+	{ key: 'heavy', label: 'Heavy' },
 ];
 const num = (v: unknown) => (v == null ? '' : String(Math.round(N(v) * 1000) / 1000));
 // PsychonautWiki stores durations as "15.0-30.0" without units: onset and come-up are minutes, the rest hours.
@@ -3659,7 +3750,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 					{routes.map((r) => (
 						<button key={r} onClick={() => setRoute(r)} className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold" style={{ background: sel === r ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.05)', border: `1px solid ${sel === r ? 'rgba(255,255,255,.35)' : C.line}`, color: sel === r ? '#fff' : C.soft }}>
 							<RouteIcon route={r} size={15} color={sel === r ? ACCENT : C.soft} />
-							{r[0].toUpperCase() + r.slice(1)}
+							{routeName(r)}
 						</button>
 					))}
 				</div>
@@ -3675,9 +3766,16 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 								<AlertTriangle size={13} /> Doses are population estimates that vary widely between people.
 							</p>
 							<div className="mt-3 grid gap-1.5">
-								{DOSE_ROWS.filter((d) => dose(d.key)).map((d) => (
-									<div key={d.key} className={row} style={{ background: `linear-gradient(90deg, ${d.tint}, rgba(255,255,255,.03) 70%)`, border: `1px solid ${C.line}` }}>
-										<span>{d.label}</span>
+								{DOSE_ROWS.map((d, i) => ({ ...d, i })).filter((d) => dose(d.key)).map((d) => (
+									<div key={d.key} className={row} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${C.line}` }}>
+										<span className="flex items-center gap-3">
+											<span className="flex gap-1" aria-hidden>
+												{[0, 1, 2, 3, 4].map((j) => (
+													<span key={j} className="rounded-full" style={{ width: 6, height: 6, background: j <= d.i ? (d.i >= 4 ? C.coral : d.i >= 3 ? C.amber : C.lav) : 'rgba(255,255,255,.15)' }} />
+												))}
+											</span>
+											{d.label}
+										</span>
 										<span style={mono}>{dose(d.key)}</span>
 									</div>
 								))}
