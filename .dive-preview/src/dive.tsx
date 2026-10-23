@@ -899,6 +899,11 @@ const CSS = `
 @media (max-width: 900px) { .rd-filters { grid-template-columns: 1fr; } .rd-filters > aside { position: static; max-height: none; } }
 .rd .rd-home-search { transition: border-color .2s, box-shadow .2s; }
 .rd .rd-home-search:focus-within { border-color: rgba(217,207,255,.6) !important; box-shadow: 0 0 0 4px rgba(217,207,255,.12), 0 20px 50px rgba(10,4,40,.5) !important; }
+/* Homepage only: the molecules wander further and quicker. */
+@keyframes rd-drift-home { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(140px, 200px) rotate(5deg); } 100% { transform: translate(250px, 60px) rotate(-4deg); } }
+.rd-home.rd-fx-rainbow .rd-molecules { animation: rd-drift-home 70s ease-in-out infinite alternate, rd-mol-hue 16s linear infinite; }
+.rd-home.rd-fx-rainbow .rd-molecules.b { animation: rd-drift-home 95s ease-in-out infinite alternate-reverse, rd-mol-hue 22s linear infinite reverse; }
+@media (prefers-reduced-motion: reduce) { .rd-home.rd-fx-rainbow .rd-molecules { animation: none; } }
 .rd-g-3 { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .rd-g-3 { grid-template-columns: 1fr; } }
 @media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
@@ -3689,6 +3694,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 		else onReport(it.id!, it.first || '');
 	};
 	const searching = open && needle && dq.toLowerCase() !== needle;
+	const typed = useTypedPlaceholder(!!inline && !q);
 	const group = (label: string, list: Item[], offset: number) =>
 		list.length > 0 && (
 			<div className="py-1.5">
@@ -3727,7 +3733,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 	const panel = (
 		<div ref={box} className="rd-fade w-full min-w-0" style={{ maxWidth: 620, margin: inline ? '0 auto' : undefined, position: 'relative', boxSizing: 'border-box' }}>
 			<label className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 ${inline ? 'rd-home-search' : ''}`} style={{ background: C.panel, border: '1px solid rgba(255,255,255,.25)', boxShadow: '0 20px 50px rgba(10,4,40,.5)' }}>
-				<Search size={18} color={inline ? '#fc6c84' : C.soft} />
+				<Search size={18} color={C.soft} />
 				<input
 					ref={input}
 					value={q}
@@ -3748,7 +3754,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 							input.current?.blur();
 						}
 					}}
-					placeholder={inline ? 'Search anything' : 'Search substances, street names, effects or experiences'}
+					placeholder={inline ? (typed ? `Search “${typed}”` : 'Search anything') : 'Search substances, street names, effects or experiences'}
 					aria-label="Search substances, effects and stories"
 					className="flex-1 bg-transparent text-lg outline-none"
 					style={{ color: C.text, minWidth: 0 }}
@@ -5218,6 +5224,29 @@ let spunionGreeted = false;
 
 // ── Home ─────────────────────────────────────────────────────────
 // Search first: type anything (a substance, slang, an effect, a phrase from an experience); a few ways in underneath.
+// The homepage search types out example searches by itself until you start typing.
+const TYPED_EXAMPLES = ['molly', 'candy flip', 'first time on shrooms', 'anxiety', 'ketamine and alcohol', 'time distortion', 'weed edibles'];
+function useTypedPlaceholder(on: boolean) {
+	const [text, setText] = useState('');
+	useEffect(() => {
+		if (!on) return;
+		let i = 0, n = 0, back = false;
+		let timer: ReturnType<typeof setTimeout>;
+		const tick = () => {
+			const word = TYPED_EXAMPLES[i % TYPED_EXAMPLES.length];
+			n += back ? -1 : 1;
+			setText(word.slice(0, n));
+			let wait = back ? 35 : 85;
+			if (!back && n >= word.length) (back = true), (wait = 1800);
+			else if (back && n <= 0) (back = false), i++, (wait = 400);
+			timer = setTimeout(tick, wait);
+		};
+		timer = setTimeout(tick, 900);
+		return () => clearTimeout(timer);
+	}, [on]);
+	return text;
+}
+
 function HomePage({ q, onSubstance, onEffect, onReport, onCombo, onView }: { q: Q; onSubstance: (s: string) => void; onEffect: (e: string) => void; onReport: (id: string, s: string) => void; onCombo: (a: string, b: string) => void; onView: (v: 'substances' | 'reports' | 'effects' | 'resources') => void }) {
 	return (
 		<section className="rd-fade flex w-full min-w-0 flex-col items-center justify-center text-center" style={{ minHeight: 'calc(100vh - 150px)', paddingBottom: 90, position: 'relative', zIndex: 2 }}>
@@ -7922,7 +7951,7 @@ export default function ReportTimelapse() {
 						</button>
 					</>
 				)}
-				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${fx.includes('sway') ? 'rd-tripping' : ''} ${fx.includes('rainbow') ? 'rd-fx-rainbow' : ''} ${fx.includes('tint') ? 'rd-fx-tint' : ''} ${fx.includes('desat') ? 'rd-fx-desat' : ''} ${fx.includes('breathe') ? 'rd-fx-breathe' : ''} ${fx.includes('shift') ? 'rd-fx-shift' : ''} ${fx.includes('replace') ? 'rd-fx-replace' : ''} ${fx.includes('enhance') ? 'rd-fx-enhance' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 20, minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowX: 'clip' }}>
+				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${fx.includes('sway') ? 'rd-tripping' : ''} ${fx.includes('rainbow') ? 'rd-fx-rainbow' : ''} ${fx.includes('tint') ? 'rd-fx-tint' : ''} ${fx.includes('desat') ? 'rd-fx-desat' : ''} ${fx.includes('breathe') ? 'rd-fx-breathe' : ''} ${fx.includes('shift') ? 'rd-fx-shift' : ''} ${fx.includes('replace') ? 'rd-fx-replace' : ''} ${fx.includes('enhance') ? 'rd-fx-enhance' : ''} ${view === 'home' && !trip ? 'rd-home' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 20, minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowX: 'clip' }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
