@@ -897,6 +897,8 @@ const CSS = `
 .rd-filters { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; align-items: start; }
 .rd-filters > aside { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding-right: 6px; }
 @media (max-width: 900px) { .rd-filters { grid-template-columns: 1fr; } .rd-filters > aside { position: static; max-height: none; } }
+.rd .rd-home-search { border: 1.5px solid rgba(252,108,132,.75) !important; box-shadow: 0 0 0 4px rgba(252,108,132,.12), 0 20px 50px rgba(10,4,40,.5) !important; transition: border-color .2s, box-shadow .2s; }
+.rd .rd-home-search:focus-within { border-color: #fc6c84 !important; box-shadow: 0 0 0 5px rgba(252,108,132,.2), 0 20px 50px rgba(10,4,40,.5) !important; }
 .rd-g-3 { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .rd-g-3 { grid-template-columns: 1fr; } }
 @media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
@@ -3687,7 +3689,6 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 		else onReport(it.id!, it.first || '');
 	};
 	const searching = open && needle && dq.toLowerCase() !== needle;
-	const typed = useTypedPlaceholder(!!inline && !q);
 	const group = (label: string, list: Item[], offset: number) =>
 		list.length > 0 && (
 			<div className="py-1.5">
@@ -3725,7 +3726,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 	}, [open]);
 	const panel = (
 		<div ref={box} className="rd-fade w-full min-w-0" style={{ maxWidth: 620, margin: inline ? '0 auto' : undefined, position: 'relative', boxSizing: 'border-box' }}>
-			<label className="flex items-center gap-3 rounded-2xl px-4 py-3.5" style={{ background: C.panel, border: '1px solid rgba(255,255,255,.25)', boxShadow: '0 20px 50px rgba(10,4,40,.5)' }}>
+			<label className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 ${inline ? 'rd-home-search' : ''}`} style={{ background: C.panel, border: '1px solid rgba(255,255,255,.25)', boxShadow: '0 20px 50px rgba(10,4,40,.5)' }}>
 				<Search size={18} color={C.soft} />
 				<input
 					ref={input}
@@ -3747,7 +3748,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport, onCombo, inline }
 							input.current?.blur();
 						}
 					}}
-					placeholder={inline ? (typed ? `Search “${typed}”` : 'Search anything') : 'Search substances, street names, effects or experiences'}
+					placeholder={inline ? 'Search anything' : 'Search substances, street names, effects or experiences'}
 					aria-label="Search substances, effects and stories"
 					className="flex-1 bg-transparent text-lg outline-none"
 					style={{ color: C.text, minWidth: 0 }}
@@ -5217,29 +5218,6 @@ let spunionGreeted = false;
 
 // ── Home ─────────────────────────────────────────────────────────
 // Search first: type anything (a substance, slang, an effect, a phrase from an experience); a few ways in underneath.
-// The homepage search types out example searches by itself until you start typing.
-const TYPED_EXAMPLES = ['molly', 'candy flip', 'first time on shrooms', 'anxiety', 'ketamine and alcohol', 'time distortion', 'weed edibles'];
-function useTypedPlaceholder(on: boolean) {
-	const [text, setText] = useState('');
-	useEffect(() => {
-		if (!on) return;
-		let i = 0, n = 0, back = false;
-		let timer: ReturnType<typeof setTimeout>;
-		const tick = () => {
-			const word = TYPED_EXAMPLES[i % TYPED_EXAMPLES.length];
-			n += back ? -1 : 1;
-			setText(word.slice(0, n));
-			let wait = back ? 35 : 85;
-			if (!back && n >= word.length) (back = true), (wait = 1800);
-			else if (back && n <= 0) (back = false), i++, (wait = 400);
-			timer = setTimeout(tick, wait);
-		};
-		timer = setTimeout(tick, 900);
-		return () => clearTimeout(timer);
-	}, [on]);
-	return text;
-}
-
 function HomePage({ q, onSubstance, onEffect, onReport, onCombo, onView }: { q: Q; onSubstance: (s: string) => void; onEffect: (e: string) => void; onReport: (id: string, s: string) => void; onCombo: (a: string, b: string) => void; onView: (v: 'substances' | 'reports' | 'effects' | 'resources') => void }) {
 	return (
 		<section className="rd-fade flex w-full min-w-0 flex-col items-center justify-center text-center" style={{ minHeight: 'calc(100vh - 150px)', paddingBottom: 90, position: 'relative', zIndex: 2 }}>
