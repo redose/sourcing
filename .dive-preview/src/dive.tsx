@@ -945,9 +945,9 @@ const CSS = `
 @media (max-width: 1100px) { .rd-board { grid-template-columns: 1fr; } }
 /* Homepage molecules: faint until you hover, then they light up and say what they are. */
 .rd-home-mols { position: absolute; inset: -40px -24px 0; pointer-events: none; z-index: -1; }
-.rd-home-mol { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; color: rgba(255,255,255,.16); --rd-mol-gap: #46389a;
+.rd-home-mol { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; color: rgba(255,255,255,.085); --rd-mol-gap: #46389a;
   display: flex; flex-direction: column; align-items: center; gap: 6px; transition: color .25s; background: none; border: 0; padding: 6px; cursor: pointer; }
-.rd-home-mol .rd-mol-atom { opacity: .3; transition: opacity .25s; }
+.rd-home-mol .rd-mol-atom { opacity: .14; transition: opacity .25s; }
 .rd-home-mol-name { font-size: 12px; font-weight: 600; color: #fff; opacity: 0; transform: translateY(-4px); transition: opacity .2s, transform .2s; white-space: nowrap; }
 .rd-home-mol:hover, .rd-home-mol:focus-visible { color: rgba(255,255,255,.85); }
 .rd-home-mol:hover .rd-mol-atom, .rd-home-mol:focus-visible .rd-mol-atom { opacity: 1; }
@@ -5385,11 +5385,11 @@ function HomeMolecules({ onSubstance }: { onSubstance: (s: string) => void }) {
 						<svg width={w} height={h} viewBox={`${minX} ${minY} ${w} ${h}`} style={{ transform: `rotate(${rot}deg)` }} aria-hidden>
 							{bonds.map(([a, b, o], i) => (
 								<g key={i}>
-									<line x1={xs[a]} y1={ys[a]} x2={xs[b]} y2={ys[b]} stroke="currentColor" strokeWidth={o > 1 ? 3.6 : 1.6} strokeLinecap="round" />
+									<line x1={xs[a]} y1={ys[a]} x2={xs[b]} y2={ys[b]} stroke="currentColor" strokeWidth={o > 1 ? 3.2 : 1.3} strokeLinecap="round" />
 									{o > 1 && <line x1={xs[a]} y1={ys[a]} x2={xs[b]} y2={ys[b]} stroke="var(--rd-mol-gap)" strokeWidth={1.2} strokeLinecap="round" />}
 								</g>
 							))}
-							{atoms.map(([el], i) => (el === 'C' ? null : <circle key={i} cx={xs[i]} cy={ys[i]} r={3.4} fill={ATOM_TINT[el] ?? 'currentColor'} className="rd-mol-atom" />))}
+							{atoms.map(([el], i) => (el === 'C' ? null : <circle key={i} cx={xs[i]} cy={ys[i]} r={3} fill={ATOM_TINT[el] ?? 'currentColor'} className="rd-mol-atom" />))}
 						</svg>
 						<span className="rd-home-mol-name">{label}</span>
 					</button>
