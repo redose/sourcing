@@ -916,9 +916,23 @@ const CSS = `
 .rd-start .rd-bounce { animation-duration: .7s; }
 .rd-start .rd-ghost-body { animation: none; fill: var(--sp-fill, #fff); fill-opacity: 1; transition: fill .1s; }
 .rd-start-sp { position: fixed; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2;
-  transition: left 1.3s cubic-bezier(.45,0,.25,1), top 1.3s cubic-bezier(.55,-0.45,.35,1), transform 1.3s ease; }
+  transition: left 1.9s cubic-bezier(.25,.1,.35,1), top 1.9s cubic-bezier(.25,.1,.35,1), transform 1.9s ease; }
 .rd-start-sp.corner { left: calc(100% - 52px); top: calc(100% - 52px); transform: scale(.773); }
-.rd-start-sp.corner .rd-bounce { animation: none; }
+/* On his way to the corner he bounces down there: three hops, each lower, then he settles. */
+.rd-start-sp.corner .rd-bounce { animation: rd-hop-down 1.9s linear 1 both; }
+@keyframes rd-hop-down {
+  0% { transform: translateY(0) scale(1.15, .82); }
+  7% { transform: translateY(0) scale(.95, 1.06); animation-timing-function: cubic-bezier(.25,.6,.45,1); }
+  21% { transform: translateY(-60%) scale(1, 1); animation-timing-function: cubic-bezier(.55,0,.75,.4); }
+  36% { transform: translateY(0) scale(1.12, .86); }
+  42% { transform: translateY(0) scale(.97, 1.04); animation-timing-function: cubic-bezier(.25,.6,.45,1); }
+  54% { transform: translateY(-34%) scale(1, 1); animation-timing-function: cubic-bezier(.55,0,.75,.4); }
+  66% { transform: translateY(0) scale(1.08, .9); }
+  71% { transform: translateY(0) scale(.98, 1.02); animation-timing-function: cubic-bezier(.25,.6,.45,1); }
+  80% { transform: translateY(-14%) scale(1, 1); animation-timing-function: cubic-bezier(.55,0,.75,.4); }
+  90% { transform: translateY(0) scale(1.04, .96); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
 .rd-start-sp.corner .rd-ghost-body { stroke: #000; stroke-width: 18; stroke-linejoin: round; }
 @media (max-width: 960px) { .rd-start-sp.corner { left: calc(100% - 45px); top: calc(100% - 45px); transform: scale(.614); } }
 .rd-wash { position: fixed; left: 50%; top: calc(50% + 44px); width: 300vmax; height: 300vmax; margin: -150vmax 0 0 -150vmax; border-radius: 50%; background-attachment: fixed !important;
