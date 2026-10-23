@@ -1,6 +1,6 @@
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
-import { Activity, AlertTriangle, BarChart3, BookOpen, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, FileText, FlaskConical, Link2, MessageCircle, MessageSquareQuote, Search, Sparkles, Pause, Play, Repeat, RotateCcw, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, BookOpen, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, FileText, FlaskConical, Link2, MessageCircle, MessageSquareQuote, Search, Sparkles, Pause, Play, Repeat, RotateCcw, Scale, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
 
@@ -836,6 +836,8 @@ const CSS = `
 .rd-stretches { display: grid; gap: 32px 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (min-width: 1024px) { .rd-stretches { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); } }
 .rd-stretches > li { padding-right: 14px; }
+.rd-legal summary::-webkit-details-marker { display: none; }
+.rd-legal:hover, .rd-legal[open] { background: rgba(255,255,255,.06); }
 .rd-glance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 32px; }
 @media (min-width: 1024px) { .rd-glance.wide { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .rd-glance > li { display: grid; align-content: start; gap: 3px; }
@@ -4500,6 +4502,66 @@ function SubstanceReferences({ name }: { name: string }) {
 	);
 }
 
+// Legal status by country, from dose.wiki (CC0): grouped by what the status means, each with dose.wiki's own wording;
+// open a country for the note behind it.
+const legalitySQL = (name: string) => `
+SELECT country, status, status_group, notes, source_url FROM ${DB}."substance_legality" WHERE substance = '${esc(name)}' ORDER BY country`;
+const LEGAL_GROUPS: { k: string; label: string; c: string }[] = [
+	{ k: 'illegal', label: 'Illegal or controlled', c: '#ff9aab' },
+	{ k: 'prescription', label: 'Prescription only', c: C.amber },
+	{ k: 'restricted', label: 'Restricted', c: '#ffb072' },
+	{ k: 'decriminalized', label: 'Decriminalized', c: C.lav },
+	{ k: 'legal', label: 'Not controlled', c: C.mint },
+	{ k: 'unclear', label: 'Unclear', c: 'rgba(255,255,255,.5)' },
+];
+function SubstanceLegality({ name }: { name: string }) {
+	const q = useSQLQuery(legalitySQL(name));
+	const list = rows(q);
+	if (q.isLoading || !list.length) return null;
+	const by = (k: string) => list.filter((r) => S(r.status_group) === k);
+	const n = (k: string) => by(k).length;
+	const summary = [
+		n('illegal') && `illegal or controlled in ${n('illegal')}`,
+		n('prescription') && `prescription only in ${n('prescription')}`,
+		n('decriminalized') && `decriminalized in ${n('decriminalized')}`,
+		n('legal') && `not controlled in ${n('legal')}`,
+	].filter(Boolean) as string[];
+	return (
+		<section id="legal" className="mt-24" style={{ scrollMarginTop: 16 }}>
+			<ArticleH2 icon={Scale} sub={`Of the ${list.length} countries on file, it’s ${summary.length > 1 ? summary.slice(0, -1).join(', ') + ' and ' + summary[summary.length - 1] : summary[0] ?? 'listed'}.`}>
+				Legal Status
+			</ArticleH2>
+			<div className="mt-8 grid gap-10">
+				{LEGAL_GROUPS.filter((g) => n(g.k)).map((g) => (
+					<div key={g.k}>
+						<div className="flex items-center gap-2 text-sm font-semibold" style={{ color: g.c }}>
+							<span className="rd-dot" style={{ width: 8, height: 8, background: g.c }} />
+							{g.label}
+							<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{n(g.k)}</span>
+						</div>
+						<div className="mt-3 grid gap-x-6 gap-y-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
+							{by(g.k).map((r) => (
+								<details key={S(r.country)} className="rd-legal min-w-0 rounded-lg px-2 py-1.5" style={{ marginLeft: -8 }}>
+									<summary className="flex cursor-pointer items-baseline justify-between gap-3" style={{ listStyle: 'none' }}>
+										<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{S(r.country)}</span>
+										<span className="text-xs" style={{ color: C.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '55%' }} title={S(r.status)}>{S(r.status)}</span>
+									</summary>
+									{S(r.notes) && <p className="mt-1.5 text-sm" style={{ color: C.soft, lineHeight: 1.55 }}>{S(r.notes)}</p>}
+								</details>
+							))}
+						</div>
+					</div>
+				))}
+			</div>
+			<p className="mt-8 text-xs" style={{ color: C.faint, lineHeight: 1.6 }}>
+				From{' '}
+				<a href={S(list[0].source_url)} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>dose.wiki (Effect Index)</a>
+				, shared under CC0. Laws change and can differ by state or region. This isn’t legal advice.
+			</p>
+		</section>
+	);
+}
+
 // ── Small pieces ──────────────────────────────────────────────────
 
 const TRIPSIT_COMBOS = 'https://wiki.tripsit.me/wiki/Drug_combinations';
@@ -5196,7 +5258,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						<ArticleH2
 							icon={Activity}
 							sub={
-								effectsRoute && !effectsRoute.loading
+								effectsRoute && !effectsRoute.loading && enoughToChart
 									? effectsRoute.used
 										? `A typical dose taken ${routeName(effectsRoute.route).toLowerCase()}, from ${closeReads} closely read reports.`
 										: `Too few ${routeName(effectsRoute.route).toLowerCase()} stories to show that route on its own, so this is all routes together.`
@@ -5210,14 +5272,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						<div className="mt-4">{onlyToggle}</div>
 					</>
 				)}
-				{!enoughToChart ? (
-					<div className="mt-6 flex items-center gap-4">
-						<SpunionPuzzle size={48} />
-						<p className="text-sm" style={{ color: C.soft, lineHeight: 1.55 }}>
-							{closeReads === 0 ? 'No closely read reports yet, so no timeline.' : `Only ${closeReads} closely read ${closeReads === 1 ? 'report' : 'reports'} so far, not enough for a timeline yet.`}
-						</p>
-					</div>
-				) : (
+				{!enoughToChart ? null : (
 				<>
 				<ol className="rd-stretches mt-8" style={{ ['--n' as string]: phases.length }}>
 					{phases.map((ph) => {
@@ -5294,6 +5349,12 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				)}
 				</>
 				)}
+				{!withSub && (
+					<>
+						{enoughToChart && <h3 className="mt-16 text-lg font-semibold">What people feel</h3>}
+						<SubstanceEffects name={sub} />
+					</>
+				)}
 			</section>
 	);
 	return (
@@ -5328,6 +5389,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 								{ id: 'numbers', label: 'By the Numbers', icon: BarChart3 },
 								{ id: 'mixes', label: 'Mixing', icon: Link2 },
 								{ id: 'risks', label: 'Known Risks', icon: AlertTriangle },
+								{ id: 'legal', label: 'Legal Status', icon: Scale },
 								{ id: 'slang', label: 'Slang', icon: MessageCircle },
 								{ id: 'stories', label: 'Stories', icon: BookOpen },
 								{ id: 'references', label: 'References', icon: FileText },
@@ -5345,6 +5407,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				</section>
 			)}
 			{!withSub && <KnownRisks name={sub} />}
+			{!withSub && <SubstanceLegality name={sub} />}
 			{!withSub && <SlangSection name={sub} />}
 			{withSub && <div className="mt-4">{onlyToggle}</div>}
 			{withSub &&
@@ -5433,12 +5496,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				</div>
 			</div>
 			<Err q={q} />
-				{!withSub && (
-					<>
-						<h3 className="mt-16 text-lg font-semibold">What people feel</h3>
-						<SubstanceEffects name={sub} />
-					</>
-				)}
 		</section>
 	);
 }
