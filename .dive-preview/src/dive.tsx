@@ -7299,7 +7299,7 @@ const BOUNCE_CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-/* The loader: Spunion stays white; each landing sends out a ring from the floor in the next colour (coral, cyan,
+/* The loader: Spunion changes colour with each landing; each landing sends out a ring from the floor in the next colour (coral, cyan,
    lavender), and a floor shadow breathes with the bounce. One bounce is .62s; colours cycle over three. */
 .rd-loader { position: relative; display: block; margin-top: 60px; pointer-events: none; }
 .rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; }
@@ -7315,7 +7315,10 @@ const BOUNCE_CSS = `
 .rd-skel > span { display: block; height: 10px; border-radius: 5px; flex-shrink: 0;
   background: linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.16) 50%, rgba(255,255,255,.08) 100%); background-size: 220% 100%; animation: rd-shimmer 1.8s ease-in-out infinite; }
 .rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5cdfe4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
-@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5cdfe4; opacity: .4; } }
+/* He takes on each landing's colour too, switching the moment he hits the floor. */
+@keyframes rd-ghost-hue { 0% { fill: #fc6c84; } 33.333% { fill: #5cdfe4; } 66.667% { fill: #b3a8f0; } }
+.rd-ghost-body { animation: rd-ghost-hue 1.86s steps(1, end) infinite; }
+@media (prefers-reduced-motion: reduce) { .rd-ghost-body { animation: none; } .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5cdfe4; opacity: .4; } }
 `;
 
 // The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
@@ -7345,7 +7348,7 @@ function SpunionGhost() {
 					<circle cx="357" cy="268" r="64" fill="#000" />
 				</mask>
 			</defs>
-			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" fillOpacity="0.92" />
+			<path className="rd-ghost-body" d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" fillOpacity="0.92" />
 			<circle cx="185" cy="300" r="86" fill="#140d2e" />
 			<circle cx="357" cy="268" r="64" fill="#140d2e" />
 			<circle cx="185" cy="300" r="70" fill="none" stroke="#fff" strokeOpacity="0.9" strokeWidth="6" />
