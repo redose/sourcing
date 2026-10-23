@@ -3882,56 +3882,49 @@ const pwPhases = (p: Record<string, unknown>) =>
 	)
 		.map(([label, key, color]) => [label, pwHours(p[key], pwIsMin(p, key)), pwDur(p[key], pwIsMin(p, key)), color] as [string, number, string, string])
 		.filter(([, h]) => h > 0);
-// Dose ranges as a rising staircase: one column per level, each a step taller, its range underneath. Always fits,
-// whatever the units, and reads as "more" at a glance.
+// Dose ranges as rows that grow left to right: light, common, strong, heavy, each bar longer than the last, its range
+// at the end. Threshold is a starting point rather than a range, so it's a line underneath.
 const DOSE_STEP_COLOR: Record<string, string> = { threshold: '#a99fd8', light: C.mint, common: C.lav, strong: C.amber, heavy: '#ff9aab' };
 function DoseSteps({ p }: { p: Record<string, unknown> }) {
 	const v = (k: string) => (p[k] == null ? '' : num(p[k]));
 	const range = (k: string) => {
-		if (k === 'threshold') return v('dose_threshold') ? `~${v('dose_threshold')}` : '';
 		if (k === 'heavy') return v('dose_heavy') ? `${v('dose_heavy')}+` : '';
 		const lo = v(`dose_${k}_min`), hi = v(`dose_${k}_max`);
 		return lo ? (hi && hi !== lo ? `${lo}–${hi}` : lo) : '';
 	};
 	const steps = DOSE_ROWS.filter((d) => d.key !== 'threshold').map((d) => ({ ...d, text: range(d.key) })).filter((d) => d.text);
 	if (!steps.length) return null;
-	const H = 64;
 	const units = S(p.dose_units);
 	return (
-		<>
-		<div className="mt-5 grid" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))`, columnGap: 4 }}>
-			{steps.map((d, i) => {
-				const h = Math.round(H * (0.22 + (0.78 * (i + 1)) / steps.length));
-				const c = DOSE_STEP_COLOR[d.key];
-				return (
-					<div key={d.key} className="min-w-0">
-						<div className="flex items-end" style={{ height: H }}>
-							<span
-								className="rd-rise block w-full"
-								style={{
-									height: h,
-									borderRadius: `8px 8px ${i === steps.length - 1 ? 8 : 0}px ${i === 0 ? 8 : 0}px`,
-									background: d.key === 'heavy' ? `linear-gradient(90deg, ${c}d0, ${c}10)` : `${c}d0`,
-									animationDelay: `${i * 0.12}s`,
-								}}
-							/>
-						</div>
-						<div className="rd-step mt-3 pl-0.5 text-xs font-semibold" style={{ color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.2 + i * 0.12}s` }}>
-							{d.label}
-						</div>
-						<div className="rd-step pl-0.5 tabular-nums" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animationDelay: `${0.25 + i * 0.12}s` }}>
-							{d.text}
-						</div>
-					</div>
-				);
-			})}
+		<div className="mt-5">
+			<div className="grid items-center gap-x-3 gap-y-2.5" style={{ gridTemplateColumns: 'auto minmax(0, 1fr) auto' }}>
+				{steps.map((d, i) => {
+					const c = DOSE_STEP_COLOR[d.key];
+					return (
+						<Fragment key={d.key}>
+							<span className="rd-step text-sm font-semibold" style={{ color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.15 + i * 0.12}s` }}>{d.label}</span>
+							<span className="block" style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,.06)' }}>
+								<span
+									className="rd-grow block h-full"
+									style={{
+										width: `${Math.round(100 * (0.3 + (0.7 * (i + 1)) / steps.length))}%`,
+										borderRadius: 6,
+										background: d.key === 'heavy' ? `linear-gradient(90deg, ${c}d0 60%, ${c}20)` : `${c}d0`,
+										animationDelay: `${i * 0.12}s`,
+									}}
+								/>
+							</span>
+							<span className="rd-step text-right tabular-nums" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13, color: '#fff', whiteSpace: 'nowrap', animationDelay: `${0.25 + i * 0.12}s` }}>{d.text}</span>
+						</Fragment>
+					);
+				})}
+			</div>
+			{v('dose_threshold') && (
+				<p className="rd-step mt-4 text-sm" style={{ color: C.soft, animationDelay: '.7s' }}>
+					First noticeable around <span className="tabular-nums" style={{ color: '#fff', fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13 }}>{v('dose_threshold')} {units}</span>
+				</p>
+			)}
 		</div>
-		{v('dose_threshold') && (
-			<p className="rd-step mt-4 text-sm" style={{ color: C.soft, animationDelay: '.7s' }}>
-				First noticeable around <span className="tabular-nums" style={{ color: '#fff', fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13 }}>{v('dose_threshold')} {units}</span>
-			</p>
-		)}
-		</>
 	);
 }
 
