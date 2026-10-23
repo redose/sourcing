@@ -831,8 +831,8 @@ const CSS = `
 /* Opacity-only entrance: a transform here would stop position: fixed children (the dock, the mood tint) from fixing to the viewport. */
 @keyframes rd-fade { from { opacity: 0; } to { opacity: 1; } }
 .rd-fade { animation: rd-fade .4s ease-out both; }
-@keyframes rd-drift { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(180px, 90px) rotate(2deg); } }
-.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 1100px; opacity: .05; animation: rd-drift 240s ease-in-out infinite alternate; filter: sepia(1) saturate(1.3) hue-rotate(215deg);
+@keyframes rd-drift { from { transform: translate(0, 0); } to { transform: translate(150px, 80px); } }
+.rd-molecules { position: fixed; inset: -200px; z-index: -1; pointer-events: none; background-size: 1100px; opacity: .05; animation: rd-drift 240s ease-in-out infinite alternate;
   -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); }
 .rd-molecules.b { background-size: 1530px; opacity: .03; animation-duration: 340s, 80s; animation-direction: alternate-reverse, reverse; }
 /* Every day: the molecules drift through a soft rainbow, slowly. */
@@ -903,8 +903,8 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
 .rd .rd-home-search { transition: border-color .2s, box-shadow .2s; }
 .rd .rd-home-search:focus-within { border-color: rgba(217,207,255,.6) !important; box-shadow: 0 0 0 4px rgba(217,207,255,.12), 0 20px 50px rgba(10,4,40,.5) !important; }
 /* Homepage only: the molecules wander further and quicker, a little brighter and warmer. */
-@keyframes rd-drift-home { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(140px, 200px) rotate(5deg); } 100% { transform: translate(250px, 60px) rotate(-4deg); } }
-.rd-home .rd-molecules { opacity: .075; filter: sepia(1) saturate(1.8) hue-rotate(200deg); animation: rd-drift-home 70s ease-in-out infinite alternate; }
+@keyframes rd-drift-home { 0% { transform: translate(0, 0); } 50% { transform: translate(110px, 170px); } 100% { transform: translate(180px, 50px); } }
+.rd-home .rd-molecules { opacity: .07; animation: rd-drift-home 70s ease-in-out infinite alternate; }
 .rd-home .rd-molecules.b { opacity: .045; animation: rd-drift-home 95s ease-in-out infinite alternate-reverse; }
 @media (prefers-reduced-motion: reduce) { .rd-home .rd-molecules { animation: none; } }
 /* Start screen: the wallpaper holds still. Each landing adds a circle of the next background colour that grows from
@@ -916,7 +916,7 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
 .rd-start-sp { position: fixed; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2; }
 
 .rd-start .rd-ripple { animation-duration: 1.8s; }
-.rd-ripples { position: fixed; inset: -280px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
+.rd-ripples { position: fixed; inset: -200px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
 .rd-ripple { position: absolute; left: 50%; top: calc(50% + 44px); width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; border-radius: 50%;
   background: radial-gradient(closest-side, transparent 50%, currentColor 72%, currentColor 86%, transparent 100%);
   animation: rd-ripple 1.7s cubic-bezier(.2,.6,.35,1) both; }
@@ -7880,7 +7880,9 @@ const MOLECULE_SVG = (() => {
 	}
 	return `<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${W}' viewBox='0 0 ${W} ${W}' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round'>${body}</svg>`;
 })();
-const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")`;
+// Drawn straight in a soft lavender, so the wallpaper needs no colour filter (filters on big fixed layers make the
+// browser keep extra full-screen copies, and scrolling stutters).
+const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG.replace(/white/g, '#d6ccff'))}")`;
 
 // ── Main ──────────────────────────────────────────────────────────
 
@@ -7907,7 +7909,7 @@ export function StartScreen() {
 			<div aria-hidden className="rd-ripples" style={{ WebkitMaskImage: MOLECULES, maskImage: MOLECULES }}>
 				{lands.map((p, i) => {
 					const k = n.current - lands.length + i;
-					return <div key={k} className="rd-ripple" style={{ color: START_COLORS[k % 2], left: p.x + 280, top: p.y + 280 }} />;
+					return <div key={k} className="rd-ripple" style={{ color: START_COLORS[k % 2], left: p.x + 200, top: p.y + 200 }} />;
 				})}
 			</div>
 			<div ref={me} className="rd-start-sp" onAnimationIteration={(e) => (e.animationName === 'rd-bounce' && n.current++, land(e))} style={{ '--sp-fill': START_COLORS[n.current % 2] } as React.CSSProperties}>
