@@ -761,17 +761,23 @@ const CSS = `
 /* Easter egg: trip mode, after Effect Index's visual effects (drifting, breathing): text lifts off the page and
    undulates in place. Only transforms and opacity
    animate, so it stays smooth; nothing flashes. */
-@keyframes rd-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.004); } }
 @keyframes rd-wave {
   0%, 100% { transform: translateY(0) skewX(0deg); text-shadow: 0 1px 3px rgba(10,6,30,.18); }
   25% { transform: translateY(-1.5px) skewX(.5deg); text-shadow: 0 3px 7px rgba(10,6,30,.24); }
   75% { transform: translateY(-1px) skewX(-.5deg); text-shadow: 0 3px 6px rgba(10,6,30,.22); }
 }
-.rd-tripping { animation: rd-breathe 6s ease-in-out infinite; transform-origin: 50% 30%; }
 .rd-tripping :is(h1, h2, h3, p, li) { animation: rd-wave 5.5s ease-in-out infinite; }
-.rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-delay: -1.1s; }
-.rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-delay: -2.2s; }
-@media (prefers-reduced-motion: reduce) { .rd-tripping, .rd-tripping :is(h1, h2, h3, p, li) { animation: none; } }
+/* Different lengths and starting points per element, so the text seems to drift at random rather than in step. */
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 6.7s; animation-delay: -1.3s; }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-duration: 4.9s; animation-delay: -2.9s; animation-direction: reverse; }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(5n) { animation-duration: 7.3s; animation-delay: -4.1s; }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(7n) { animation-duration: 5.1s; animation-delay: -0.6s; animation-direction: alternate-reverse; }
+/* A touch of colour: soft glows in the logo's colours drifting slowly behind everything. */
+@keyframes rd-glow-drift { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(-6%, 4%) rotate(8deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+.rd-trip-glow { position: fixed; inset: -20%; pointer-events: none; z-index: 0; opacity: .5;
+  background: radial-gradient(35% 30% at 25% 30%, rgba(252,108,132,.28), transparent 70%), radial-gradient(30% 28% at 75% 25%, rgba(90,224,228,.24), transparent 70%), radial-gradient(40% 32% at 55% 80%, rgba(138,125,220,.3), transparent 70%);
+  animation: rd-glow-drift 22s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .rd-tripping :is(h1, h2, h3, p, li), .rd-trip-glow { animation: none; } }
 /* The accent is the logo coral, except on cannabis pages, where it goes green (safety colours stay as they are). */
 .rd { --rd-accent: ${C.coral}; --rd-select: rgba(252,108,132,.45); }
 .rd.rd-green { --rd-accent: #8fe3a4; --rd-select: rgba(120,220,140,.45); }
@@ -7043,6 +7049,7 @@ export default function ReportTimelapse() {
 				<style>{CSS}</style>
 				{trip && (
 					<>
+						<div className="rd-trip-glow" aria-hidden />
 						<button className="rd-btn text-sm" onClick={() => setTrip(false)} style={{ position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 70, background: '#fff', color: C.deep }}>
 							Come down (Esc)
 						</button>
