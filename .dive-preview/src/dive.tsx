@@ -6195,11 +6195,14 @@ const BOUNCE_CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-.rd-bounce { display: block; opacity: .3; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; pointer-events: none; margin-top: 60px; }
+/* Each landing flips his colour: logo coral, then logo cyan (two bounces per cycle, switching on the squash). */
+@keyframes rd-hue { 0% { color: #fc6c84; } 50% { color: #5ae0e4; } }
+.rd-bounce { display: block; opacity: .85; color: #5ae0e4; animation: rd-bounce .62s infinite, rd-hue 1.24s steps(1, end) infinite; transform-origin: 50% 100%; pointer-events: none; margin-top: 60px; }
 @media (prefers-reduced-motion: reduce) { .rd-bounce { animation: none; } }
 `;
 
-// The loader: white watermark Spunion bouncing. Exported for the preview's startup screen.
+// The loader: Spunion bouncing, switching between the logo's coral and cyan each time he lands. Exported for the
+// preview's startup screen.
 export function BouncingSpunion({ size = 96 }: { size?: number }) {
 	return (
 		<span className="rd-bounce" style={{ width: size, height: size }}>
@@ -6209,7 +6212,7 @@ export function BouncingSpunion({ size = 96 }: { size?: number }) {
 	);
 }
 
-// Spunion as a white watermark for loading: his body in white with the eyes cut out, rings kept.
+// Spunion as a one-colour silhouette for loading (the current text colour): eyes cut out, rings kept.
 function SpunionGhost() {
 	return (
 		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden style={{ display: 'block', overflow: 'visible' }}>
@@ -6220,9 +6223,9 @@ function SpunionGhost() {
 					<circle cx="357" cy="268" r="64" fill="#000" />
 				</mask>
 			</defs>
-			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" mask="url(#sp-ghost-eyes)" />
-			<circle cx="185" cy="300" r="70" fill="none" stroke="#fff" strokeWidth="6" />
-			<circle cx="357" cy="268" r="49" fill="none" stroke="#fff" strokeWidth="6" />
+			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="currentColor" mask="url(#sp-ghost-eyes)" />
+			<circle cx="185" cy="300" r="70" fill="none" stroke="currentColor" strokeWidth="6" />
+			<circle cx="357" cy="268" r="49" fill="none" stroke="currentColor" strokeWidth="6" />
 		</svg>
 	);
 }
