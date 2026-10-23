@@ -776,7 +776,8 @@ const CSS = `
   transition: border-color 1.2s ease, box-shadow 1.2s ease; }
 .rd-card { background: ${C.card}; border: 1px solid ${C.line}; border-radius: 20px; }
 .rd-label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: ${C.faint}; font-weight: 600; }
-.rd-in { animation: rd-in .4s ease-out both; }
+/* backwards, not both: once it ends no transform lingers, so position: fixed children (pop-ups) stay put */
+.rd-in { animation: rd-in .4s ease-out backwards; }
 .rd-hover { transition: background .2s ease, border-color .2s ease; }
 .rd-hover:hover, .rd-hover:focus-visible { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); outline: none; }
 .rd-tag { white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 600;
@@ -1786,7 +1787,7 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 		return (i.pos ?? 0) >= 0.6 ? { w: 'mostly good', c: C.mint } : i.neg >= 0.55 ? { w: 'mostly rough', c: C.coral } : { w: 'mixed', c: C.lav };
 	};
 	return (
-		<section className="rd-in">
+		<section className="rd-fade">
 			<h1 className="text-4xl font-semibold">Effects</h1>
 			<p className="mt-2" style={{ color: C.soft }}>
 				Everything people described in their stories, grouped by kind. Each card says what the effect is, how many stories mention it, and how people usually felt about it.
@@ -2617,6 +2618,7 @@ function SubstanceOverview({ name }: { name: string }) {
 						)}
 					</div>
 					<div className="min-w-0">
+						<MoleculeCard name={name} />
 						<div className="rd-label mb-3">At a glance</div>
 						{glance}
 					</div>
@@ -3713,6 +3715,136 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 				</div>
 			</div>
 		</div>
+	);
+}
+
+// ── Molecule ──────────────────────────────────────────────────────
+// A substance's 3D structure (heavy atoms from PubChem's computed conformer), drawn as shaded spheres and bonds,
+// turning slowly. Drag to spin it.
+
+const structureSQL = (name: string) => `
+SELECT formula, iupac_name, atoms, bonds, source_url FROM ${DB}."substance_structures" WHERE substance = '${esc(name)}'`;
+
+const ATOM_COLOR: Record<string, string> = { C: '#d9cfff', N: '#8ff4f7', O: '#ffa3b6', S: '#ffe082', P: '#ffb072', F: '#a6f2e4', Cl: '#a6f2e4', Br: '#a6f2e4', I: '#a6f2e4' };
+const ATOM_SIZE: Record<string, number> = { C: 0.36, N: 0.34, O: 0.34, S: 0.44, P: 0.44, F: 0.3, Cl: 0.42, Br: 0.46, I: 0.5 };
+
+function Molecule3D({ atoms, bonds, size = 240 }: { atoms: [string, number, number, number][]; bonds: [number, number, number][]; size?: number }) {
+	const [rot, setRot] = useState({ y: 0.6, x: -0.35 });
+	const drag = useRef<{ x: number; y: number; ry: number; rx: number } | null>(null);
+	const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+	useEffect(() => {
+		if (still) return;
+		let raf = 0;
+		const tick = () => {
+			if (!drag.current) setRot((r) => ({ ...r, y: r.y + 0.006 }));
+			raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+	}, [still]);
+	// Centre the molecule and scale it to fit.
+	const cx = atoms.reduce((a, t) => a + t[1], 0) / atoms.length;
+	const cy = atoms.reduce((a, t) => a + t[2], 0) / atoms.length;
+	const cz = atoms.reduce((a, t) => a + t[3], 0) / atoms.length;
+	const radius = Math.max(1.5, ...atoms.map((t) => Math.hypot(t[1] - cx, t[2] - cy, t[3] - cz))) + 0.6;
+	const k = size / 2 / radius;
+	const [sy, cyy, sx, cxx] = [Math.sin(rot.y), Math.cos(rot.y), Math.sin(rot.x), Math.cos(rot.x)];
+	const pts = atoms.map(([el, x0, y0, z0]) => {
+		const x = x0 - cx, y = y0 - cy, z = z0 - cz;
+		const x1 = x * cyy + z * sy, z1 = -x * sy + z * cyy;
+		const y2 = y * cxx - z1 * sx, z2 = y * sx + z1 * cxx;
+		const persp = 1 + z2 / (radius * 5);
+		return { el, x: size / 2 + x1 * k * persp, y: size / 2 - y2 * k * persp, z: z2, r: (ATOM_SIZE[el] ?? 0.4) * k * persp };
+	});
+	type Shape = { z: number; node: JSX.Element };
+	const shapes: Shape[] = [];
+	bonds.forEach(([a, b, order], i) => {
+		const p = pts[a], q = pts[b];
+		if (!p || !q) return;
+		const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
+		const ox = (-dy / len) * k * 0.09, oy = (dx / len) * k * 0.09;
+		const lines = order >= 2 ? [[-ox, -oy], [ox, oy]] : [[0, 0]];
+		shapes.push({
+			z: (p.z + q.z) / 2 - 0.01,
+			node: (
+				<g key={`b${i}`} stroke="rgba(255,255,255,.55)" strokeWidth={Math.max(1.5, k * 0.07)} strokeLinecap="round">
+					{lines.map(([u, v], j) => (
+						<line key={j} x1={p.x + u} y1={p.y + v} x2={q.x + u} y2={q.y + v} />
+					))}
+				</g>
+			),
+		});
+	});
+	pts.forEach((p, i) =>
+		shapes.push({
+			z: p.z,
+			node: <circle key={`a${i}`} cx={p.x} cy={p.y} r={p.r} fill={`url(#mol-${ATOM_COLOR[p.el] ? p.el : 'X'})`} />,
+		}),
+	);
+	shapes.sort((a, b) => a.z - b.z);
+	const elements = [...new Set(atoms.map((t) => (ATOM_COLOR[t[0]] ? t[0] : 'X')))];
+	return (
+		<svg
+			width={size}
+			height={size}
+			viewBox={`0 0 ${size} ${size}`}
+			role="img"
+			aria-label="3D structure of the molecule, drag to rotate"
+			style={{ display: 'block', cursor: drag.current ? 'grabbing' : 'grab', touchAction: 'none', overflow: 'visible' }}
+			onPointerDown={(e) => {
+				(e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
+				drag.current = { x: e.clientX, y: e.clientY, ry: rot.y, rx: rot.x };
+			}}
+			onPointerMove={(e) => {
+				const d = drag.current;
+				if (d) setRot({ y: d.ry + (e.clientX - d.x) * 0.012, x: Math.max(-1.4, Math.min(1.4, d.rx + (e.clientY - d.y) * 0.012)) });
+			}}
+			onPointerUp={() => (drag.current = null)}
+			onPointerCancel={() => (drag.current = null)}
+		>
+			<defs>
+				{elements.map((el) => {
+					const c = ATOM_COLOR[el] ?? '#ffffff';
+					return (
+						<radialGradient key={el} id={`mol-${el}`} cx="35%" cy="32%" r="70%">
+							<stop offset="0%" stopColor="#ffffff" />
+							<stop offset="35%" stopColor={c} />
+							<stop offset="100%" stopColor={c} stopOpacity="0.45" />
+						</radialGradient>
+					);
+				})}
+			</defs>
+			{shapes.map((s) => s.node)}
+		</svg>
+	);
+}
+
+// The molecule with its formula (subscripted) and a link to PubChem, or nothing when there isn't one.
+function MoleculeCard({ name }: { name: string }) {
+	const q = useSQLQuery(structureSQL(name));
+	const r = rows(q)[0];
+	if (!r) return null;
+	let atoms: [string, number, number, number][] = [], bonds: [number, number, number][] = [];
+	try {
+		atoms = JSON.parse(S(r.atoms));
+		bonds = JSON.parse(S(r.bonds));
+	} catch {
+		return null;
+	}
+	if (atoms.length < 2) return null;
+	const formula = S(r.formula).split(/(\d+)/).map((part, i) => (/^\d+$/.test(part) ? <sub key={i}>{part}</sub> : <span key={i}>{part}</span>));
+	return (
+		<figure className="mb-6 flex flex-col items-center">
+			<Molecule3D atoms={atoms} bonds={bonds} size={230} />
+			<figcaption className="mt-2 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+				<span className="text-sm" style={{ color: C.soft, fontFamily: SANS }}>{formula}</span>
+				<span>·</span>
+				<a href={S(r.source_url)} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+					PubChem ↗
+				</a>
+				<span>· drag to turn</span>
+			</figcaption>
+		</figure>
 	);
 }
 
