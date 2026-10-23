@@ -2965,7 +2965,6 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 								</h1>
 								{isGroup(name) && <GroupBadge />}
 							</div>
-							{!molecule && <Sources className="pt-3" list={['erowid', 'pw', 'sei', 'tripsit']} />}
 						</div>
 						{kindLine && (
 							<p className="mt-3 max-w-2xl" style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1.45, color: 'rgba(255,255,255,.9)' }}>
@@ -3016,9 +3015,6 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 					</div>
 					{molecule && (
 						<div className="flex min-w-0 flex-col self-stretch">
-							<div className="flex justify-end">
-								<Sources className="pt-4" list={['erowid', 'pw', 'sei', 'tripsit']} />
-							</div>
 							<MoleculeCard list={molecules} />
 						</div>
 					)}
@@ -4368,7 +4364,7 @@ function MoleculeCard({ list }: { list: Record<string, unknown>[] }) {
 	if (atoms.length < 2) return null;
 	const formula = S(r.formula).split(/(\d+)/).map((part, i) => (/^\d+$/.test(part) ? <sub key={i}>{part}</sub> : <span key={i}>{part}</span>));
 	return (
-		<figure className="mt-6 flex flex-1 flex-col items-center justify-center" style={{ minHeight: 420, background: 'radial-gradient(closest-side at 50% 46%, rgba(217,207,255,.16), rgba(217,207,255,.05) 60%, transparent)' }}>
+		<figure className="flex flex-1 flex-col items-center justify-center" style={{ minHeight: 420, background: 'radial-gradient(closest-side at 50% 46%, rgba(217,207,255,.16), rgba(217,207,255,.05) 60%, transparent)' }}>
 			<Molecule3D key={i} atoms={atoms} bonds={bonds} size={310} />
 			{list.length > 1 && (
 				<div className="mt-4 flex flex-wrap justify-center gap-1.5" role="tablist" aria-label="Active compounds">
@@ -4389,6 +4385,92 @@ function MoleculeCard({ list }: { list: Record<string, unknown>[] }) {
 				<span>· drag to turn</span>
 			</figcaption>
 		</figure>
+	);
+}
+
+// References: every source behind a substance page, numbered, with what each one contributed and a link.
+function SubstanceReferences({ name }: { name: string }) {
+	const detailQ = useSQLQuery(substanceDetailSQL(name));
+	const structQ = useSQLQuery(structureSQL(name));
+	const r = rows(detailQ)[0];
+	const mols = rows(structQ);
+	const link = { color: '#fff', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.35)', textUnderlineOffset: 3 } as const;
+	const refs: { src: keyof typeof SOURCES | null; title: React.ReactNode; what: React.ReactNode }[] = [
+		{
+			src: 'erowid',
+			title: <a href="https://erowid.org/experiences/" target="_blank" rel="noopener noreferrer" style={link}>Erowid Experience Vaults</a>,
+			what: r ? `The ${N(r.n_reports).toLocaleString()} first-hand stories on this page, in their writers’ own words.` : 'The first-hand stories on this page, in their writers’ own words.',
+		},
+		{
+			src: 'pw',
+			title: <a href={S(r?.url) || SOURCES.pw.href} target="_blank" rel="noopener noreferrer" style={link}>PsychonautWiki{S(r?.url) ? `: ${short(name)}` : ''}</a>,
+			what: 'What kind of drug it is, dose ranges and duration by route, tolerance, addiction potential and interaction notes.',
+		},
+		{
+			src: 'sei',
+			title: <a href={SOURCES.sei.href} target="_blank" rel="noopener noreferrer" style={link}>Subjective Effect Index</a>,
+			what: <>Effect names, categories and descriptions. CC BY-NC-SA 4.0; descriptions shortened to their first sentence and shared under the same licence.</>,
+		},
+		{
+			src: 'tripsit',
+			title: <a href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" style={link}>TripSit drug combinations chart</a>,
+			what: 'The risk rating and note for each mix, and the Known Risks list.',
+		},
+		...(mols.length
+			? [
+					{
+						src: null,
+						title: (
+							<>
+								PubChem:{' '}
+								{mols.map((m, i) => (
+									<Fragment key={S(m.source_url)}>
+										{i > 0 && ', '}
+										<a href={S(m.source_url)} target="_blank" rel="noopener noreferrer" style={link}>{S(m.compound) || short(name)}</a>
+									</Fragment>
+								))}
+							</>
+						),
+						what: 'The 3D molecule: a computed conformer, hydrogens left out.',
+					},
+				]
+			: []),
+		{
+			src: null,
+			title: (
+				<>
+					Slang lists:{' '}
+					<a href={SLANG_SOURCES.dea.href} target="_blank" rel="noopener noreferrer" style={link}>DEA</a>,{' '}
+					<a href={SLANG_SOURCES.noslang.href} target="_blank" rel="noopener noreferrer" style={link}>NoSlang</a>, Dope Lookup
+				</>
+			),
+			what: 'Street names, each shown with the lists it appears on.',
+		},
+		{
+			src: null,
+			title: 'Close readings by Claude (Anthropic)',
+			what: r ? `${N(r.n_read).toLocaleString()} of these stories read closely for doses, timed moments, effects and mood, behind the timelines and “how it went”.` : 'Stories read closely for doses, timed moments, effects and mood.',
+		},
+	];
+	return (
+		<section id="references" className="mt-24" style={{ scrollMarginTop: 16 }}>
+			<ArticleH2 icon={FileText}>References</ArticleH2>
+			<ol className="mt-6 grid gap-4" style={{ maxWidth: 760 }}>
+				{refs.map((ref, i) => (
+					<li key={i} className="grid gap-x-4" style={{ gridTemplateColumns: '28px minmax(0, 1fr)' }}>
+						<span className="pt-0.5 text-sm tabular-nums" style={{ color: C.faint }}>{i + 1}.</span>
+						<div className="min-w-0">
+							<div className="flex items-center gap-2 font-semibold">
+								{ref.src && <img src={SOURCES[ref.src].logo} alt="" width={16} height={16} style={{ borderRadius: 4 }} />}
+								<span>{ref.title}</span>
+							</div>
+							<p className="mt-0.5 text-sm" style={{ color: C.soft, lineHeight: 1.55 }}>{ref.what}</p>
+						</div>
+					</li>
+				))}
+			</ol>
+			<p className="mt-6 text-xs" style={{ color: C.faint }}>Thank you to everyone behind these. Nothing here is medical advice.</p>
+		</section>
 	);
 }
 
@@ -5212,6 +5294,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 								{ id: 'risks', label: 'Known Risks', icon: AlertTriangle },
 								{ id: 'slang', label: 'Slang', icon: MessageCircle },
 								{ id: 'stories', label: 'Stories', icon: BookOpen },
+								{ id: 'references', label: 'References', icon: FileText },
 							]}
 						/>
 					</div>
@@ -5310,6 +5393,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 			)}
 				</>
 			)}
+			{!withSub && <SubstanceReferences name={sub} />}
 				</div>
 			</div>
 			<Err q={q} />
@@ -6193,16 +6277,19 @@ function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boole
 		</span>
 	);
 }
-// Spunion with a big piece missing, for "not enough data yet": a puzzle-shaped bite out of his side (dashed edge),
-// the piece itself bobbing beside him, his eyes on it.
-const PUZZLE_PIECE = 'M0 0 h30 a15 15 0 1 1 30 0 h30 v30 a15 15 0 1 1 0 30 v30 h-90 Z';
+// Spunion with a big piece missing, for "not enough data yet": a jigsaw-shaped bite out of his side, the piece
+// itself bobbing beside him, his eyes on it.
+// A classic jigsaw piece, 100 square: necked tabs out on the top and right, matching blanks in on the bottom and left.
+const PUZZLE_PIECE =
+	'M0 0 L35 0 C38 0 40 -2 38 -6 C34 -14 37 -27 50 -27 C63 -27 66 -14 62 -6 C60 -2 62 0 65 0 L100 0 L100 35 C100 38 102 40 106 38 C114 34 127 37 127 50 C127 63 114 66 106 62 C102 60 100 62 100 65 L100 100 L65 100 C62 100 60 98 62 94 C66 86 63 73 50 73 C37 73 34 86 38 94 C40 98 38 100 35 100 L0 100 L0 65 C0 62 2 60 6 62 C14 66 27 63 27 50 C27 37 14 34 6 38 C2 40 0 38 0 35 Z';
 function SpunionPuzzle({ size = 72 }: { size?: number }) {
-	const hole = 'translate(318 232) rotate(8) scale(1.75)';
+	// Mirrored, so the tabs point into him and the flat side runs along his edge.
+	const hole = 'translate(498 228) rotate(10) scale(-1.45 1.45)';
 	return (
-		<svg viewBox="-20 -20 780 520" width={(size * 780) / 520} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
+		<svg viewBox="-20 -20 800 540" width={(size * 800) / 540} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
 			<defs>
-				<mask id="sp-bite" maskUnits="userSpaceOnUse" x="-20" y="-20" width="780" height="520">
-					<rect x="-20" y="-20" width="780" height="520" fill="#fff" />
+				<mask id="sp-bite" maskUnits="userSpaceOnUse" x="-20" y="-20" width="800" height="540">
+					<rect x="-20" y="-20" width="800" height="540" fill="#fff" />
 					<path d={PUZZLE_PIECE} transform={hole} fill="#000" />
 				</mask>
 			</defs>
@@ -6212,13 +6299,12 @@ function SpunionPuzzle({ size = 72 }: { size?: number }) {
 				fillOpacity="0.92"
 				mask="url(#sp-bite)"
 			/>
-			<path d={PUZZLE_PIECE} transform={hole} fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="4" strokeDasharray="8 7" strokeLinejoin="round" />
 			<circle cx="152" cy="270" r="52" fill={C.deep} />
 			<circle cx="170" cy="288" r="15" fill="#fff" />
-			<circle cx="272" cy="236" r="39" fill={C.deep} />
-			<circle cx="286" cy="250" r="11" fill="#fff" />
+			<circle cx="258" cy="236" r="39" fill={C.deep} />
+			<circle cx="272" cy="250" r="11" fill="#fff" />
 			<g className="rd-piece">
-				<path d={PUZZLE_PIECE} transform="translate(560 200) rotate(22) scale(1.75)" fill="#fff" fillOpacity="0.92" />
+				<path d={PUZZLE_PIECE} transform="translate(735 170) rotate(22) scale(-1.45 1.45)" fill="#fff" fillOpacity="0.95" />
 			</g>
 		</svg>
 	);
