@@ -7299,7 +7299,7 @@ const BOUNCE_CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-/* The loader: Spunion changes colour with each landing; each landing sends out a ring from the floor in the next colour (coral, cyan,
+/* The loader: Spunion changes colour mid-air and lands on purple; each landing sends out a ring from the floor in the next colour (coral, cyan,
    lavender), and a floor shadow breathes with the bounce. One bounce is .62s; colours cycle over three. */
 .rd-loader { position: relative; display: block; margin-top: 60px; pointer-events: none; }
 .rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; }
@@ -7315,9 +7315,12 @@ const BOUNCE_CSS = `
 .rd-skel > span { display: block; height: 10px; border-radius: 5px; flex-shrink: 0;
   background: linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.16) 50%, rgba(255,255,255,.08) 100%); background-size: 220% 100%; animation: rd-shimmer 1.8s ease-in-out infinite; }
 .rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5cdfe4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
-/* He takes on each landing's colour too, switching the moment he hits the floor. */
-@keyframes rd-ghost-hue { 0% { fill: #fc6c84; } 33.333% { fill: #5cdfe4; } 66.667% { fill: #b3a8f0; } }
-.rd-ghost-body { animation: rd-ghost-hue 1.86s steps(1, end) infinite; }
+/* In the air he flows into a colour (coral, then cyan, then pink, one per bounce) and always lands back on purple. */
+@keyframes rd-ghost-hue {
+  0% { fill: #b3a8f0; } 16.667% { fill: #fc6c84; } 33.333% { fill: #b3a8f0; }
+  50% { fill: #5cdfe4; } 66.667% { fill: #b3a8f0; } 83.333% { fill: #f0a8e0; } 100% { fill: #b3a8f0; }
+}
+.rd-ghost-body { animation: rd-ghost-hue 1.86s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .rd-ghost-body { animation: none; } .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5cdfe4; opacity: .4; } }
 `;
 
