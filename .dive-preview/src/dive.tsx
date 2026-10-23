@@ -1144,20 +1144,24 @@ function ScrubChart({
 				))}
 				{xLabels.map((l, i) =>
 					i % labelEvery === 0 ? (
-						<text key={`xl${i}`} x={sx(l.x)} y={H - 2} fill={C.faint} fontSize="11" textAnchor={i === 0 ? 'start' : 'middle'}>
+						<text key={`xl${i}`} x={sx(l.x)} y={H - 2} fill={C.faint} fontSize="11" textAnchor={i === 0 ? 'start' : sx(l.x) > w - 24 ? 'end' : 'middle'}>
 							{l.label}
 						</text>
 					) : null,
 				)}
 				{hx != null && Math.abs(sx(hx) - cx) > 6 && (
 					<g pointerEvents="none">
-						<line x1={sx(hx)} x2={sx(hx)} y1={pillH ? 20 : 0} y2={plotBottom + 2} stroke="#fff" strokeOpacity="0.45" strokeDasharray="3 4" />
+						{lanes.map((_, li) => (
+							<line key={`hh${li}`} x1={sx(hx)} x2={sx(hx)} y1={tops[li]} y2={tops[li] + heights[li]} stroke="#fff" strokeOpacity="0.45" strokeDasharray="3 4" />
+						))}
 						<text x={clamp(sx(hx), padX + 18, w - padX - 18)} y={pillH ? 14 : 10} textAnchor="middle" fontSize="11" fontWeight="600" fill={C.soft} style={{ fontVariantNumeric: 'tabular-nums' }}>
 							{fmtT(hx)}
 						</text>
 					</g>
 				)}
-				<line x1={cx} x2={cx} y1={pillH ? 20 : 0} y2={plotBottom + 2} stroke="#fff" strokeOpacity="0.95" strokeWidth="2" />
+				{lanes.map((_, li) => (
+					<line key={`ph${li}`} x1={cx} x2={cx} y1={tops[li]} y2={li === lanes.length - 1 ? plotBottom + 2 : tops[li] + heights[li]} stroke="#fff" strokeOpacity="0.95" strokeWidth="2" />
+				))}
 				{cursorLabel && (
 					<g transform={`translate(${clamp(cx, padX + 24, w - padX - 24)}, 10)`}>
 						<rect x={-24} y={-10} width={48} height={20} rx={10} fill="#fff" />
@@ -5167,7 +5171,6 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	const [x, setX] = useState<number | null>(null);
 	const { open } = useContext(OpenCtx);
 	const w = horizon / SLICES;
-	const cursor = x ?? horizon * 0.3;
 	const { series, denom } = useMemo(() => {
 		const denom = new Map(rows(denQ).map((r) => [N(r.bin), N(r.n)]));
 		const by = new Map<string, Map<number, number>>();
@@ -5193,8 +5196,27 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	const moodPts = rows(denQ).filter((r) => N(r.n) >= 3).sort((a, b) => N(a.bin) - N(b.bin)).map((r) => ({ x: (N(r.bin) + 0.5) * w, y: N(r.mood) }));
 	const dataEnd = Math.max(0, ...series.flatMap((x) => x.points.map((p) => p.x)), ...moodPts.map((p) => p.x)) + w / 2;
 	const chartMax = clamp(dataEnd, Math.min(horizon, w * 4), horizon);
+	const firstX = Math.min(chartMax, ...series.flatMap((x) => x.points.slice(0, 1).map((p) => p.x)));
+	const cursor = x ?? clamp(chartMax * 0.3, firstX, chartMax);
 	const slice = clamp(Math.floor(cursor / w), 0, SLICES - 1);
-	const readout = series.map((s) => ({ ...s, v: interp(s.points, cursor) })).filter((r) => r.v != null).sort((a, b) => (b.v as number) - (a.v as number));
+	const readout = series
+		.filter((s) => s.points.length && cursor >= s.points[0].x && cursor <= s.points[s.points.length - 1].x)
+		.map((s) => ({ ...s, v: interp(s.points, cursor) }))
+		.filter((r) => r.v != null)
+		.sort((a, b) => (b.v as number) - (a.v as number));
+	const closeReads = N(rows(denQ)[0]?.total);
+	// Below this, a curve over time is just a line between two points; show what's mentioned instead.
+	const enoughToChart = closeReads >= 10;
+	const onlyToggle = (
+		<div className="flex flex-wrap items-center gap-2">
+			{[false, true].map((v) => (
+				<button key={String(v)} className="rd-nav" aria-current={only === v ? 'page' : undefined} onClick={() => setOnly(v)} style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }}>
+					{v ? (withSub ? 'Only these two' : `Only ${short(sub)}`) : withSub ? 'Any reports with both' : 'Any reports with it'}
+				</button>
+			))}
+			<span className="text-xs" style={{ color: C.faint }}>{only ? 'Nothing else taken' : 'May include other substances'}</span>
+		</div>
+	);
 	const shuffle = () => list.length && onOpen(S(list[Math.floor(Math.random() * list.length)].report_id));
 	// A dangerous or unsafe pair tints the whole page, so the risk is felt before anything is read.
 	const pairNote = withSub ? rows(pairQ)[0] : undefined;
@@ -5252,14 +5274,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 			)}
 			{!withSub && <KnownRisks name={sub} />}
 			{!withSub && <SlangSection name={sub} />}
-			<div className={`${withSub ? "mt-4" : "mt-12"} flex flex-wrap items-center gap-2`}>
-				{[false, true].map((v) => (
-					<button key={String(v)} className="rd-nav" aria-current={only === v ? 'page' : undefined} onClick={() => setOnly(v)} style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }}>
-						{v ? (withSub ? 'Only these two' : `Only ${short(sub)}`) : withSub ? 'Any reports with both' : 'Any reports with it'}
-					</button>
-				))}
-				<span className="text-xs" style={{ color: C.faint }}>{only ? 'Nothing else taken' : 'May include other substances'}</span>
-			</div>
+			{withSub && <div className="mt-4">{onlyToggle}</div>}
 			{withSub &&
 				(pairQ.isLoading ? (
 					<div className="rd-card mt-6 p-5" style={{ color: C.faint }}>Checking interaction notes…</div>
@@ -5303,16 +5318,36 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					{N(rows(denQ)[0]?.total) >= 20 && series.length > 0 && <div className="rd-card mt-4 p-5 text-sm" style={{ color: C.faint }}>Based on {N(rows(denQ)[0]?.total)} closely read reports with both.</div>}
 				</>
 			) : series.length > 0 ? (
-				<section id="unfold" className={withSub ? 'mt-10 border-t pt-7' : 'mt-14'} style={{ borderColor: C.line, scrollMarginTop: 16 }}>
+				<section id="unfold" className={withSub ? 'mt-10 border-t pt-7' : 'mt-24'} style={{ borderColor: C.line, scrollMarginTop: 16 }}>
 					{withSub ? (
 						<div className="flex flex-wrap items-baseline justify-between gap-2">
 							<h2 className="text-2xl font-semibold">How it tends to unfold together</h2>
 							<span className="text-sm" style={{ color: C.faint }}>From {N(rows(denQ)[0]?.total)} closely read reports · % mentioning each effect · drag across</span>
 						</div>
 					) : (
-						<ArticleH2 icon={Activity} sub={`From ${N(rows(denQ)[0]?.total)} closely read reports · % mentioning each effect · drag across`}>How It Unfolds</ArticleH2>
+						<>
+							<ArticleH2 icon={Activity} sub={enoughToChart ? `From ${closeReads} closely read reports · % mentioning each effect · drag across` : undefined}>How It Unfolds</ArticleH2>
+							<div className="mt-4">{onlyToggle}</div>
+						</>
 					)}
-					<div className="mt-5">
+					{!enoughToChart ? (
+						<div className="mt-6">
+							<p style={{ color: C.soft, lineHeight: 1.6 }}>
+								Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. What {closeReads === 1 ? 'it mentions' : 'they mention'} most:
+							</p>
+							<div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+								{series
+									.map((s) => ({ ...s, peak: Math.max(0, ...s.points.map((p) => p.y)) }))
+									.sort((a, b) => b.peak - a.peak)
+									.slice(0, 8)
+									.map((r) => (
+										<EffectTag key={r.label} name={r.label} />
+									))}
+							</div>
+						</div>
+					) : (
+					<>
+					<div className="mt-6">
 						<ScrubChart
 							id="sub"
 							lanes={[
@@ -5327,23 +5362,28 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</div>
 					<div className="mt-5">
 						<span className="rd-label">
-							Around {fmtT(cursor)} · {denom.get(slice) ?? 0} reports describe this
+							{readout.length ? `Around ${fmtT(cursor)} · ${denom.get(slice) ?? 0} reports describe this` : `Around ${fmtT(cursor)} · nothing described yet`}
 						</span>
 						<div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
 							{readout.map((r) => (
 								<span key={r.label} className="flex items-center gap-2">
-									<EffectTag name={r.label} />
+									<button className="rd-tag" onClick={() => open({ kind: 'effect', name: r.label })} title={`${r.label}: tap for what it is`}>
+										<span className="rd-dot" style={{ background: r.color }} />
+										{r.label}
+									</button>
 									<span className="text-sm tabular-nums" style={{ color: C.faint }}>{Math.round(r.v as number)}%</span>
 								</span>
 							))}
 						</div>
 					</div>
+					</>
+					)}
 				</section>
 			) : null)}
 
 			{(
 				<>
-			<div id="stories" className={`${withSub ? 'mt-10' : 'mt-14'} flex flex-wrap items-end justify-between gap-3`} style={{ scrollMarginTop: 16 }}>
+			<div id="stories" className={`${withSub ? 'mt-10' : 'mt-24'} flex flex-wrap items-end justify-between gap-3`} style={{ scrollMarginTop: 16 }}>
 				<div className="min-w-0 flex-1">
 					{withSub ? (
 						<>
@@ -5354,6 +5394,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						<ArticleH2 icon={BookOpen} sub="What people went through, in their own words. Closely read ones first.">Stories</ArticleH2>
 					)}
 				</div>
+				{!withSub && series.length === 0 && <div className="order-last w-full">{onlyToggle}</div>}
 				<button onClick={shuffle} className="rd-btn flex items-center gap-2">
 					<Shuffle size={15} /> Random
 				</button>
