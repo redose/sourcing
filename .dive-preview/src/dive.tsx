@@ -7258,16 +7258,16 @@ const BOUNCE_CSS = `
 @keyframes rd-shadow { 0%, 100% { transform: translateX(-50%) scale(1.15, 1); opacity: .45; } 50% { transform: translateX(-50%) scale(.55, .7); opacity: .15; } }
 .rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
 @keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
-@keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5ae0e4; } 66.667% { border-color: #b3a8f0; } }
+@keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5cdfe4; } 66.667% { border-color: #b3a8f0; } }
 @keyframes rd-exude { 0% { transform: scale(1.06); opacity: .4; } 60% { transform: scale(.94); opacity: .15; } 100% { transform: scale(1.06); opacity: .4; } }
-@keyframes rd-glow-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #b3a8f0; } }
+@keyframes rd-glow-hue { 0% { color: #fc6c84; } 33.333% { color: #5cdfe4; } 66.667% { color: #b3a8f0; } }
 .rd-halo { position: absolute; inset: -10%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, currentColor, transparent 70%); filter: blur(6px); animation: rd-exude .62s ease-out infinite, rd-glow-hue 1.86s steps(1, end) infinite; }
 @keyframes rd-shimmer { from { background-position: 120% 0; } to { background-position: -20% 0; } }
 .rd-skel { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; overflow: hidden; border-radius: 20px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); transform-origin: 50% 0; }
 .rd-skel > span { display: block; height: 10px; border-radius: 5px; flex-shrink: 0;
   background: linear-gradient(90deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,.16) 50%, rgba(255,255,255,.08) 100%); background-size: 220% 100%; animation: rd-shimmer 1.8s ease-in-out infinite; }
-.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
-@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5ae0e4; opacity: .4; } }
+.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5cdfe4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
+@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5cdfe4; opacity: .4; } }
 `;
 
 // The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
@@ -7312,7 +7312,7 @@ function SpunionSvg() {
 			<g className="sp-body">
 				<path
 					d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
-					fill="#5ae0e4"
+					fill="#5cdfe4"
 					stroke="#000"
 					strokeWidth="18"
 					strokeLinejoin="round"
