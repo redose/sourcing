@@ -1,16 +1,11 @@
 import { createRoot } from 'react-dom/client';
 import { MotherDuckSDKProvider, useConnectionStatus } from './md-sdk';
 import { AlertCircle } from 'lucide-react';
-import Dive, { BouncingSpunion } from './dive';
+import Dive, { StartScreen } from './dive';
 
 function ConnectionGate({ children }: { children: React.ReactNode }) {
 	const { isConnected, isConnecting, error } = useConnectionStatus();
-	if (isConnecting)
-		return (
-			<div className="flex items-center justify-center h-screen gap-2" style={{ color: '#aba3c7' }}>
-				<BouncingSpunion size={88} />
-			</div>
-		);
+	if (isConnecting) return <StartScreen />;
 	if (error)
 		return (
 			<div className="flex items-center justify-center h-screen gap-2 text-red-600">
