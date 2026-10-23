@@ -6237,22 +6237,19 @@ const BOUNCE_CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-/* The loader: one solid colour per bounce (coral, cyan, white), switching on each landing; a floor shadow breathes
-   with the bounce; each landing sends out a ring in that colour. One bounce is .62s; colours cycle over three. */
+/* The loader: Spunion stays white; each landing sends out a ring from the floor in the next colour (coral, cyan,
+   lavender), and a floor shadow breathes with the bounce. One bounce is .62s; colours cycle over three. */
 .rd-loader { position: relative; display: block; margin-top: 60px; pointer-events: none; }
 .rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; }
-@keyframes rd-g1 { 0%, 31% { stop-color: #fc6c84; } 33.3%, 64% { stop-color: #5ae0e4; } 66.6%, 97% { stop-color: #ffffff; } 100% { stop-color: #fc6c84; } }
-.rd-g1 { animation: rd-g1 1.86s linear infinite; }
 @keyframes rd-shadow { 0%, 100% { transform: translateX(-50%) scale(1.15, 1); opacity: .45; } 50% { transform: translateX(-50%) scale(.55, .7); opacity: .15; } }
 .rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
 @keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
-@keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5ae0e4; } 66.667% { border-color: #ffffff; } }
+@keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5ae0e4; } 66.667% { border-color: #b3a8f0; } }
 .rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
-@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-g1 { animation: none; } .rd-ring { display: none; } }
+@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring { animation: none; } .rd-ring { display: none; } }
 `;
 
-// The loader: Spunion bouncing, his colour drifting through the logo's palette, a shadow and a landing ring under
-// him. Exported for the
+// The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
 // preview's startup screen.
 export function BouncingSpunion({ size = 96 }: { size?: number }) {
 	return (
@@ -6267,22 +6264,18 @@ export function BouncingSpunion({ size = 96 }: { size?: number }) {
 	);
 }
 
-// Spunion for loading: a body in one colour that drifts through the logo's palette, eyes cut out, white rings.
+// Spunion for loading: white, eyes cut out, rings kept.
 function SpunionGhost() {
 	return (
 		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden style={{ display: 'block', overflow: 'visible' }}>
 			<defs>
-				<linearGradient id="sp-load-grad" x1="0" y1="0" x2="1" y2="1">
-					<stop offset="0%" className="rd-g1" stopColor="#fc6c84" />
-					<stop offset="100%" className="rd-g1" stopColor="#fc6c84" />
-				</linearGradient>
 				<mask id="sp-ghost-eyes">
 					<rect width="500" height="500" fill="#fff" />
 					<circle cx="185" cy="300" r="86" fill="#000" />
 					<circle cx="357" cy="268" r="64" fill="#000" />
 				</mask>
 			</defs>
-			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="url(#sp-load-grad)" mask="url(#sp-ghost-eyes)" />
+			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" fillOpacity="0.9" mask="url(#sp-ghost-eyes)" />
 			<circle cx="185" cy="300" r="70" fill="none" stroke="#fff" strokeOpacity="0.9" strokeWidth="6" />
 			<circle cx="357" cy="268" r="49" fill="none" stroke="#fff" strokeOpacity="0.9" strokeWidth="6" />
 		</svg>
