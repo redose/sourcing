@@ -912,6 +912,8 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
 .rd-start .rd-loader { margin-top: 0; }
 .rd-start .rd-bounce { animation-duration: .7s; }
 .rd-start .rd-ghost-body { animation: none; fill: var(--sp-fill, #fff); fill-opacity: 1; transition: fill .1s; }
+/* The little ring on the floor each time he lands, in the colour he isn't. */
+.rd-start .rd-ring { animation: rd-ring .7s ease-out infinite; border-color: var(--sp-ring, #5cdfe4); }
 .rd-start-sp { position: fixed; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2; }
 .rd-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .rd-board { grid-template-columns: 1fr; } }
@@ -7477,13 +7479,14 @@ const BOUNCE_CSS = `
 @media (prefers-reduced-motion: reduce) { .rd-ghost-body { animation: none; } .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5cdfe4; opacity: .4; } }
 `;
 
-// The loader: Spunion bouncing; his landings send waves of colour through the start screen. Exported for the
+// The loader: Spunion bouncing, with a little ring on the floor each time he lands. Exported for the
 // preview's startup screen.
 export function BouncingSpunion({ size = 96, style }: { size?: number; style?: React.CSSProperties }) {
 	const ref = useRef<HTMLSpanElement | null>(null);
 	return (
 		<span ref={ref} className="rd-loader" style={{ width: size, height: size, ...style }}>
 			<style>{BOUNCE_CSS}</style>
+			<span className="rd-ring" />
 			<span className="rd-bounce">
 				<SpunionGhost />
 			</span>
@@ -7894,7 +7897,7 @@ export function StartScreen() {
 			<style>{CSS}</style>
 			<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 			<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
-			<div className="rd-start-sp" onAnimationIteration={(e) => e.animationName === 'rd-bounce' && setLands((l) => l + 1)} style={{ '--sp-fill': START_COLORS[lands % 2] } as React.CSSProperties}>
+			<div className="rd-start-sp" onAnimationIteration={(e) => e.animationName === 'rd-bounce' && setLands((l) => l + 1)} style={{ '--sp-fill': START_COLORS[lands % 2], '--sp-ring': START_COLORS[(lands + 1) % 2] } as React.CSSProperties}>
 				<BouncingSpunion size={88} />
 			</div>
 		</main>
