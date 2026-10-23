@@ -761,15 +761,14 @@ const CSS = `
 /* Easter egg: trip mode, after Effect Index's visual effects (drifting, breathing): text lifts off the page and
    undulates in place. Only transforms and opacity
    animate, so it stays smooth; nothing flashes. */
-@keyframes rd-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.01); } }
+@keyframes rd-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.004); } }
 @keyframes rd-wave {
-  0%, 100% { transform: translateY(0) skewX(0deg) scale(1); text-shadow: 0 2px 6px rgba(10,6,30,.25); }
-  25% { transform: translateY(-5px) skewX(1.6deg) scale(1.01); text-shadow: 0 10px 18px rgba(10,6,30,.35); }
-  50% { transform: translateY(-2px) skewX(0deg) scale(1.005); text-shadow: 0 6px 12px rgba(10,6,30,.3); }
-  75% { transform: translateY(-6px) skewX(-1.6deg) scale(1.012); text-shadow: 0 12px 20px rgba(10,6,30,.35); }
+  0%, 100% { transform: translateY(0) skewX(0deg); text-shadow: 0 1px 3px rgba(10,6,30,.18); }
+  25% { transform: translateY(-1.5px) skewX(.5deg); text-shadow: 0 3px 7px rgba(10,6,30,.24); }
+  75% { transform: translateY(-1px) skewX(-.5deg); text-shadow: 0 3px 6px rgba(10,6,30,.22); }
 }
 .rd-tripping { animation: rd-breathe 6s ease-in-out infinite; transform-origin: 50% 30%; }
-.rd-tripping :is(h1, h2, h3, p, li) { animation: rd-wave 4.2s ease-in-out infinite; }
+.rd-tripping :is(h1, h2, h3, p, li) { animation: rd-wave 5.5s ease-in-out infinite; }
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-delay: -1.1s; }
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-delay: -2.2s; }
 @media (prefers-reduced-motion: reduce) { .rd-tripping, .rd-tripping :is(h1, h2, h3, p, li) { animation: none; } }
