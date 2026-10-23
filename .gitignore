@@ -7,3 +7,5 @@ __pycache__/
 .DS_Store
 site/data/
 site/dist/
+pharmacokinetics/cache/
+extraction/cache/
