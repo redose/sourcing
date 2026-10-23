@@ -912,17 +912,20 @@ const CSS = `
 /* Start screen: the wallpaper holds still, and each of Spunion's landings (every .62s, colours taking turns) sends a
    ring out through it: a coloured copy of the molecules, seen only through an expanding ring from his floor. */
 .rd-start .rd-molecules { animation: rd-mol-hue-soft 60s linear infinite; }
-.rd-wave { position: fixed; inset: -280px; z-index: -1; pointer-events: none; opacity: 0;
+.rd-wave { position: fixed; inset: -280px; z-index: -1; pointer-events: none; opacity: 0; filter: drop-shadow(0 0 3px currentColor);
   -webkit-mask-repeat: repeat, no-repeat; mask-repeat: repeat, no-repeat;
   -webkit-mask-position: 0 0, 50% calc(50% + 74px); mask-position: 0 0, 50% calc(50% + 74px);
   -webkit-mask-size: 1100px, 0 0; mask-size: 1100px, 0 0;
   -webkit-mask-composite: source-in; mask-composite: intersect;
   animation: rd-wave 1.86s cubic-bezier(.2,.6,.35,1) infinite; }
 @keyframes rd-wave {
-  0% { -webkit-mask-size: 1100px, 40px 40px; mask-size: 1100px, 40px 40px; opacity: .75; }
-  100% { -webkit-mask-size: 1100px, 190vmax 190vmax; mask-size: 1100px, 190vmax 190vmax; opacity: 0; }
+  0% { -webkit-mask-size: 1100px, 40px 40px; mask-size: 1100px, 40px 40px; opacity: 1; }
+  60% { opacity: .7; }
+  100% { -webkit-mask-size: 1100px, 210vmax 210vmax; mask-size: 1100px, 210vmax 210vmax; opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .rd-wave { display: none; } }
+.rd-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
+@media (max-width: 1100px) { .rd-board { grid-template-columns: 1fr; } }
 .rd-g-3 { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .rd-g-3 { grid-template-columns: 1fr; } }
 @media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
@@ -3838,30 +3841,40 @@ const STORY_THEMES: [string, string][] = [
 const THEME_LABEL = new Map(STORY_THEMES);
 type StoryFilter = { mood: string; themes: string[]; who: string; age: string; route: string; era: string; sub: string; sort: string; seed: number; limit: number };
 const AGE_BANDS: Record<string, string> = { teen: 'r.age < 20', '20s': 'r.age BETWEEN 20 AND 29', '30s': 'r.age BETWEEN 30 AND 39', '40+': 'r.age >= 40' };
+// How it went: the close reading's verdict where there is one, otherwise what Erowid's own themes say
+// (Glowing or Mystical vs. Bad trip, Difficult or Trip disaster; both means mixed).
+const GOOD_TAGS = `['Glowing Experiences', 'Mystical Experiences']`;
+const BAD_TAGS = `['Bad Trips', 'Difficult Experiences', 'Train Wrecks & Trip Disasters', 'Overdose', 'Hospital']`;
+const MOOD_SQL = `coalesce(x.overall_sentiment, CASE
+  WHEN list_has_any(r.category_tags, ${GOOD_TAGS}) AND list_has_any(r.category_tags, ${BAD_TAGS}) THEN 'mixed'
+  WHEN list_has_any(r.category_tags, ${GOOD_TAGS}) THEN 'positive'
+  WHEN list_has_any(r.category_tags, ${BAD_TAGS}) THEN 'negative' END)`;
 
 const storyWhere = (f: StoryFilter) =>
 	[
-		f.mood && `x.overall_sentiment = '${esc(f.mood)}'`,
+		f.mood && `${MOOD_SQL} = '${esc(f.mood)}'`,
 		...f.themes.map((t) => `list_contains(r.category_tags, '${esc(t)}')`),
 		f.who === 'm' && `lower(r.gender) IN ('male', 'm')`,
 		f.who === 'f' && `lower(r.gender) = 'female'`,
 		AGE_BANDS[f.age],
 		f.route && `EXISTS (SELECT 1 FROM ${DB}."report_doses" d WHERE d.report_id = r.id AND d.route = '${esc(f.route)}')`,
-		f.sub && `EXISTS (SELECT 1 FROM unnest(r.substances) u(s) WHERE u.s ILIKE '%${esc(f.sub)}%')`,
+		f.sub &&
+			`(EXISTS (SELECT 1 FROM ${DB}."report_doses" d WHERE d.report_id = r.id AND d.canonical_substance = '${esc(f.sub)}') OR EXISTS (SELECT 1 FROM unnest(r.substances) u(s) WHERE u.s ILIKE '%${esc(f.sub)}%'))`,
 		f.era && `r.experience_year BETWEEN ${Number(f.era)} AND ${Number(f.era) + 9}`,
 	].filter(Boolean) as string[];
 // How many reports each filter option would leave, given the others already picked.
 const storyFacetsSQL = (f: StoryFilter) => {
 	const w = storyWhere(f);
-	const base = `FROM ${DB}."experience_reports" r LEFT JOIN ${DB}."llm_extractions" x ON x.report_id = r.id ${w.length ? `WHERE ${w.join(' AND ')}` : ''}`;
+	const from = `FROM ${DB}."experience_reports" r LEFT JOIN ${DB}."llm_extractions" x ON x.report_id = r.id`;
+	const base = `${from} ${w.length ? `WHERE ${w.join(' AND ')}` : ''}`;
 	return `
 SELECT 'theme' AS facet, t AS v, count(*) AS n FROM (SELECT unnest(r.category_tags) AS t ${base}) GROUP BY 2
-UNION ALL SELECT 'mood', x.overall_sentiment, count(*) ${base} GROUP BY 2
+UNION ALL SELECT 'mood', ${MOOD_SQL}, count(*) ${base} GROUP BY 2
 UNION ALL SELECT 'era', CAST(CAST(floor(r.experience_year / 10) * 10 AS INTEGER) AS VARCHAR), count(*) ${base} GROUP BY 2
-UNION ALL SELECT 'route', d.route, count(DISTINCT r.id) FROM ${DB}."experience_reports" r LEFT JOIN ${DB}."llm_extractions" x ON x.report_id = r.id JOIN ${DB}."report_doses" d ON d.report_id = r.id ${w.length ? `WHERE ${w.join(' AND ')}` : ''} GROUP BY 2`;
+UNION ALL SELECT 'route', d.route, count(DISTINCT r.id) ${from} JOIN ${DB}."report_doses" d ON d.report_id = r.id ${w.length ? `WHERE ${w.join(' AND ')}` : ''} GROUP BY 2`;
 };
 
-// Every report, filtered and sorted. Closely read ones carry a quoted moment and a mood; the rest show their title.
+// Reports, filtered and sorted. Closely read ones carry a quoted moment; the rest show their opening line.
 const storiesSQL = (f: StoryFilter) => {
 	const where = storyWhere(f);
 	const order = {
@@ -3869,20 +3882,18 @@ const storiesSQL = (f: StoryFilter) => {
 		newest: `r.experience_year DESC NULLS LAST, r.id DESC`,
 		oldest: `r.experience_year ASC NULLS LAST, r.id`,
 		longest: `ph.session_end DESC NULLS LAST`,
-		bright: `CASE x.overall_sentiment WHEN 'positive' THEN 0 WHEN 'mixed' THEN 1 WHEN 'neutral' THEN 2 WHEN 'negative' THEN 3 ELSE 4 END, hash(r.id || '${f.seed}')`,
-		rough: `CASE x.overall_sentiment WHEN 'negative' THEN 0 WHEN 'mixed' THEN 1 WHEN 'neutral' THEN 2 WHEN 'positive' THEN 3 ELSE 4 END, hash(r.id || '${f.seed}')`,
 	}[f.sort] ?? `hash(r.id || '${f.seed}')`;
 	return `
 WITH quote AS (
   SELECT report_id, arg_max(description, length(description)) AS q
   FROM ${DB}."llm_observations"
-  WHERE description LIKE '"%' AND length(description) BETWEEN 50 AND 220
+  WHERE description LIKE '"%' AND length(description) BETWEEN 40 AND 160
   GROUP BY 1
 )
-SELECT r.id, coalesce(nullif(regexp_extract(trim(r.body), '^(.{30,170}?[.!?])\\s', 1), ''), left(trim(r.body), 150) || '…') AS opening, array_to_string(list_distinct(r.substances), ' · ') AS subs, r.experience_year AS yr, x.overall_sentiment AS overall,
-  trim(both '"' FROM quote.q) AS quote, r.category_tags AS tags, r.gender, r.age, ph.session_end AS hrs,
+SELECT r.id, coalesce(nullif(regexp_extract(trim(r.body), '^(.{30,170}?[.!?])\\s', 1), ''), left(trim(r.body), 150) || '…') AS opening,
+  list_distinct(r.substances) AS subs, r.experience_year AS yr, ${MOOD_SQL} AS overall,
+  trim(both '"' FROM quote.q) AS quote, r.category_tags AS tags, r.gender, r.age,
   (SELECT canonical_substance FROM ${DB}."report_doses" d WHERE d.report_id = r.id AND canonical_substance IS NOT NULL LIMIT 1) AS first_sub,
-  (SELECT d.route FROM ${DB}."report_doses" d WHERE d.report_id = r.id AND d.route IS NOT NULL LIMIT 1) AS route,
   count(*) OVER () AS total
 FROM ${DB}."experience_reports" r
 LEFT JOIN ${DB}."llm_extractions" x ON x.report_id = r.id
@@ -3893,16 +3904,91 @@ ORDER BY ${order}
 LIMIT ${f.limit}`;
 };
 
+const MOODS: [string, string][] = [['positive', 'Went well'], ['mixed', 'Mixed'], ['negative', 'Rough']];
+
+// One experience, kept short: what was taken, two lines in their words, a couple of themes.
+function StoryCard({ r, onOpen }: { r: Record<string, unknown>; onOpen: (id: string, sub: string) => void }) {
+	const subs = L(r.subs).map(String);
+	const tags = L(r.tags).map(String).map((t) => THEME_LABEL.get(t)).filter((t): t is string => !!t && !['Glowing', 'Bad trip', 'Difficult', 'Mystical', 'Trip disaster'].includes(t)).slice(0, 2);
+	const who = [r.gender ? (S(r.gender).toLowerCase().startsWith('f') ? 'woman' : 'man') : '', r.age != null ? `${N(r.age)}` : ''].filter(Boolean).join(', ');
+	return (
+		<button onClick={() => onOpen(S(r.id), S(r.first_sub))} className="rd-card rd-hover grid w-full content-start gap-2 p-4 text-left">
+			<div className="flex items-baseline gap-2">
+				<span className="min-w-0 flex-1 font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={subs.join(' · ')}>
+					{subs.slice(0, 2).map(short).join(' + ')}
+					{subs.length > 2 && <span style={{ color: C.faint, fontWeight: 400 }}> +{subs.length - 2}</span>}
+				</span>
+				{r.yr != null && <span className="text-xs tabular-nums" style={{ color: C.faint }}>{N(r.yr)}</span>}
+			</div>
+			<p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 15.5, lineHeight: 1.4, color: C.soft, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+				“{S(r.quote) || S(r.opening)}”
+			</p>
+			{(tags.length > 0 || who) && (
+				<div className="flex flex-wrap items-center gap-1.5 text-xs" style={{ color: C.faint }}>
+					{tags.map((t) => (
+						<span key={t} className="rounded-full px-2 py-0.5" style={{ background: 'rgba(255,255,255,.08)', color: C.soft }}>{t}</span>
+					))}
+					{who && <span className="ml-auto">{who}</span>}
+				</div>
+			)}
+		</button>
+	);
+}
+
+// A column of one mood, with its own "more".
+function StoryColumn({ f, mood, label, onOpen }: { f: StoryFilter; mood: string; label: string; onOpen: (id: string, sub: string) => void }) {
+	const [limit, setLimit] = useState(8);
+	useEffect(() => setLimit(8), [JSON.stringify({ ...f, limit: 0 })]);
+	const q = useSQLQuery(storiesSQL({ ...f, mood, limit }));
+	const list = rows(q);
+	const total = N(list[0]?.total);
+	const c = MOMENT[mood]?.color ?? C.lav;
+	return (
+		<section className="min-w-0">
+			<div className="mb-3 flex items-center gap-2 border-b pb-2" style={{ borderColor: c }}>
+				<span className="rd-dot" style={{ background: c }} />
+				<span className="font-semibold" style={{ color: c }}>{label}</span>
+				<span className="ml-auto text-xs tabular-nums" style={{ color: C.faint }}>{q.isLoading && !list.length ? '' : total.toLocaleString()}</span>
+			</div>
+			{q.isLoading && !list.length ? (
+				<Loading height={260} quiet />
+			) : list.length === 0 ? (
+				<p className="text-sm" style={{ color: C.faint }}>None match.</p>
+			) : (
+				<div className="grid gap-2">
+					{list.map((r) => <StoryCard key={S(r.id)} r={r} onOpen={onOpen} />)}
+				</div>
+			)}
+			{list.length > 0 && list.length < total && (
+				<button className="mt-3 text-sm" onClick={() => setLimit(limit + 8)} style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 4 }} disabled={q.isLoading}>
+					{q.isLoading ? 'Loading…' : 'More'}
+				</button>
+			)}
+		</section>
+	);
+}
+
 function StoriesBrowse({ onOpen }: { onOpen: (id: string, sub: string) => void }) {
 	const [f, setF] = useState<StoryFilter>(() => ({ mood: '', themes: [], who: '', age: '', route: '', era: '', sub: '', sort: 'shuffle', seed: Math.floor(Math.random() * 1e6), limit: 24 }));
 	const [subText, setSubText] = useState('');
+	const [subOpen, setSubOpen] = useState(false);
 	const [allThemes, setAllThemes] = useState(false);
 	useEffect(() => {
 		const t = setTimeout(() => setF((o) => (o.sub === subText.trim() ? o : { ...o, sub: subText.trim(), limit: 24 })), 350);
 		return () => clearTimeout(t);
 	}, [subText]);
 	const set = (patch: Partial<StoryFilter>) => setF((o) => ({ ...o, limit: 24, ...patch }));
-	const q = useSQLQuery(storiesSQL(f));
+	// Substance suggestions as you type, matching street names too ("molly" finds MDMA).
+	const pickQ = useSQLQuery(pickListSQL);
+	const needle = subText.trim().toLowerCase();
+	const suggestions = needle
+		? rows(pickQ)
+				.map((r) => ({ r, m: matchSubstance(r, needle) }))
+				.filter((x) => x.m.rank >= 0 && S(x.r.s).toLowerCase() !== needle)
+				.sort((a, b) => b.m.rank - a.m.rank || N(b.r.n) - N(a.r.n))
+				.slice(0, 6)
+		: [];
+	const q = useSQLQuery(storiesSQL(f), { enabled: !!f.mood });
 	const facetQ = useSQLQuery(storyFacetsSQL({ ...f, limit: 0 }));
 	const count = useMemo(() => {
 		const m = new Map<string, number>();
@@ -3913,10 +3999,10 @@ function StoriesBrowse({ onOpen }: { onOpen: (id: string, sub: string) => void }
 	const total = N(list[0]?.total);
 	const anyFilter = f.mood || f.themes.length || f.who || f.age || f.route || f.era || f.sub;
 	const themes = STORY_THEMES.filter(([t]) => f.themes.includes(t) || count('theme', t) > 0).sort((x, y) => count('theme', y[0]) - count('theme', x[0]));
-	const head = (t: string) => <div className="rd-label mb-2 mt-6 first:mt-0">{t}</div>;
-	// One option in the sidebar: a label, how many reports it leaves, and a tick when it's on.
+	const head = (t: string) => <div className="rd-label mb-2 mt-6">{t}</div>;
+	// One option in the sidebar: a label, how many reports it leaves, highlighted when it's on.
 	const opt = (on: boolean, label: string, n: number | null, onClick: () => void) => (
-		<button key={label} onClick={onClick} className="rd-hover flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1 text-left text-sm" style={{ marginLeft: -8, width: 'calc(100% + 16px)', color: on ? '#fff' : C.soft, fontWeight: on ? 600 : 400, background: on ? 'rgba(255,255,255,.1)' : undefined }}>
+		<button key={label} onClick={onClick} className="rd-hover flex items-center justify-between gap-3 rounded-lg px-2 py-1 text-left text-sm" style={{ marginLeft: -8, width: 'calc(100% + 16px)', color: on ? '#fff' : C.soft, fontWeight: on ? 600 : 400, background: on ? 'rgba(255,255,255,.1)' : undefined }}>
 			<span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
 			{n != null && <span className="text-xs tabular-nums" style={{ color: C.faint }}>{n.toLocaleString()}</span>}
 		</button>
@@ -3928,9 +4014,35 @@ function StoriesBrowse({ onOpen }: { onOpen: (id: string, sub: string) => void }
 			<p className="mt-2" style={{ color: C.soft }}>Real experiences, in the words of the people who had them. Narrow them down, then pick one to replay it.</p>
 			<div className="rd-filters mt-8">
 				<aside className="min-w-0">
-					<input value={subText} onChange={(e) => setSubText(e.target.value)} placeholder="Substance…" aria-label="Substance" className="rd-card w-full px-4 py-2 text-sm" style={{ borderRadius: 999, color: C.text, outline: 'none' }} />
+					<div className="relative">
+						<input
+							value={subText}
+							onChange={(e) => (setSubText(e.target.value), setSubOpen(true))}
+							onFocus={() => setSubOpen(true)}
+							onBlur={() => setTimeout(() => setSubOpen(false), 150)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' && suggestions[0]) (setSubText(S(suggestions[0].r.s)), set({ sub: S(suggestions[0].r.s) }), setSubOpen(false));
+								if (e.key === 'Escape') setSubOpen(false);
+							}}
+							placeholder="Substance…"
+							aria-label="Substance"
+							className="rd-card w-full px-4 py-2 text-sm"
+							style={{ borderRadius: 999, color: C.text, outline: 'none' }}
+						/>
+						{subOpen && suggestions.length > 0 && (
+							<div className="absolute left-0 right-0 mt-1 rounded-2xl p-1" style={{ zIndex: 20, background: C.panel, border: `1px solid ${C.line}`, boxShadow: '0 16px 40px rgba(10,4,40,.5)' }}>
+								{suggestions.map(({ r, m }) => (
+									<button key={S(r.s)} onMouseDown={(e) => e.preventDefault()} onClick={() => (setSubText(S(r.s)), set({ sub: S(r.s) }), setSubOpen(false))} className="rd-hover flex w-full items-baseline gap-2 rounded-xl px-3 py-1.5 text-left text-sm">
+										<span className="font-semibold" style={{ whiteSpace: 'nowrap' }}>{short(S(r.s))}</span>
+										{m.via && <span className="text-xs italic" style={{ color: C.mint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>“{m.via}”</span>}
+									</button>
+								))}
+							</div>
+						)}
+					</div>
 					{head('How it went')}
-					{([['', 'Any'], ['positive', 'Went well'], ['mixed', 'Mixed'], ['negative', 'Rough']] as const).map(([k, label]) => opt(f.mood === k, label, k ? count('mood', k) : null, () => set({ mood: k })))}
+					{opt(!f.mood, 'Side by side', null, () => set({ mood: '' }))}
+					{MOODS.map(([k, label]) => opt(f.mood === k, label, count('mood', k), () => set({ mood: f.mood === k ? '' : k })))}
 					{head('Themes')}
 					{(allThemes ? themes : themes.slice(0, 10)).map(([tag, label]) => opt(f.themes.includes(tag), label, count('theme', tag), () => set({ themes: f.themes.includes(tag) ? f.themes.filter((t) => t !== tag) : [...f.themes, tag] })))}
 					{themes.length > 10 && (
@@ -3950,79 +4062,54 @@ function StoriesBrowse({ onOpen }: { onOpen: (id: string, sub: string) => void }
 					{['2020', '2010', '2000', '1990', '1980'].filter((e) => f.era === e || count('era', e) > 0).map((e) => opt(f.era === e, `${e}s`, count('era', e), () => set({ era: f.era === e ? '' : e })))}
 				</aside>
 				<div className="min-w-0">
-			<div className="flex flex-wrap items-center gap-2">
-				<span className="text-sm tabular-nums" style={{ color: C.soft }}>{q.isLoading && !list.length ? 'Looking…' : `${total.toLocaleString()} ${total === 1 ? 'experience' : 'experiences'}`}</span>
-				{anyFilter && (
-					<button className="text-sm" onClick={() => (setSubText(''), set({ mood: '', themes: [], who: '', age: '', route: '', era: '', sub: '' }))} style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 4, padding: '5px 6px' }}>
-						Clear filters
-					</button>
-				)}
-				<span className="ml-auto flex items-center gap-2">
-					<select className="rd-nav text-sm" value={f.sort} onChange={(e) => set({ sort: e.target.value })} aria-label="Sort" style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}`, background: 'transparent', color: C.text }}>
-						<option value="shuffle">Shuffled</option>
-						<option value="bright">Went best first</option>
-						<option value="rough">Roughest first</option>
-						<option value="newest">Newest</option>
-						<option value="oldest">Oldest</option>
-						<option value="longest">Longest</option>
-					</select>
-					{f.sort === 'shuffle' && (
-						<button className="rd-btn flex items-center gap-2" onClick={() => set({ seed: Math.floor(Math.random() * 1e6) })} aria-label="Shuffle again" title="Shuffle again">
-							<Shuffle size={15} />
-						</button>
-					)}
-				</span>
-			</div>
-
-			{q.isLoading && !list.length ? (
-				<Loading height={320} className="mt-6" />
-			) : list.length === 0 ? (
-				<p className="mt-10 text-center" style={{ color: C.soft }}>Nothing matches all of that. Try taking a filter off.</p>
-			) : (
-				<div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-					{list.map((r) => {
-						const m = MOMENT[S(r.overall)];
-						const tags = L(r.tags).map(String).map((t) => THEME_LABEL.get(t)).filter(Boolean).slice(0, 3) as string[];
-						const who = [r.gender ? (S(r.gender).toLowerCase().startsWith('f') ? 'woman' : 'man') : '', r.age != null ? `${N(r.age)}` : ''].filter(Boolean).join(', ');
-						return (
-							<button key={S(r.id)} onClick={() => onOpen(S(r.id), S(r.first_sub))} className="rd-card rd-hover grid content-start gap-3 p-5 text-left">
-								<p style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 18, lineHeight: 1.45, color: C.text }}>“{S(r.quote) || S(r.opening)}”</p>
-								<div className="text-sm font-semibold" style={{ color: C.soft }}>{S(r.subs)}</div>
-								{tags.length > 0 && (
-									<div className="flex flex-wrap gap-1.5">
-										{tags.map((t) => (
-											<span key={t} className="rounded-full px-2 py-0.5 text-xs" style={{ background: 'rgba(255,255,255,.08)', color: C.soft }}>{t}</span>
-										))}
-									</div>
-								)}
-								<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: C.faint }}>
-									{r.yr != null && <span>{N(r.yr)}</span>}
-									{who && <span>{who}</span>}
-									{r.route != null && <span>{S(r.route) === 'insufflated' ? 'snorted' : S(r.route)}</span>}
-									{r.hrs != null && N(r.hrs) > 0 && <span>~{N(r.hrs) < 1 ? `${Math.round(N(r.hrs) * 60)} min` : `${Math.round(N(r.hrs))} h`}</span>}
-									{m && (
-										<span className="inline-flex items-center gap-1.5" style={{ color: m.color }}>
-											<span className="rd-dot" style={{ background: m.color }} />
-											{({ positive: 'went well', negative: 'was rough', mixed: 'was mixed', neutral: 'neutral' } as Record<string, string>)[S(r.overall)]}
-										</span>
-									)}
-									<span className="ml-auto">#{S(r.id).replace('erowid-', '')}</span>
-								</div>
+					<div className="mb-5 flex flex-wrap items-center gap-2">
+						{anyFilter ? (
+							<button className="text-sm" onClick={() => (setSubText(''), set({ mood: '', themes: [], who: '', age: '', route: '', era: '', sub: '' }))} style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 4 }}>
+								Clear filters
 							</button>
-						);
-					})}
-				</div>
-			)}
-			{list.length > 0 && list.length < total && (
-				<div className="mt-6 flex justify-center">
-					<button className="rd-btn" onClick={() => setF((o) => ({ ...o, limit: o.limit + 24 }))} disabled={q.isLoading}>
-						{q.isLoading ? 'Loading…' : 'Show more'}
-					</button>
-				</div>
-			)}
+						) : (
+							<span className="text-sm" style={{ color: C.faint }}>Mood comes from our close reading, or from Erowid’s own labels.</span>
+						)}
+						<span className="ml-auto flex items-center gap-2">
+							<select className="rd-nav text-sm" value={f.sort} onChange={(e) => set({ sort: e.target.value })} aria-label="Sort" style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}`, background: 'transparent', color: C.text }}>
+								<option value="shuffle">Shuffled</option>
+								<option value="newest">Newest</option>
+								<option value="oldest">Oldest</option>
+								<option value="longest">Longest</option>
+							</select>
+							{f.sort === 'shuffle' && (
+								<button className="rd-btn flex items-center gap-2" onClick={() => set({ seed: Math.floor(Math.random() * 1e6) })} aria-label="Shuffle again" title="Shuffle again">
+									<Shuffle size={15} />
+								</button>
+							)}
+						</span>
+					</div>
+					{!f.mood ? (
+						<div className="rd-board">
+							{MOODS.map(([k, label]) => <StoryColumn key={k} f={f} mood={k} label={label} onOpen={onOpen} />)}
+						</div>
+					) : q.isLoading && !list.length ? (
+						<Loading height={320} />
+					) : list.length === 0 ? (
+						<p className="mt-10 text-center" style={{ color: C.soft }}>Nothing matches all of that. Try taking a filter off.</p>
+					) : (
+						<>
+							<div className="mb-3 text-sm tabular-nums" style={{ color: C.soft }}>{total.toLocaleString()} {total === 1 ? 'experience' : 'experiences'}</div>
+							<div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+								{list.map((r) => <StoryCard key={S(r.id)} r={r} onOpen={onOpen} />)}
+							</div>
+							{list.length < total && (
+								<div className="mt-6 flex justify-center">
+									<button className="rd-btn" onClick={() => setF((o) => ({ ...o, limit: o.limit + 24 }))} disabled={q.isLoading}>
+										{q.isLoading ? 'Loading…' : 'Show more'}
+									</button>
+								</div>
+							)}
+						</>
+					)}
 				</div>
 			</div>
-			<Err q={q} />
+			<Err q={f.mood ? q : facetQ} />
 		</section>
 	);
 }
@@ -7741,7 +7828,7 @@ export function StartScreen() {
 			<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
 			{/* Each landing sends a ring of colour out through the molecules. */}
 			{['#fc6c84', '#5cdfe4', '#b3a8f0'].map((c, i) => (
-				<div key={c} aria-hidden className="rd-wave" style={{ background: c, animationDelay: `${i * 0.62}s`, WebkitMaskImage: `${MOLECULES}, radial-gradient(closest-side, transparent 72%, #000 88%, transparent 100%)`, maskImage: `${MOLECULES}, radial-gradient(closest-side, transparent 72%, #000 88%, transparent 100%)` }} />
+				<div key={c} aria-hidden className="rd-wave" style={{ background: c, animationDelay: `${i * 0.62}s`, WebkitMaskImage: `${MOLECULES}, radial-gradient(closest-side, rgba(0,0,0,.35) 0%, rgba(0,0,0,.15) 45%, #000 80%, transparent 100%)`, maskImage: `${MOLECULES}, radial-gradient(closest-side, rgba(0,0,0,.35) 0%, rgba(0,0,0,.15) 45%, #000 80%, transparent 100%)` }} />
 			))}
 			<BouncingSpunion size={88} />
 		</main>
