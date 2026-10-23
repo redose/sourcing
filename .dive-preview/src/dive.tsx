@@ -944,7 +944,7 @@ const CSS = `
 .rd-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .rd-board { grid-template-columns: 1fr; } }
 /* Homepage molecules: faint until you hover, then they light up and say what they are. */
-.rd-home-mols { position: absolute; inset: -40px -24px 0; pointer-events: none; z-index: -1; }
+.rd-home-mols { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
 .rd-home-mol { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; color: rgba(255,255,255,.085); --rd-mol-gap: #46389a;
   display: flex; flex-direction: column; align-items: center; gap: 6px; transition: color .25s; background: none; border: 0; padding: 6px; cursor: pointer; }
 .rd-home-mol .rd-mol-atom { opacity: .14; transition: opacity .25s; }
@@ -5425,7 +5425,6 @@ function useTypedPlaceholder(on: boolean) {
 function HomePage({ q, onSubstance, onEffect, onReport, onCombo, onView }: { q: Q; onSubstance: (s: string) => void; onEffect: (e: string) => void; onReport: (id: string, s: string) => void; onCombo: (a: string, b: string) => void; onView: (v: 'substances' | 'reports' | 'effects' | 'resources') => void }) {
 	return (
 		<section className="rd-fade flex w-full min-w-0 flex-col items-center justify-center text-center" style={{ minHeight: 'calc(100vh - 150px)', paddingBottom: 90, position: 'relative', zIndex: 2 }}>
-			<HomeMolecules onSubstance={onSubstance} />
 			<h1 className="sr-only">re:dose</h1>
 			<div className="relative w-full">
 				<GlobalSearch inline subs={rows(q)} onSubstance={onSubstance} onEffect={onEffect} onReport={onReport} onCombo={onCombo} />
@@ -8162,6 +8161,7 @@ export default function ReportTimelapse() {
 				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${fx.includes('sway') ? 'rd-tripping' : ''} ${fx.includes('rainbow') ? 'rd-fx-rainbow' : ''} ${fx.includes('tint') ? 'rd-fx-tint' : ''} ${fx.includes('desat') ? 'rd-fx-desat' : ''} ${fx.includes('breathe') ? 'rd-fx-breathe' : ''} ${fx.includes('shift') ? 'rd-fx-shift' : ''} ${fx.includes('replace') ? 'rd-fx-replace' : ''} ${fx.includes('enhance') ? 'rd-fx-enhance' : ''} ${view === 'home' && !trip ? 'rd-home' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 20, minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowX: 'clip' }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
+					{view === 'home' && !trip && <HomeMolecules onSubstance={goSubstance} />}
 					<div aria-hidden ref={glowRef} className="rd-mol-glow" style={{ opacity: view === 'home' && !trip ? 1 : 0 }}>
 						<div className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					</div>
