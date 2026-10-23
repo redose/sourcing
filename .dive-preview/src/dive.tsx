@@ -7078,8 +7078,8 @@ type Q = ReturnType<typeof useSQLQuery>;
 
 export default function ReportTimelapse() {
 	const [savedView, setView] = useDiveState<'reports' | 'substances' | 'effects' | 'resources'>('view', 'substances');
-	// Easter egg: type "trip" (outside a text box) or poke the corner Spunion five times quickly. Esc comes down;
-	// it wears off by itself after 30 seconds.
+	// Easter egg: copy the word "psychedelic" from anywhere on the page, or poke the corner Spunion five times
+	// quickly. Esc comes down; it wears off by itself after 30 seconds.
 	const [trip, setTrip] = useState(false);
 	const pageRef = useRef<HTMLDivElement | null>(null);
 	const pokes = useRef<number[]>([]);
@@ -7092,17 +7092,16 @@ export default function ReportTimelapse() {
 		}
 	};
 	useEffect(() => {
-		let typed = '';
-		const key = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') return setTrip(false);
-			const t = e.target as HTMLElement | null;
-			if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-			if (e.key.length !== 1) return;
-			typed = (typed + e.key.toLowerCase()).slice(-4);
-			if (typed === 'trip') setTrip(true);
+		const key = (e: KeyboardEvent) => e.key === 'Escape' && setTrip(false);
+		const copy = () => {
+			if (/psychedelic/i.test(window.getSelection?.()?.toString() ?? '')) setTrip(true);
 		};
 		window.addEventListener('keydown', key);
-		return () => window.removeEventListener('keydown', key);
+		document.addEventListener('copy', copy);
+		return () => {
+			window.removeEventListener('keydown', key);
+			document.removeEventListener('copy', copy);
+		};
 	}, []);
 	useEffect(() => {
 		if (!trip) return;
