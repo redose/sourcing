@@ -797,6 +797,7 @@ const CSS = `
 .rd-contents { position: sticky; top: 16px; }
 .rd-article { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; align-items: start; }
 @media (max-width: 1100px) { .rd-article { grid-template-columns: minmax(0, 1fr); } .rd-contents { display: none; } }
+.rd-glance > li { background: rgba(255,255,255,.05); border: 1px solid ${C.line}; border-radius: 14px; padding: 11px 13px; }
 .rd-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 10px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.06); border: 1px solid ${C.line}; white-space: nowrap; }
 @keyframes rd-step-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 @keyframes rd-dot-in { to { transform: scale(1); opacity: 1; } }
@@ -2538,7 +2539,7 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 
 // How one dose usually plays out, as a shape: nothing → first effects → strongest → fading. The three moments are
 // marked on the curve and spelled out underneath, so the numbers read as a timeline rather than three stats.
-function PhaseStrip({ on, pk, end, span: shared }: { on: number; pk: number; end: number; span?: number }) {
+function PhaseStrip({ on, pk, end, span: shared, playhead }: { on: number; pk: number; end: number; span?: number; playhead?: number }) {
 	const span = Math.max(shared ?? 0, end * 1.12);
 	const x = (v: number) => (100 * v) / span;
 	const pts: [number, number][] = [
@@ -2576,6 +2577,19 @@ function PhaseStrip({ on, pk, end, span: shared }: { on: number; pk: number; end
 				{marks.map((m) => (
 					<span key={m.label} className="absolute rounded-full" style={{ left: `${x(m.v)}%`, bottom: -5, width: 10, height: 10, marginLeft: -5, background: m.color, boxShadow: `0 0 0 3px ${C.deep}` }} />
 				))}
+				{playhead != null && playhead > 0 && (() => {
+					// Height of the curve under the playhead, so a dot can ride along it.
+					const i = pts.findIndex(([v]) => v >= playhead);
+					const [v0, y0] = pts[Math.max(0, i - 1)] ?? [0, 0];
+					const [v1, y1] = pts[i] ?? pts[pts.length - 1];
+					const yy = v1 > v0 ? y0 + ((playhead - v0) / (v1 - v0)) * (y1 - y0) : y1;
+					return (
+						<>
+							<span className="absolute" style={{ left: `${x(playhead)}%`, top: -6, bottom: 0, width: 2, marginLeft: -1, background: '#fff', borderRadius: 2, opacity: 0.85 }} />
+							<span className="absolute rounded-full" style={{ left: `${x(playhead)}%`, top: H - yy * (H - 8) - 6, width: 12, height: 12, marginLeft: -6, background: '#fff', boxShadow: '0 0 0 4px rgba(255,255,255,.18)' }} />
+						</>
+					);
+				})()}
 			</div>
 			<div className="mt-1 flex justify-between text-xs" style={{ color: C.faint }}>
 				<span>Dose</span>
@@ -2638,7 +2652,7 @@ function SubstanceOverview({ name }: { name: string }) {
 		</div>
 	);
 	const glance = (
-		<ul className="grid gap-3 text-sm" style={{ lineHeight: 1.5 }}>
+		<ul className="rd-glance grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4" style={{ lineHeight: 1.45 }}>
 			{S(r.addiction) && (
 				<li className="flex items-start gap-3">
 					{/high|very|extreme|moderate|addictive/i.test(S(r.addiction)) && !/^non|not /i.test(S(r.addiction)) ? (
@@ -2680,90 +2694,76 @@ function SubstanceOverview({ name }: { name: string }) {
 	return (
 		<>
 			<section id="overview" className="rd-in" style={{ scrollMarginTop: 16 }}>
-				<div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-					<div className="flex flex-wrap items-center gap-3">
-						<h1 className="flex items-center gap-3 text-4xl font-semibold sm:text-5xl">
-							<SubstanceIcon name={name} />
-							{short(name)}
-						</h1>
-						{isGroup(name) && <GroupBadge />}
-					</div>
-					<Sources className="pt-3" list={['erowid', 'pw', 'sei', 'tripsit']} />
-				</div>
-				<div className={`mt-2 grid items-center gap-8 ${molecule ? 'lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]' : ''}`}>
+				<div className={`grid items-center gap-x-10 gap-y-6 ${molecule ? 'lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`}>
 					<div className="min-w-0">
-						<div className="mt-4 grid gap-2.5" style={{ color: C.soft }}>
-							{short(name) !== name && (
-								<div className="flex items-center gap-3">
-									<BookOpen size={17} color={ACCENT} style={{ flexShrink: 0 }} />
-									<span>{name}</span>
-								</div>
-							)}
-							{aka.length > 0 && (
-								<div className="flex items-start gap-3">
-									<MessageSquareQuote size={17} color={ACCENT} style={{ flexShrink: 0, marginTop: 3 }} />
-									<span>{aka.join(', ')}</span>
-								</div>
-							)}
+						<div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+							<div className="flex flex-wrap items-center gap-3">
+								<h1 className="flex items-center gap-3 text-4xl font-semibold sm:text-5xl" style={{ letterSpacing: '-0.02em' }}>
+									<SubstanceIcon name={name} />
+									{short(name)}
+								</h1>
+								{isGroup(name) && <GroupBadge />}
+							</div>
+							{!molecule && <Sources className="pt-3" list={['erowid', 'pw', 'sei', 'tripsit']} />}
 						</div>
-						<StreetNames name={name} known={[name, ...aka]} />
+						{kindLine && (
+							<p className="mt-3 max-w-2xl" style={{ fontFamily: SERIF, fontSize: 22, lineHeight: 1.45, color: 'rgba(255,255,255,.9)' }}>
+								{kindLine}
+							</p>
+						)}
 						{(cls.length > 0 || chem.length > 0) && (
-							<div className="mt-5 grid gap-4">
-								{cls.length > 0 && (
-									<div>
-										<div className="rd-label mb-2 flex items-center gap-2">
-											<Sparkles size={13} /> Psychoactive class
-										</div>
-										<div className="flex flex-wrap gap-2">
-											{cls.map((c) => (
-												<span key={c} className="rd-chip">
-													<ClassIcon cls={c} size={14} color={ACCENT} />
-													{c.replace(/s$/, '')}
-												</span>
-											))}
-										</div>
-									</div>
-								)}
-								{chem.length > 0 && (
-									<div>
-										<div className="rd-label mb-2 flex items-center gap-2">
-											<FlaskConical size={13} /> Chemical class
-										</div>
-										<div className="flex flex-wrap gap-2">
-											{chem.map((c) => (
-												<span key={c} className="rd-chip">{c}</span>
-											))}
-										</div>
-									</div>
-								)}
+							<div className="mt-4 flex flex-wrap gap-2">
+								{cls.map((c) => (
+									<span key={c} className="rd-chip" title="Psychoactive class">
+										<ClassIcon cls={c} size={14} color={ACCENT} />
+										{c.replace(/s$/, '')}
+									</span>
+								))}
+								{chem.map((c) => (
+									<span key={c} className="rd-chip" title="Chemical class" style={{ background: 'transparent' }}>
+										<FlaskConical size={13} color={C.faint} />
+										{c}
+									</span>
+								))}
 							</div>
 						)}
-						<div className="mt-6">
-							<div className="rd-label mb-3">At a glance</div>
-							{glance}
-						</div>
+						{aka.length > 0 && (
+							<p className="mt-5" style={{ color: C.soft }}>
+								Also called{' '}
+								{aka.map((x, i) => (
+									<span key={x}>
+										{i > 0 && <span style={{ color: C.faint }}>{i === aka.length - 1 ? ' or ' : ', '}</span>}
+										<span style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{x}</span>
+									</span>
+								))}
+							</p>
+						)}
+						<StreetNames name={name} known={[name, ...aka]} />
+						{group && members.length > 0 && (
+							<p className="mt-4" style={{ color: C.soft, lineHeight: 1.5 }}>
+								Reports filed here sometimes name the drug:{' '}
+								{members.map((m, i) => (
+									<span key={m}>
+										{i > 0 && ', '}
+										<b style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{m}</b>
+									</span>
+								))}
+								. Others just say “{short(name).toLowerCase()}”.
+							</p>
+						)}
 					</div>
 					{molecule && (
 						<div className="min-w-0">
+							<div className="flex justify-end">
+								<Sources list={['erowid', 'pw', 'sei', 'tripsit']} />
+							</div>
 							<MoleculeCard r={molecule} />
 						</div>
 					)}
 				</div>
-				<div className="my-6 h-px" style={{ background: C.line }} />
-				<div className="max-w-3xl" style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.6 }}>
-					{kindLine && <p>{kindLine}</p>}
-					{group && members.length > 0 && (
-						<p className="mt-3" style={{ color: C.soft }}>
-							Reports filed here sometimes name the drug:{' '}
-							{members.map((m, i) => (
-								<span key={m}>
-									{i > 0 && ', '}
-									<b style={{ color: '#fff', fontWeight: 600, whiteSpace: 'nowrap' }}>{m}</b>
-								</span>
-							))}
-							. Others just say “{short(name).toLowerCase()}”.
-						</p>
-					)}
+				<div className="mt-8">
+					<div className="rd-label mb-3">At a glance</div>
+					{glance}
 				</div>
 				{warning && (
 					<div className="mt-5 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
@@ -3757,13 +3757,16 @@ function DoseScale({ p }: { p: Record<string, unknown> }) {
 	const ticks = [...new Set([...(thr != null ? [thr] : []), ...segs.map((g) => g.a), ...segs.slice(0, -1).map((g) => g.b), ...(last.label !== 'Heavy' ? [last.b] : [])])].sort((a, b) => a - b);
 	const fmt = (x: number) => String(Math.round(x * 1000) / 1000);
 	return (
-		<div className="relative mt-4" style={{ height: 78 }}>
-			{segs.map((g, i) => (
-				<span key={g.label} className="rd-step absolute text-xs font-semibold" style={{ left: `${(pos(g.a) + pos(g.b)) / 2}%`, top: 0, transform: 'translateX(-50%)', color: g.color, whiteSpace: 'nowrap', animationDelay: `${0.15 + i * 0.18}s` }}>
-					{g.label}
-				</span>
-			))}
-			<div className="absolute left-0 right-0" style={{ top: 24, height: 12, borderRadius: 999, background: 'rgba(255,255,255,.07)' }}>
+		<div className="relative mt-5" style={{ height: 84 }}>
+			{segs.map((g, i) => {
+				const inside = pos(g.b) - pos(g.a) > 13;
+				return (
+					<span key={g.label} className="rd-step absolute text-xs font-semibold" style={{ left: `${(pos(g.a) + pos(g.b)) / 2}%`, top: inside ? 17 : 0, transform: 'translateX(-50%)', color: inside ? C.deep : g.color, whiteSpace: 'nowrap', zIndex: 1, animationDelay: `${0.35 + i * 0.18}s` }}>
+						{g.label}
+					</span>
+				);
+			})}
+			<div className="absolute left-0 right-0" style={{ top: 14, height: 22, borderRadius: 999, background: 'rgba(255,255,255,.07)' }}>
 				{segs.map((g, i) => (
 					<span
 						key={g.label}
@@ -3782,13 +3785,13 @@ function DoseScale({ p }: { p: Record<string, unknown> }) {
 				)}
 			</div>
 			{ticks.map((x, i) => (
-				<span key={x} className="rd-step absolute tabular-nums" style={{ left: `${pos(x)}%`, top: 46, transform: 'translateX(-50%)', fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12, color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.3 + i * 0.12}s` }}>
+				<span key={x} className="rd-step absolute tabular-nums" style={{ left: `${pos(x)}%`, top: 44, transform: 'translateX(-50%)', fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12, color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.3 + i * 0.12}s` }}>
 					{fmt(x)}
 					{x === heavy ? '+' : ''}
 				</span>
 			))}
 			{thr != null && (
-				<span className="absolute text-xs" style={{ left: `${pos(thr)}%`, top: 63, transform: 'translateX(-50%)', color: C.faint, whiteSpace: 'nowrap' }}>
+				<span className="absolute text-xs" style={{ left: `${pos(thr)}%`, top: 62, transform: 'translateX(-50%)', color: C.faint, whiteSpace: 'nowrap' }}>
 					threshold
 				</span>
 			)}
@@ -3813,7 +3816,7 @@ const pwPhases = (p: Record<string, unknown>) =>
 			['Offset', pwHours(p.duration_offset, false), pwDur(p.duration_offset, false), 'rgba(217,207,255,.55)'],
 		] as [string, number, string, string][]
 	).filter(([, h]) => h > 0);
-function DurationBand({ p, span }: { p: Record<string, unknown>; span: number }) {
+function DurationBand({ p, span, playhead }: { p: Record<string, unknown>; span: number; playhead?: number }) {
 	const phases = pwPhases(p);
 	const after = pwHours(p.duration_aftereffects, false);
 	if (!phases.length) return null;
@@ -3833,6 +3836,7 @@ function DurationBand({ p, span }: { p: Record<string, unknown>; span: number })
 				{after > 0 && t0 < span && (
 					<span className="rd-grow absolute top-0 h-full" title={`After effects: ${pwDur(p.duration_aftereffects, false)}`} style={{ left: `${x(t0)}%`, width: `${x(Math.min(span, t0 + after)) - x(t0)}%`, background: 'linear-gradient(90deg, rgba(217,207,255,.35), rgba(217,207,255,0))', borderRadius: '3px 999px 999px 3px', animationDelay: `${0.4 + segs.length * 0.22}s` }} />
 				)}
+				{playhead != null && playhead > 0 && <span className="absolute" style={{ left: `${x(playhead)}%`, top: -6, bottom: -6, width: 2, marginLeft: -1, background: '#fff', borderRadius: 2, opacity: 0.85 }} />}
 			</div>
 			{[...segs, ...(after > 0 && t0 < span ? [{ label: 'After effects', from: t0, to: t0 + after, text: pwDur(p.duration_aftereffects, false), color: 'rgba(217,207,255,.5)' }] : [])].map((g, i) => (
 				<div key={g.label} className="rd-step absolute" style={{ left: `${x(g.from)}%`, top: i % 2 ? 54 : 20, animationDelay: `${0.55 + i * 0.22}s`, maxWidth: '40%' }}>
@@ -3883,6 +3887,68 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	// The stories' curve and PsychonautWiki's phases share one time axis.
 	const coreH = p ? pwPhases(p).reduce((a, [, h]) => a + h, 0) : 0;
 	const span = Math.max(coreH * 1.08, t ? N(t.end_m) * 1.12 : 0, 0.5);
+	// A time-lapse: a playhead sweeps from the dose to the end, and the caption says which stage you'd be in.
+	const stages = (() => {
+		if (p && pwPhases(p).length) {
+			let at = 0;
+			const out = pwPhases(p).map(([label, h, text]) => {
+				const st = { label, from: at, to: at + h, text };
+				at += h;
+				return st;
+			});
+			const after = pwHours(p.duration_aftereffects, false);
+			if (after > 0) out.push({ label: 'After effects', from: at, to: at + after, text: pwDur(p.duration_aftereffects, false) });
+			return out;
+		}
+		if (t) return [
+			{ label: 'Coming on', from: N(t.on_m), to: N(t.pk_m), text: '' },
+			{ label: 'Strongest, then easing off', from: N(t.pk_m), to: N(t.end_m), text: '' },
+			{ label: 'Mostly gone', from: N(t.end_m), to: span * 2, text: '' },
+		];
+		return [];
+	})();
+	const STAGE_NOTE: Record<string, string> = {
+		Onset: 'First effects start to show. Don’t redose yet.',
+		'Come-up': 'Effects build toward their strongest.',
+		Peak: 'The strongest part of the experience.',
+		Offset: 'Effects ease off.',
+		'After effects': 'Lingering effects on the way back to baseline.',
+		'Coming on': 'Effects start to show and build.',
+		'Strongest, then easing off': 'The strongest stretch, then winding down.',
+		'Mostly gone': 'Most people describe effects as over by now.',
+	};
+	const [pt, setPt] = useState(0);
+	const [playing, setPlaying] = useState(false);
+	const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+	useEffect(() => {
+		if (!go) return;
+		if (still) return void setPt(span);
+		setPt(0);
+		const timer = setTimeout(() => setPlaying(true), 900);
+		return () => clearTimeout(timer);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [go, sel]);
+	useEffect(() => {
+		if (!playing) return;
+		const dur = 8000;
+		const start = performance.now() - (pt / span) * dur;
+		let raf = 0;
+		const tick = () => {
+			const v = ((performance.now() - start) / dur) * span;
+			if (v >= span) {
+				setPt(span);
+				setPlaying(false);
+				return;
+			}
+			setPt(v);
+			raf = requestAnimationFrame(tick);
+		};
+		raf = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(raf);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [playing, span]);
+	const stage = stages.find((st) => pt >= st.from && pt < st.to);
+	const waiting = stages.length > 0 && pt < stages[0].from;
 	return (
 		<div className="mt-5">
 			{routes.length > 0 && (
@@ -3932,16 +3998,40 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 							</span>
 						)}
 					</div>
+					{stages.length > 0 && (
+						<div className="mt-4 flex items-center gap-4 rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,.05)', border: `1px solid ${C.line}` }}>
+							<button
+								onClick={() => {
+									if (pt >= span) setPt(0);
+									setPlaying(!playing);
+								}}
+								aria-label={playing ? 'Pause' : 'Play the timeline'}
+								className="flex items-center justify-center"
+								style={{ width: 38, height: 38, borderRadius: '50%', background: '#fff', color: C.deep, flexShrink: 0 }}
+							>
+								{playing ? <Pause size={15} /> : pt >= span ? <RotateCcw size={15} /> : <Play size={15} style={{ marginLeft: 2 }} />}
+							</button>
+							<div key={waiting ? 'wait' : stage?.label ?? 'end'} className="rd-fade min-w-0 flex-1">
+								<div className="flex flex-wrap items-baseline gap-x-3">
+									<span className="text-lg font-semibold">{waiting ? 'Waiting for it to kick in' : stage?.label ?? (pt >= span ? 'Back to baseline' : 'Dose taken')}</span>
+									<span className="text-sm tabular-nums" style={{ color: C.faint }}>{pt > 0 ? `${fmtT(pt)} after the dose` : 'at the dose'}</span>
+								</div>
+								<div className="text-sm" style={{ color: C.soft }}>
+									{waiting ? 'Effects can take a while to show. Don’t redose yet.' : stage ? `${STAGE_NOTE[stage.label] ?? ''}${stage.text ? ` Usually ${stage.text}.` : ''}` : pt >= span ? 'The stages above add up to the total.' : 'Press play to step through how a dose usually goes.'}
+								</div>
+							</div>
+						</div>
+					)}
 					{t && (
-						<div className="mt-4">
+						<div className="mt-5">
 							<div className="rd-label mb-2">In the stories{tOwn ? '' : ' (all routes)'} · {N(t.n)} closely read</div>
-							<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} span={span} />
+							<PhaseStrip on={N(t.on_m)} pk={N(t.pk_m)} end={N(t.end_m)} span={span} playhead={pt} />
 						</div>
 					)}
 					{p && pwPhases(p).length > 0 && (
 						<div className={t ? 'mt-7' : 'mt-4'}>
 							<div className="rd-label mb-3">PsychonautWiki</div>
-							<DurationBand p={p} span={span} />
+							<DurationBand p={p} span={span} playhead={pt} />
 						</div>
 					)}
 				</div>
@@ -5893,6 +5983,17 @@ export default function ReportTimelapse() {
 		clearReport();
 		setOpenItem(null);
 	};
+	// Tab title: re:dose // whatever page you're on.
+	useEffect(() => {
+		const page =
+			view === 'effects' ? effect || 'effects'
+			: view === 'about' ? 'about'
+			: view === 'reports' && reportId ? `story #${reportId.replace('erowid-', '')}`
+			: view === 'reports' && sub ? (withSub ? `${short(sub)} + ${short(withSub)}` : short(sub))
+			: view === 'reports' ? 'stories'
+			: 'substances';
+		document.title = `re:dose // ${page}`;
+	}, [view, sub, withSub, reportId, effect]);
 	// Which nav item is "here": a substance or pair page counts as Substances, a story as Stories.
 	const navHere = view === 'reports' ? (reportId || !sub ? 'reports' : 'substances') : view;
 	const goCombo = (a: string, b: string) => {
