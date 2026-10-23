@@ -7915,8 +7915,8 @@ type Q = ReturnType<typeof useSQLQuery>;
 // down into the bottom-right corner, where the site's Spunion lives. Each landing (the bounce animation's own loop
 // event, so it stays in step) also rolls a ring of colour out through the molecules.
 const START_FILLS = ['#ffffff', '#fc6c84', '#5cdfe4'];
-// Spunion's own green (so red Spunion stands on green, then green Spunion on purple), then the site's exact background.
-const START_WASHES = ['linear-gradient(170deg, #3cc6cc 0%, #5cdfe4 55%, #86ecef 100%)', BG];
+// A calm deep teal (a quiet echo of Spunion's green), then the site's exact background.
+const START_WASHES = ['linear-gradient(170deg, #24506e 0%, #2b6a80 55%, #34808e 100%)', BG];
 const START_RINGS = ['#fc6c84', '#5cdfe4', '#b3a8f0'];
 export function StartScreen() {
 	const [lands, setLands] = useState(0);
