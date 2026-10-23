@@ -16,7 +16,13 @@ const MOTHERDUCK_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoC
 
 const DB = '"sourcing"."main"';
 const N = (v: unknown): number => (v == null ? 0 : Number(v));
-const S = (v: unknown): string => (v == null ? '' : String(v));
+// Some stories store Windows-1252 punctuation as C1 control characters (’ as U+0092…); map them back, one for one.
+const CP1252: Record<string, string> = { '\u0080': '€', '\u0082': '‚', '\u0084': '„', '\u0085': '…', '\u0091': '‘', '\u0092': '’', '\u0093': '“', '\u0094': '”', '\u0095': '•', '\u0096': '–', '\u0097': '—', '\u0098': '˜', '\u0099': '™' };
+const S = (v: unknown): string => {
+	if (v == null) return '';
+	const t = String(v);
+	return /[\u0080-\u009f]/.test(t) ? t.replace(/[\u0080-\u009f]/g, (c) => CP1252[c] ?? ' ') : t;
+};
 const esc = (s: string) => s.replace(/'/g, "''");
 const L = (v: unknown): string[] => {
 	if (v == null) return [];
@@ -827,9 +833,9 @@ const CSS = `
 @keyframes rd-q { 0% { opacity: 0; transform: translateY(0) rotate(-6deg); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px) rotate(10deg); } }
 .rd-q { position: absolute; top: -6%; color: #fff; font-weight: 800; line-height: 1; pointer-events: none; opacity: 0; animation: rd-q 1.35s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .rd-q { animation: none; opacity: .8; } .rd-q + .rd-q { display: none; } }
-.rd-story { display: grid; gap: 32px 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 1024px) { .rd-story { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); } }
-.rd-story > li { padding-right: 14px; }
+.rd-stretches { display: grid; gap: 32px 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 1024px) { .rd-stretches { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); } }
+.rd-stretches > li { padding-right: 14px; }
 .rd-glance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 32px; }
 @media (min-width: 1024px) { .rd-glance.wide { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .rd-glance > li { display: grid; align-content: start; gap: 3px; }
@@ -2282,11 +2288,9 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 	);
 }
 
-// Known risks: everything TripSit's chart warns about for this substance, worst first, in plain words. Caution-level
-// pairs fold away so the serious ones stand out.
+// Known risks: everything TripSit's chart warns about for this substance, worst first, in plain words, all shown.
 function KnownRisks({ name }: { name: string }) {
 	const q = useSQLQuery(knownMixSQL(name));
-	const [more, setMore] = useState(false);
 	const list = rows(q).map((r) => ({ grp: S(r.grp), rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
 	const bad = list.filter((k) => k.rank >= 2), care = list.filter((k) => k.rank === 1);
 	if (q.isLoading) return null;
@@ -2325,14 +2329,7 @@ function KnownRisks({ name }: { name: string }) {
 			{list.length > 0 ? (
 				<div className="mt-8">
 					{bad.length > 0 ? bad.map(row) : <p className="py-4 text-sm" style={{ color: C.faint, borderTop: `1px solid ${C.line}` }}>TripSit doesn’t mark any combination with {short(name)} as unsafe or dangerous.</p>}
-					{care.length > 0 && (
-						<>
-							{more && care.map(row)}
-							<button className="rd-btn mt-3 text-sm" onClick={() => setMore(!more)}>
-								{more ? 'Hide the ones to be careful with' : `Show ${care.length} more to be careful with`}
-							</button>
-						</>
-					)}
+					{care.map(row)}
 				</div>
 			) : (
 				<p className="mt-6 text-sm" style={{ color: C.faint }}>{short(name)} isn’t on TripSit’s combination chart, so check each mix carefully before trying it.</p>
@@ -3040,7 +3037,7 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 				</div>
 				{!molecule && <div className="mt-12">{glance}</div>}
 				{warning && (
-					<div className="mt-5 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
+					<div className="mt-12 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
 						<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
 						<span>{warning}</span>
 					</div>
@@ -5232,7 +5229,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</div>
 				) : (
 				<>
-				<ol className="rd-story mt-8" style={{ ['--n' as string]: phases.length }}>
+				<ol className="rd-stretches mt-8" style={{ ['--n' as string]: phases.length }}>
 					{phases.map((ph) => {
 						const mood = moodWord(ph.mood);
 						const max = Math.max(...ph.list.map((e) => e.v), 1);
@@ -6250,17 +6247,17 @@ const BOUNCE_CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-/* The loader: his body is one colour drifting through the logo's palette; a floor shadow breathes with the bounce;
-   each landing sends out a ring in the colour he's turning. One bounce is .62s; colours cycle over four. */
+/* The loader: one solid colour per bounce (coral, cyan, white), switching on each landing; a floor shadow breathes
+   with the bounce; each landing sends out a ring in that colour. One bounce is .62s; colours cycle over three. */
 .rd-loader { position: relative; display: block; margin-top: 60px; pointer-events: none; }
 .rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; }
-@keyframes rd-g1 { 0%, 100% { stop-color: #fc6c84; } 25% { stop-color: #8a7ddc; } 50% { stop-color: #5ae0e4; } 75% { stop-color: #58e2d8; } }
-.rd-g1 { animation: rd-g1 2.48s linear infinite; }
+@keyframes rd-g1 { 0%, 31% { stop-color: #fc6c84; } 33.3%, 64% { stop-color: #5ae0e4; } 66.6%, 97% { stop-color: #ffffff; } 100% { stop-color: #fc6c84; } }
+.rd-g1 { animation: rd-g1 1.86s linear infinite; }
 @keyframes rd-shadow { 0%, 100% { transform: translateX(-50%) scale(1.15, 1); opacity: .45; } 50% { transform: translateX(-50%) scale(.55, .7); opacity: .15; } }
 .rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
 @keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
-@keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 25% { border-color: #8a7ddc; } 50% { border-color: #5ae0e4; } 75% { border-color: #58e2d8; } }
-.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 2.48s steps(1, end) infinite; }
+@keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5ae0e4; } 66.667% { border-color: #ffffff; } }
+.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
 @media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-g1 { animation: none; } .rd-ring { display: none; } }
 `;
 
