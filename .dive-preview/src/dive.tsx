@@ -2559,11 +2559,12 @@ function SubstanceOverview({ name }: { name: string }) {
 	const cls = L(r.cls), chem = L(r.chem);
 	return (
 		<>
-			<section id="overview" className="rd-card rd-in p-6 sm:p-8" style={{ scrollMarginTop: 16 }}>
+			<section id="overview" className="rd-in" style={{ scrollMarginTop: 16 }}>
 				<div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
 					<div className="min-w-0">
 						<div className="flex flex-wrap items-center gap-3">
-							<h1 style={{ fontSize: 'clamp(40px, 6vw, 62px)', fontWeight: 750, letterSpacing: '-0.035em', lineHeight: 1.02, background: `linear-gradient(90deg, ${ACCENT}, #c7a8ff)`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+							<h1 className="flex items-center gap-3 text-4xl font-semibold sm:text-5xl">
+								<SubstanceIcon name={name} />
 								{short(name)}
 							</h1>
 							{isGroup(name) && <GroupBadge />}
@@ -3540,17 +3541,13 @@ function EffectPage({ name, onSubstance, onCombo, onEffect, onReport }: { name: 
 // A substance page reads like an article: a sticky contents list on the left, a hero card, then sections with
 // accent headings.
 
-const ACCENT = '#e6b8ff';
+const ACCENT = C.lav; // our usual soft lavender for small icons and the selected route
 
-function ArticleH2({ icon: Icon, children, sub }: { icon: typeof Clock; children: React.ReactNode; sub?: string }) {
+function ArticleH2({ children, sub }: { icon?: typeof Clock; children: React.ReactNode; sub?: string }) {
 	return (
 		<div>
-			<div className="flex items-center gap-3">
-				<Icon size={26} color={ACCENT} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-				<h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', color: ACCENT, whiteSpace: 'nowrap' }}>{children}</h2>
-				<span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, rgba(230,184,255,.35), transparent)' }} />
-			</div>
-			{sub && <p className="mt-1.5 text-sm" style={{ color: C.faint }}>{sub}</p>}
+			<h2 className="text-2xl font-semibold">{children}</h2>
+			{sub && <p className="mt-1 text-sm" style={{ color: C.faint }}>{sub}</p>}
 		</div>
 	);
 }
@@ -3652,7 +3649,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 			{routes.length > 0 && (
 				<div className="flex flex-wrap gap-2">
 					{routes.map((r) => (
-						<button key={r} onClick={() => setRoute(r)} className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold" style={{ background: sel === r ? 'rgba(230,184,255,.18)' : 'rgba(255,255,255,.05)', border: `1px solid ${sel === r ? 'rgba(230,184,255,.5)' : C.line}`, color: sel === r ? '#fff' : C.soft }}>
+						<button key={r} onClick={() => setRoute(r)} className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold" style={{ background: sel === r ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.05)', border: `1px solid ${sel === r ? 'rgba(255,255,255,.35)' : C.line}`, color: sel === r ? '#fff' : C.soft }}>
 							<RouteIcon route={r} size={15} color={sel === r ? ACCENT : C.soft} />
 							{r[0].toUpperCase() + r.slice(1)}
 						</button>
