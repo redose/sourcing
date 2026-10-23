@@ -6080,7 +6080,7 @@ function SpunionSvg() {
 // Spunion when there's nothing to show: X eyes, a question mark, a slight puzzled tilt.
 function SpunionLost({ size = 44 }: { size?: number }) {
 	return (
-		<svg viewBox="0 0 500 560" width={size} height={(size * 560) / 500} aria-hidden style={{ flexShrink: 0, overflow: 'visible', transform: 'rotate(-8deg)' }}>
+		<svg viewBox="0 0 500 560" width={size} height={(size * 560) / 500} aria-hidden style={{ flexShrink: 0, overflow: 'visible', transform: 'rotate(-8deg)', filter: 'grayscale(1)', opacity: 0.5 }}>
 			<text x="400" y="120" fontSize="150" fontWeight="800" fill="#fff" opacity="0.85" fontFamily={SANS}>?</text>
 			<g transform="translate(0 60)">
 				<path
@@ -6098,12 +6098,13 @@ function SpunionLost({ size = 44 }: { size?: number }) {
 		</svg>
 	);
 }
-// A "nothing here" line with the puzzled Spunion beside it.
+// "Nothing here": the puzzled Spunion, greyed out and centred, NO DATA YET! under him, then what's missing.
 function EmptyNote({ children, className = 'mt-4' }: { children: React.ReactNode; className?: string }) {
 	return (
-		<div className={`flex items-center gap-3 text-sm ${className}`} style={{ color: C.faint }}>
-			<SpunionLost />
-			<span>{children}</span>
+		<div className={`flex flex-col items-center py-6 text-center ${className}`}>
+			<SpunionLost size={64} />
+			<div className="mt-4 text-xs font-bold" style={{ letterSpacing: '.16em', color: C.faint }}>NO DATA YET!</div>
+			<div className="mt-1.5 max-w-sm text-sm" style={{ color: C.faint }}>{children}</div>
 		</div>
 	);
 }
