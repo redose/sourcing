@@ -2046,7 +2046,7 @@ function CombosList({ name, onCombo, bare }: { name: string; onCombo: (a: string
 			{combosQ.isLoading ? (
 				<div className="mt-3 flex items-center justify-center" style={{ height: 180 }} aria-busy="true" />
 			) : rows(combosQ).length === 0 ? (
-				<p className="mt-2 text-sm" style={{ color: C.faint }}>No combinations on record.</p>
+				<EmptyNote className="mt-2">No combinations on record yet.</EmptyNote>
 			) : (
 				<div className="mt-2 grid">
 					{rows(combosQ).map((r) => {
@@ -2149,7 +2149,7 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 	const maxN = Math.max(1, ...common.map((m) => m.n));
 	const sel = all.find((m) => m.key === pick) ?? common.find((m) => m.lane >= 0) ?? all[0];
 	if (commonQ.isLoading || knownQ.isLoading) return <Loading height={300} className="mt-5" quiet />;
-	if (!all.length) return <p className="mt-4 text-sm" style={{ color: C.faint }}>No combinations on record.</p>;
+	if (!all.length) return <EmptyNote>No combinations on record yet.</EmptyNote>;
 	const top = common.slice(0, 3).map((m) => m.label);
 	const nBad = (k: number) => all.filter((m) => m.lane === k).length;
 	return (
@@ -2707,7 +2707,7 @@ function SubstanceEffects({ name }: { name: string }) {
 	const [all, setAll] = useState<Record<string, boolean>>({});
 	const list = rows(q);
 	if (q.isLoading) return <Loading height={220} className="mt-5" quiet />;
-	if (!list.length) return <p className="mt-4 text-sm" style={{ color: C.faint }}>Not enough closely read stories to say yet.</p>;
+	if (!list.length) return <EmptyNote>Not enough closely read stories to say yet.</EmptyNote>;
 	const n = N(list[0].n_stories);
 	const groups = new Map<string, Record<string, unknown>[]>();
 	for (const r of list) {
@@ -3009,7 +3009,7 @@ function SubstanceOverview({ name }: { name: string }) {
 						)}
 					</div>
 					{molecule && (
-						<div className="min-w-0">
+						<div className="flex min-w-0 flex-col self-stretch">
 							<div className="flex justify-end">
 								<Sources className="pt-4" list={['erowid', 'pw', 'sei', 'tripsit']} />
 							</div>
@@ -3896,19 +3896,19 @@ function DoseSteps({ p }: { p: Record<string, unknown> }) {
 	if (!steps.length) return null;
 	const units = S(p.dose_units);
 	return (
-		<div className="mt-5">
-			<div className="grid items-center gap-x-3 gap-y-2.5" style={{ gridTemplateColumns: 'auto minmax(0, 1fr) auto' }}>
+		<div className="mt-5 flex flex-1 flex-col">
+			<div className="grid flex-1 items-center gap-x-3 gap-y-2" style={{ gridTemplateColumns: 'auto minmax(0, 1fr) auto', gridAutoRows: 'minmax(30px, 1fr)' }}>
 				{steps.map((d, i) => {
 					const c = DOSE_STEP_COLOR[d.key];
 					return (
 						<Fragment key={d.key}>
 							<span className="rd-step text-sm font-semibold" style={{ color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.15 + i * 0.12}s` }}>{d.label}</span>
-							<span className="block" style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,.06)' }}>
+							<span className="block" style={{ height: 'clamp(12px, 55%, 34px)', borderRadius: 8, background: 'rgba(255,255,255,.06)' }}>
 								<span
 									className="rd-grow block h-full"
 									style={{
 										width: `${Math.round(100 * (0.3 + (0.7 * (i + 1)) / steps.length))}%`,
-										borderRadius: 6,
+										borderRadius: 8,
 										background: d.key === 'heavy' ? `linear-gradient(90deg, ${c}d0 60%, ${c}20)` : `${c}d0`,
 										animationDelay: `${i * 0.12}s`,
 									}}
@@ -4107,7 +4107,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	}, [go, sel]);
 	useEffect(() => {
 		if (!playing) return;
-		const dur = 8000;
+		const dur = 16000;
 		const start = performance.now() - (pt / span) * dur;
 		let raf = 0;
 		const tick = () => {
@@ -4128,7 +4128,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	const waiting = stages.length > 0 && pt < stages[0].from;
 	// Early returns only after every hook, so the hook order never changes between loading and loaded.
 	if (q.isLoading) return <Loading height={260} className="mt-5" quiet />;
-	if (!p && !t) return <p className="mt-4 text-sm" style={{ color: C.faint }}>No dose or timing information on file yet.</p>;
+	if (!p && !t) return <EmptyNote>No dose or timing information on file yet.</EmptyNote>;
 	return (
 		<div className="mt-5">
 			{routes.length > 0 && (
@@ -4159,7 +4159,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 							</p>
 						</>
 					) : (
-						<p className="mt-3 text-sm" style={{ color: C.faint }}>No dose ranges on file for this route.</p>
+						<EmptyNote className="mt-4">No dose ranges on file for this route.</EmptyNote>
 					)}
 				</div>
 				<div className="rd-card p-6 sm:p-7">
@@ -4361,9 +4361,10 @@ function MoleculeCard({ list }: { list: Record<string, unknown>[] }) {
 	if (atoms.length < 2) return null;
 	const formula = S(r.formula).split(/(\d+)/).map((part, i) => (/^\d+$/.test(part) ? <sub key={i}>{part}</sub> : <span key={i}>{part}</span>));
 	return (
-		<figure className="flex flex-col items-center" style={{ background: 'radial-gradient(circle at 50% 45%, rgba(217,207,255,.13), transparent 62%)' }}>
+		<figure className="mt-6 flex flex-1 flex-col items-center justify-center" style={{ minHeight: 420, background: 'radial-gradient(closest-side at 50% 46%, rgba(217,207,255,.16), rgba(217,207,255,.05) 60%, transparent)' }}>
+			<Molecule3D key={i} atoms={atoms} bonds={bonds} size={310} />
 			{list.length > 1 && (
-				<div className="mt-3 flex flex-wrap justify-center gap-1.5" role="tablist" aria-label="Active compounds">
+				<div className="mt-4 flex flex-wrap justify-center gap-1.5" role="tablist" aria-label="Active compounds">
 					{list.map((m, j) => (
 						<button key={S(m.compound) || j} role="tab" aria-selected={j === i} className="rd-nav" aria-current={j === i ? 'page' : undefined} onClick={() => setI(j)} style={{ fontSize: 13, padding: '4px 12px', border: `1px solid ${C.line}` }}>
 							{S(m.compound) || 'Molecule'}
@@ -4371,8 +4372,7 @@ function MoleculeCard({ list }: { list: Record<string, unknown>[] }) {
 					))}
 				</div>
 			)}
-			<Molecule3D key={i} atoms={atoms} bonds={bonds} size={270} />
-			<figcaption className="mt-2 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+			<figcaption className="mt-3 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
 				{list.length > 1 && <span className="text-sm font-semibold" style={{ color: '#fff' }}>{S(r.compound)}</span>}
 				<span className="text-sm" style={{ color: C.soft, fontFamily: SANS }}>{formula}</span>
 				<span>·</span>
@@ -5130,8 +5130,9 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					)}
 					{!enoughToChart ? (
 						<div className="mt-6">
-							<p style={{ color: C.soft, lineHeight: 1.6 }}>
-								Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. What {closeReads === 1 ? 'it mentions' : 'they mention'} most:
+							<p className="flex items-center gap-3" style={{ color: C.soft, lineHeight: 1.6 }}>
+								<SpunionLost />
+								<span>Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. What {closeReads === 1 ? 'it mentions' : 'they mention'} most:</span>
 							</p>
 							<div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
 								{series
@@ -6073,6 +6074,37 @@ function SpunionSvg() {
 				</g>
 			</g>
 		</svg>
+	);
+}
+
+// Spunion when there's nothing to show: X eyes, a question mark, a slight puzzled tilt.
+function SpunionLost({ size = 44 }: { size?: number }) {
+	return (
+		<svg viewBox="0 0 500 560" width={size} height={(size * 560) / 500} aria-hidden style={{ flexShrink: 0, overflow: 'visible', transform: 'rotate(-8deg)' }}>
+			<text x="400" y="120" fontSize="150" fontWeight="800" fill="#fff" opacity="0.85" fontFamily={SANS}>?</text>
+			<g transform="translate(0 60)">
+				<path
+					d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
+					fill="#5ae0e4"
+					stroke="#000"
+					strokeWidth="18"
+					strokeLinejoin="round"
+				/>
+				<g stroke="#000" strokeWidth="26" strokeLinecap="round">
+					<path d="M140 255 L230 345 M230 255 L140 345" />
+					<path d="M322 233 L392 303 M392 233 L322 303" />
+				</g>
+			</g>
+		</svg>
+	);
+}
+// A "nothing here" line with the puzzled Spunion beside it.
+function EmptyNote({ children, className = 'mt-4' }: { children: React.ReactNode; className?: string }) {
+	return (
+		<div className={`flex items-center gap-3 text-sm ${className}`} style={{ color: C.faint }}>
+			<SpunionLost />
+			<span>{children}</span>
+		</div>
 	);
 }
 
