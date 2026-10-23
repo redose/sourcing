@@ -3186,54 +3186,89 @@ const ALIAS_KINDS = [
 const ALIAS_SOURCE: Record<string, string> = { psychonautwiki: 'PsychonautWiki', pubchem: 'PubChem', dea: 'DEA', noslang: 'NoSlang', dope_lookup: 'Dope Lookup', lists: 'slang lists' };
 function SlangSection({ name }: { name: string }) {
 	const q = useSQLQuery(aliasesSQL(name));
-	const [all, setAll] = useState<Record<string, boolean>>({});
+	const [allSlang, setAllSlang] = useState(false);
 	const list = rows(q).map((r) => ({ term: S(r.alias), kind: S(r.kind), src: L(r.sources).map(String), ai: !!r.ai, cite: S(r.citations), desc: S(r.description) }));
 	if (!list.length) return null;
-	const cell = (r: (typeof list)[number]) => (
-		<div key={r.term} className="min-w-0 py-1">
-			<div className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.term}>{r.term}</div>
-			<div className="mt-0.5 text-xs" style={{ color: C.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-				{r.kind === 'mix' && r.desc ? (
-					<span title={r.desc}>{r.desc}</span>
-				) : r.ai && /^https?:/.test(r.cite) ? (
-					<a href={r.cite} target="_blank" rel="noopener noreferrer" style={{ color: C.faint, textDecoration: 'underline', textUnderlineOffset: 3 }}>matched by AI · source ↗</a>
-				) : (
-					['psychonautwiki', 'pubchem', 'dea', 'noslang', 'dope_lookup', 'lists'].filter((k) => r.src.includes(k)).map((k) => ALIAS_SOURCE[k]).join(' · ')
-				)}
-			</div>
+	const of = (k: string) => list.filter((r) => r.kind === k);
+	const chem = of('chemical'), brand = of('brand'), slang = of('slang'), mix = of('mix');
+	const where = (r: (typeof list)[number]) => (r.ai ? 'Matched by AI' : ['psychonautwiki', 'pubchem', 'dea', 'noslang', 'dope_lookup', 'lists'].filter((k) => r.src.includes(k)).map((k) => ALIAS_SOURCE[k]).join(', '));
+	const head = (kind: string, label: string, n: number) => (
+		<div className="flex items-center gap-3">
+			<AliasDoodle kind={kind} />
+			<span className="font-semibold">{label}</span>
+			<span className="text-sm tabular-nums" style={{ color: C.faint }}>{n}</span>
 		</div>
 	);
+	// Slang as a cloud: names on more lists are bigger and brighter.
+	const cloud = [...slang].sort((a, b) => b.src.length - a.src.length || a.term.localeCompare(b.term));
+	const shown = allSlang ? cloud : cloud.slice(0, 70);
 	return (
 		<section id="slang" className="mt-24" style={{ scrollMarginTop: 16 }}>
-			<ArticleH2 icon={MessageCircle} sub="Every name it goes by, and where each one is listed. Slang changes fast and varies by place.">Aliases</ArticleH2>
-			<div className="mt-8 grid gap-10">
-				{ALIAS_KINDS.map((g) => {
-					const items = list.filter((r) => r.kind === g.k);
-					if (!items.length) return null;
-					const cap = all[g.k] ? Infinity : g.k === 'slang' ? 36 : 18;
-					return (
-						<div key={g.k}>
-							<div className="flex items-center gap-3 text-sm font-semibold">
-								<AliasDoodle kind={g.k} />
-								<span>{g.label}</span>
-								<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{items.length}</span>
-							</div>
-							<div className="mt-3 grid gap-x-6 gap-y-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))' }}>
-								{items.slice(0, cap).map(cell)}
-							</div>
-							{items.length > cap && (
-								<button className="rd-btn mt-3 text-sm" onClick={() => setAll({ ...all, [g.k]: true })}>
-									Show all {items.length}
-								</button>
-							)}
+			<ArticleH2 icon={MessageCircle} sub="Every name it goes by. Hover a name to see where it’s listed.">Aliases</ArticleH2>
+			{(chem.length > 0 || brand.length > 0) && (
+				<div className="mt-8 grid gap-4 md:grid-cols-2">
+					{chem.length > 0 && (
+						<div className="rd-card p-5">
+							{head('chemical', 'Chemical names', chem.length)}
+							<ul className="mt-4 grid gap-2">
+								{chem.map((r) => (
+									<li key={r.term} title={`${r.term} · ${where(r)}`} style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13.5, color: C.soft, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+										{r.term}
+									</li>
+								))}
+							</ul>
 						</div>
-					);
-				})}
-			</div>
+					)}
+					{brand.length > 0 && (
+						<div className="rd-card p-5">
+							{head('brand', 'Brand names', brand.length)}
+							<div className="mt-4 flex flex-wrap gap-2">
+								{brand.map((r) => (
+									<span key={r.term} className="rd-chip" title={where(r)}>{r.term}</span>
+								))}
+							</div>
+						</div>
+					)}
+				</div>
+			)}
+			{slang.length > 0 && (
+				<div className="mt-10">
+					{head('slang', 'Slang', slang.length)}
+					<p className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-2" style={{ lineHeight: 1.3 }}>
+						{shown.map((r) => {
+							const w = Math.min(3, r.src.length);
+							return (
+								<span key={r.term} title={where(r)} style={{ fontSize: [13.5, 13.5, 16, 19][w], fontWeight: w >= 3 ? 650 : w === 2 ? 550 : 450, color: w >= 3 ? '#fff' : w === 2 ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.6)', whiteSpace: 'nowrap', fontStyle: r.ai ? 'italic' : 'normal' }}>
+									{r.term}
+								</span>
+							);
+						})}
+						{cloud.length > 70 && (
+							<button className="text-sm font-semibold" style={{ color: '#fff', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.3)', textUnderlineOffset: 4 }} onClick={() => setAllSlang(!allSlang)}>
+								{allSlang ? 'fewer' : `+${cloud.length - 70} more`}
+							</button>
+						)}
+					</p>
+					<p className="mt-3 text-xs" style={{ color: C.faint }}>Bigger names are on more of the lists. Italic ones were matched to {short(name)} by AI.</p>
+				</div>
+			)}
+			{mix.length > 0 && (
+				<div className="mt-10">
+					{head('mix', 'Names for mixes', mix.length)}
+					<ul className="mt-4 grid gap-x-8 gap-y-2 md:grid-cols-2">
+						{mix.map((r) => (
+							<li key={r.term} className="min-w-0 text-sm" title={where(r)} style={{ lineHeight: 1.5 }}>
+								<b style={{ color: '#fff', whiteSpace: 'nowrap' }}>{r.term.replace(/\s*\(.*\)\s*$/, '')}</b>
+								{(r.desc || /\(.*\)/.test(r.term)) && <span style={{ color: C.soft }}> · {r.desc || r.term.match(/\((.*)\)/)?.[1]}</span>}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 			<p className="mt-8 text-xs" style={{ color: C.faint, lineHeight: 1.6 }}>
 				From PsychonautWiki’s common names, PubChem’s chemical name and public slang lists (the{' '}
 				<a href={SLANG_SOURCES.dea.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>DEA</a>,{' '}
-				<a href={SLANG_SOURCES.noslang.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>NoSlang</a> and Dope Lookup). Which kind each name is was sorted by AI, so the odd one may be misfiled. Names about paraphernalia or dealing are left out.
+				<a href={SLANG_SOURCES.noslang.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>NoSlang</a> and Dope Lookup). Which kind each name is was sorted by AI, so the odd one may be misfiled. Slang changes fast and varies by place.
 			</p>
 		</section>
 	);
