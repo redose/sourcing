@@ -3885,19 +3885,19 @@ const pwPhases = (p: Record<string, unknown>) =>
 	)
 		.map(([label, key, color]) => [label, pwHours(p[key], pwIsMin(p, key)), pwDur(p[key], pwIsMin(p, key)), color] as [string, number, string, string])
 		.filter(([, h]) => h > 0);
-// Dose ranges as rows that grow left to right: light, common, strong, heavy, each bar longer than the last, its range
-// at the end. Threshold is a starting point rather than a range, so it's a line underneath.
+// Dose ranges as rows that grow left to right: threshold, light, common, strong, heavy, each bar longer than the last,
+// its range at the end.
 const DOSE_STEP_COLOR: Record<string, string> = { threshold: '#a99fd8', light: C.mint, common: C.lav, strong: C.amber, heavy: '#ff9aab' };
 function DoseSteps({ p }: { p: Record<string, unknown> }) {
 	const v = (k: string) => (p[k] == null ? '' : num(p[k]));
 	const range = (k: string) => {
+		if (k === 'threshold') return v('dose_threshold') ? `~${v('dose_threshold')}` : '';
 		if (k === 'heavy') return v('dose_heavy') ? `${v('dose_heavy')}+` : '';
 		const lo = v(`dose_${k}_min`), hi = v(`dose_${k}_max`);
 		return lo ? (hi && hi !== lo ? `${lo}–${hi}` : lo) : '';
 	};
-	const steps = DOSE_ROWS.filter((d) => d.key !== 'threshold').map((d) => ({ ...d, text: range(d.key) })).filter((d) => d.text);
+	const steps = DOSE_ROWS.map((d) => ({ ...d, text: range(d.key) })).filter((d) => d.text);
 	if (!steps.length) return null;
-	const units = S(p.dose_units);
 	return (
 		<div className="mt-5 flex flex-1 flex-col">
 			<div className="grid flex-1 items-center gap-x-3 gap-y-2" style={{ gridTemplateColumns: 'auto minmax(0, 1fr) auto', gridAutoRows: 'minmax(30px, 1fr)' }}>
@@ -3910,7 +3910,7 @@ function DoseSteps({ p }: { p: Record<string, unknown> }) {
 								<span
 									className="rd-grow block h-full"
 									style={{
-										width: `${Math.round(100 * (0.3 + (0.7 * (i + 1)) / steps.length))}%`,
+										width: `${Math.round(100 * (0.18 + (0.82 * (i + 1)) / steps.length))}%`,
 										borderRadius: 8,
 										background: d.key === 'heavy' ? `linear-gradient(90deg, ${c}d0 60%, ${c}20)` : `${c}d0`,
 										animationDelay: `${i * 0.12}s`,
@@ -3922,11 +3922,6 @@ function DoseSteps({ p }: { p: Record<string, unknown> }) {
 					);
 				})}
 			</div>
-			{v('dose_threshold') && (
-				<p className="rd-step mt-4 text-sm" style={{ color: C.soft, animationDelay: '.7s' }}>
-					First noticeable around <span className="tabular-nums" style={{ color: '#fff', fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13 }}>{v('dose_threshold')} {units}</span>
-				</p>
-			)}
 		</div>
 	);
 }
