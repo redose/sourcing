@@ -5021,13 +5021,21 @@ function Loading({ height = 200, className = '', quiet }: { height?: number; cla
 				handoffUntil = Date.now() + 400;
 				// Let a loader that's still waiting take him; deferred so it doesn't update others mid-render.
 				setTimeout(() => pillListeners.forEach((l) => l()), 0);
+				// If none does, he hops home to the corner.
+				setTimeout(() => pillOwner == null && window.dispatchEvent(new Event('rd-spunion-home')), 450);
 			}
 		};
 	}, []);
 	if (pillOwner !== me.current) return <div className={className} style={{ height }} aria-busy="true" />;
+	// He bounces on a faint placeholder of what's loading, which squashes a little each time he lands.
+	const sz = Math.min(84, Math.round(height * 0.4));
 	return (
-		<div className={`flex items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
-			<BouncingSpunion size={Math.min(96, Math.round(height * 0.45))} />
+		<div className={`flex flex-col items-center justify-center ${className}`} style={{ height }} role="status" aria-label="Loading">
+			<BouncingSpunion size={sz} style={{ marginTop: Math.round(sz * 0.7) }} />
+			<div className="rd-pad" style={{ width: Math.min(260, sz * 3.2) }}>
+				<span style={{ width: '72%' }} />
+				<span style={{ width: '48%' }} />
+			</div>
 		</div>
 	);
 }
@@ -6527,15 +6535,33 @@ const BOUNCE_CSS = `
 @keyframes rd-exude { 0% { transform: scale(1.06); opacity: .4; } 60% { transform: scale(.94); opacity: .15; } 100% { transform: scale(1.06); opacity: .4; } }
 @keyframes rd-glow-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #b3a8f0; } }
 .rd-halo { position: absolute; inset: -10%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, currentColor, transparent 70%); filter: blur(6px); animation: rd-exude .62s ease-out infinite, rd-glow-hue 1.86s steps(1, end) infinite; }
+@keyframes rd-pound { 0%, 100% { transform: translateY(3px) scale(1.02, .9); } 18% { transform: none; } }
+.rd-pad { display: grid; gap: 7px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); transform-origin: 50% 0; animation: rd-pound .62s infinite; }
+.rd-pad > span { display: block; height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); }
 .rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
-@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5ae0e4; opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-pad { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5ae0e4; opacity: .4; } }
 `;
 
 // The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
 // preview's startup screen.
-// Where the last loader Spunion was on screen, and when; a new one that appears soon after hops over from there.
+// Where the last loader Spunion was (page coordinates, so scrolling doesn't matter), and when. A new one that
+// appears soon after hops over from there; if none does, the corner Spunion hops home from there.
 let lastSpunionSpot: { x: number; y: number; at: number } | null = null;
-export function BouncingSpunion({ size = 96 }: { size?: number }) {
+// One big arcing hop: from (dx, dy) away to where the element sits now, up and over, landing with a squash.
+function hopFrom(el: HTMLElement, dx: number, dy: number, duration = 720) {
+	if (Math.hypot(dx, dy) < 24 || typeof el.animate !== 'function') return;
+	const peak = Math.min(dy, 0) - Math.max(140, Math.abs(dx) * 0.35);
+	el.animate(
+		[
+			{ transform: `translate(${dx}px, ${dy}px) scale(1.1, .85)` },
+			{ transform: `translate(${dx * 0.5}px, ${peak}px) scale(.95, 1.08)`, offset: 0.5 },
+			{ transform: 'translate(0, 0) scale(1.15, .82)', offset: 0.9 },
+			{ transform: 'translate(0, 0) scale(1, 1)' },
+		],
+		{ duration, easing: 'cubic-bezier(.33,.66,.4,1)' },
+	);
+}
+export function BouncingSpunion({ size = 96, style }: { size?: number; style?: React.CSSProperties }) {
 	const ref = useRef<HTMLSpanElement | null>(null);
 	useEffect(() => {
 		const el = ref.current;
@@ -6543,36 +6569,18 @@ export function BouncingSpunion({ size = 96 }: { size?: number }) {
 		const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 		const r = el.getBoundingClientRect();
 		const prev = lastSpunionSpot;
-		// A big arcing hop from the old spot to this one: up and over, landing with a little squash.
-		if (!still && prev && Date.now() - prev.at < 1500 && typeof el.animate === 'function') {
-			const dx = prev.x - r.left, dy = prev.y - r.top;
-			if (Math.hypot(dx, dy) > 24) {
-				const peak = Math.min(dy, 0) - Math.max(140, Math.abs(dx) * 0.35);
-				el.animate(
-					[
-						{ transform: `translate(${dx}px, ${dy}px) scale(1.1, .85)` },
-						{ transform: `translate(${dx * 0.5}px, ${peak}px) scale(.95, 1.08)`, offset: 0.5 },
-						{ transform: 'translate(0, 0) scale(1.15, .82)', offset: 0.9 },
-						{ transform: 'translate(0, 0) scale(1, 1)' },
-					],
-					{ duration: 720, easing: 'cubic-bezier(.33,.66,.4,1)' },
-				);
-			}
-		}
-		// Keep note of where he is while he's here, so the next one knows where to hop from.
+		if (!still && prev && Date.now() - prev.at < 1500) hopFrom(el, prev.x - (r.left + window.scrollX), prev.y - (r.top + window.scrollY));
+		// Keep note of where he is while he's on screen (not after he's gone: his box is empty by then).
 		const note = () => {
 			const b = el.getBoundingClientRect();
-			lastSpunionSpot = { x: b.left, y: b.top, at: Date.now() };
+			if (b.width > 0) lastSpunionSpot = { x: b.left + window.scrollX, y: b.top + window.scrollY, at: Date.now() };
 		};
 		note();
-		const timer = setInterval(note, 150);
-		return () => {
-			clearInterval(timer);
-			note();
-		};
+		const timer = setInterval(note, 120);
+		return () => clearInterval(timer);
 	}, []);
 	return (
-		<span ref={ref} className="rd-loader" style={{ width: size, height: size }}>
+		<span ref={ref} className="rd-loader" style={{ width: size, height: size, ...style }}>
 			<style>{BOUNCE_CSS}</style>
 			<span className="rd-floor" />
 			<span className="rd-ring" />
@@ -6771,6 +6779,18 @@ function SpunionDizzy({ size = 64 }: { size?: number }) {
 function Spunion({ tips, lift, autoOpen }: { tips: string[]; lift: boolean; autoOpen: boolean }) {
 	const [i, setI] = useState(0);
 	const [open, setOpen] = useState(autoOpen);
+	// When the last loader finishes, the loader Spunion hops down here and settles in.
+	const meRef = useRef<HTMLButtonElement | null>(null);
+	useEffect(() => {
+		const home = () => {
+			const el = meRef.current, spot = lastSpunionSpot;
+			if (!el || !spot || Date.now() - spot.at > 2000 || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+			const r = el.getBoundingClientRect();
+			hopFrom(el, spot.x - window.scrollX - r.left, spot.y - window.scrollY - r.top, 900);
+		};
+		window.addEventListener('rd-spunion-home', home);
+		return () => window.removeEventListener('rd-spunion-home', home);
+	}, []);
 	const [hop, setHop] = useState(false);
 	const key = tips.join('|');
 	useEffect(() => {
@@ -6805,7 +6825,7 @@ function Spunion({ tips, lift, autoOpen }: { tips: string[]; lift: boolean; auto
 					</button>
 				</div>
 			)}
-			<button className={`sp-me ${hop ? 'hop' : ''}`} onClick={next} aria-label={open ? 'Spunion: next tip' : 'Spunion: show a tip'} title="Spunion">
+			<button ref={meRef} className={`sp-me ${hop ? 'hop' : ''}`} onClick={next} aria-label={open ? 'Spunion: next tip' : 'Spunion: show a tip'} title="Spunion">
 				<SpunionSvg />
 			</button>
 		</div>
