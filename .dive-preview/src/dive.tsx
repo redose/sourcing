@@ -804,6 +804,9 @@ const CSS = `
 @media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
 @media (min-width: 1024px) { .rd-g-dose { grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); } }
 @media (min-width: 1024px) { .rd-g-hero { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+@keyframes rd-piece { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(6px, -14px) rotate(8deg); } }
+.rd-piece { transform-box: fill-box; transform-origin: center; animation: rd-piece 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .rd-piece { animation: none; } }
 @keyframes rd-q { 0% { opacity: 0; transform: translateY(0) rotate(-6deg); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px) rotate(10deg); } }
 .rd-q { position: absolute; top: -6%; color: #fff; font-weight: 800; line-height: 1; pointer-events: none; opacity: 0; animation: rd-q 1.35s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .rd-q { animation: none; opacity: .8; } .rd-q + .rd-q { display: none; } }
@@ -5132,12 +5135,13 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						</>
 					)}
 					{!enoughToChart ? (
-						<div className="mt-6">
-							<p className="flex items-center gap-3" style={{ color: C.soft, lineHeight: 1.6 }}>
-								<SpunionLost size={34} marks={false} />
-								<span>Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. What {closeReads === 1 ? 'it mentions' : 'they mention'} most:</span>
+						<div className="mt-6 flex flex-col items-center py-6 text-center">
+							<SpunionPuzzle size={72} />
+							<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
+							<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
+								Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
 							</p>
-							<div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+							<div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-2">
 								{series
 									.map((s) => ({ ...s, peak: Math.max(0, ...s.points.map((p) => p.y)) }))
 									.sort((a, b) => b.peak - a.peak)
@@ -6104,6 +6108,36 @@ function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boole
 		</span>
 	);
 }
+// Spunion with a piece missing, for "not enough data yet": a puzzle-shaped notch in his side, the piece bobbing
+// beside him, his eyes on it.
+const PUZZLE_PIECE = 'M0 0 h30 a15 15 0 1 1 30 0 h30 v30 a15 15 0 1 1 0 30 v30 h-90 Z';
+function SpunionPuzzle({ size = 72 }: { size?: number }) {
+	return (
+		<svg viewBox="0 0 640 500" width={size * 1.28} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
+			<defs>
+				<mask id="sp-notch">
+					<rect x="0" y="0" width="640" height="500" fill="#fff" />
+					<path d={PUZZLE_PIECE} transform="translate(318 318) rotate(8)" fill="#000" />
+				</mask>
+			</defs>
+			<path
+				d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
+				fill="#fff"
+				fillOpacity="0.92"
+				mask="url(#sp-notch)"
+			/>
+			{/* Eyes looking down and right, at the piece. */}
+			<circle cx="180" cy="268" r="54" fill={C.deep} />
+			<circle cx="198" cy="286" r="14" fill="#fff" />
+			<circle cx="340" cy="236" r="40" fill={C.deep} />
+			<circle cx="354" cy="250" r="11" fill="#fff" />
+			<g className="rd-piece">
+				<path d={PUZZLE_PIECE} transform="translate(505 290) rotate(20)" fill="#fff" fillOpacity="0.92" />
+			</g>
+		</svg>
+	);
+}
+
 // "Nothing here": the white, puzzled Spunion centred in its box, NO DATA YET! under him, then what's missing.
 function EmptyNote({ children, className = 'mt-4' }: { children: React.ReactNode; className?: string }) {
 	return (
