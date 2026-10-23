@@ -909,6 +909,20 @@ const CSS = `
 .rd-home.rd-fx-rainbow .rd-molecules { animation: rd-drift-home 70s ease-in-out infinite alternate, rd-mol-hue 16s linear infinite; }
 .rd-home.rd-fx-rainbow .rd-molecules.b { animation: rd-drift-home 95s ease-in-out infinite alternate-reverse, rd-mol-hue 22s linear infinite reverse; }
 @media (prefers-reduced-motion: reduce) { .rd-home.rd-fx-rainbow .rd-molecules { animation: none; } }
+/* Start screen: the wallpaper holds still, and each of Spunion's landings (every .62s, colours taking turns) sends a
+   ring out through it: a coloured copy of the molecules, seen only through an expanding ring from his floor. */
+.rd-start .rd-molecules { animation: rd-mol-hue-soft 60s linear infinite; }
+.rd-wave { position: fixed; inset: -280px; z-index: -1; pointer-events: none; opacity: 0;
+  -webkit-mask-repeat: repeat, no-repeat; mask-repeat: repeat, no-repeat;
+  -webkit-mask-position: 0 0, 50% calc(50% + 74px); mask-position: 0 0, 50% calc(50% + 74px);
+  -webkit-mask-size: 1100px, 0 0; mask-size: 1100px, 0 0;
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+  animation: rd-wave 1.86s cubic-bezier(.2,.6,.35,1) infinite; }
+@keyframes rd-wave {
+  0% { -webkit-mask-size: 1100px, 40px 40px; mask-size: 1100px, 40px 40px; opacity: .75; }
+  100% { -webkit-mask-size: 1100px, 190vmax 190vmax; mask-size: 1100px, 190vmax 190vmax; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .rd-wave { display: none; } }
 .rd-g-3 { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .rd-g-3 { grid-template-columns: 1fr; } }
 @media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
@@ -7716,10 +7730,14 @@ type Q = ReturnType<typeof useSQLQuery>;
 // The preview's connecting screen: the site's background and drifting molecules behind the bouncing Spunion.
 export function StartScreen() {
 	return (
-		<main className="rd rd-fx-rainbow" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+		<main className="rd rd-fx-rainbow rd-start" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
 			<style>{CSS}</style>
 			<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 			<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
+			{/* Each landing sends a ring of colour out through the molecules. */}
+			{['#fc6c84', '#5cdfe4', '#b3a8f0'].map((c, i) => (
+				<div key={c} aria-hidden className="rd-wave" style={{ background: c, animationDelay: `${i * 0.62}s`, WebkitMaskImage: `${MOLECULES}, radial-gradient(closest-side, transparent 72%, #000 88%, transparent 100%)`, maskImage: `${MOLECULES}, radial-gradient(closest-side, transparent 72%, #000 88%, transparent 100%)` }} />
+			))}
 			<BouncingSpunion size={88} />
 		</main>
 	);
