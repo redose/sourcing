@@ -4973,6 +4973,8 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	const list = rows(q);
 	const k = rows(kq)[0];
 	const [x, setX] = useState<number | null>(null);
+	const [detail, setDetail] = useState(false);
+	const unfoldTimingQ = useSQLQuery(timingSQL(withSub ? [] : [sub]), { enabled: !withSub });
 	const { open } = useContext(OpenCtx);
 	const w = horizon / SLICES;
 	const { series, denom } = useMemo(() => {
@@ -5009,6 +5011,39 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 		.filter((r) => r.v != null)
 		.sort((a, b) => (b.v as number) - (a.v as number));
 	const closeReads = N(rows(denQ)[0]?.total);
+	const phases = (() => {
+		const t = rows(unfoldTimingQ).find((r) => S(r.route) === '*');
+		const [b1, b2, b3] = t
+			? [N(t.pk_m) * 0.8, N(t.pk_m) + (N(t.end_m) - N(t.pk_m)) * 0.45, N(t.end_m)]
+			: [chartMax * 0.2, chartMax * 0.45, chartMax * 0.75];
+		const spans = [
+			{ label: 'Coming on', lo: 0, hi: b1 },
+			{ label: 'At its strongest', lo: b1, hi: b2 },
+			{ label: 'Easing off', lo: b2, hi: b3 },
+			{ label: 'After', lo: b3, hi: chartMax + w },
+		];
+		const mean = (pts: { x: number; y: number }[], lo: number, hi: number) => {
+			const v = pts.filter((q) => q.x >= lo && q.x < hi).map((q) => q.y);
+			return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+		};
+		// Each effect goes to the stretch where it's mentioned most; a stretch with too few gets topped up.
+		const scored = series.map((s) => ({ s, m: spans.map((sp) => mean(s.points, sp.lo, sp.hi)) }));
+		return spans
+			.map((sp, i) => {
+				const own = scored.filter((e) => e.m[i] != null && e.m.every((v) => v == null || (v as number) <= (e.m[i] as number)));
+				const extra = scored.filter((e) => e.m[i] != null && !own.includes(e));
+				const list = [...own, ...extra]
+					.sort((a, b) => (own.includes(b) ? 1 : 0) - (own.includes(a) ? 1 : 0) || (b.m[i] as number) - (a.m[i] as number))
+					.slice(0, 4)
+					.sort((a, b) => (b.m[i] as number) - (a.m[i] as number))
+					.map((e) => ({ label: e.s.label, v: e.m[i] as number, peak: own.includes(e) }));
+				const mood = mean(moodPts, sp.lo, sp.hi);
+				return { ...sp, list, mood };
+			})
+			.filter((p) => p.list.length > 0 && p.lo < chartMax);
+	})();
+	const moodWord = (m: number | null) => (m == null ? null : m > 0.25 ? { w: 'Mostly good', c: C.mint } : m < -0.15 ? { w: 'Often rough', c: C.coral } : { w: 'Mixed', c: C.amber });
+	const span = (lo: number, hi: number, last: boolean) => (last ? `after ${fmtDur(lo)}` : lo <= 0 ? `first ${fmtDur(hi)}` : `${fmtDur(lo)} – ${fmtDur(hi)}`);
 	// Below this, a curve over time is just a line between two points; show what's mentioned instead.
 	const enoughToChart = closeReads >= 10;
 	const onlyToggle = (
@@ -5130,13 +5165,13 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						</div>
 					) : (
 						<>
-							<ArticleH2 icon={Activity} sub={enoughToChart ? `From ${closeReads} closely read reports · % mentioning each effect · drag across` : undefined}>How It Unfolds</ArticleH2>
+							<ArticleH2 icon={Activity} sub={enoughToChart ? `A typical dose in four stretches, from ${closeReads} closely read reports.` : undefined}>How It Unfolds</ArticleH2>
 							<div className="mt-4">{onlyToggle}</div>
 						</>
 					)}
 					{!enoughToChart ? (
 						<div className="mt-6 flex flex-col items-center py-6 text-center">
-							<SpunionPuzzle size={72} />
+							<SpunionPuzzle size={76} missing={closeReads <= 2 ? 3 : closeReads <= 5 ? 2 : 1} />
 							<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
 							<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
 								Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
@@ -5152,6 +5187,51 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 							</div>
 						</div>
 					) : (
+					<>
+					<ol className="rd-story mt-8 grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+						{phases.map((ph, i) => {
+							const mood = moodWord(ph.mood);
+							const max = Math.max(...ph.list.map((e) => e.v), 1);
+							return (
+								<li key={ph.label} className="min-w-0">
+									<div className="rd-story-step flex items-center gap-3">
+										<span className="flex items-center justify-center rounded-full text-xs font-bold tabular-nums" style={{ width: 26, height: 26, background: '#fff', color: C.deep, flexShrink: 0 }}>{i + 1}</span>
+										<span className="h-px flex-1" style={{ background: i < phases.length - 1 ? 'rgba(255,255,255,.22)' : 'transparent' }} />
+									</div>
+									<div className="mt-3 font-semibold" style={{ whiteSpace: 'nowrap' }}>{ph.label}</div>
+									<div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs" style={{ color: C.faint }}>
+										<span className="tabular-nums">{span(ph.lo, ph.hi, i === phases.length - 1 && ph.label === 'After')}</span>
+										{mood && (
+											<span className="flex items-center gap-1.5" style={{ color: mood.c }}>
+												<span className="rd-dot" style={{ width: 7, height: 7, background: mood.c }} />
+												{mood.w}
+											</span>
+										)}
+									</div>
+									<div className="mt-4 grid gap-2.5">
+										{ph.list.map((e) => (
+											<button key={e.label} onClick={() => open({ kind: 'effect', name: e.label })} className="rd-hover min-w-0 rounded-lg px-2 py-1 text-left" style={{ marginLeft: -8 }} title={`${e.label}: ${Math.round(e.v)}% of stories mention it in this stretch`}>
+												<span className="flex items-baseline justify-between gap-2 text-sm">
+													<span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: e.peak ? 600 : 400, color: e.peak ? '#fff' : C.soft }}>{e.label}</span>
+													<span className="text-xs tabular-nums" style={{ color: C.faint }}>{Math.round(e.v)}%</span>
+												</span>
+												<span className="mt-1 block" style={{ height: 3, borderRadius: 3, background: 'rgba(255,255,255,.08)' }}>
+													<span className="block h-full" style={{ width: `${Math.max(6, (100 * e.v) / max)}%`, borderRadius: 3, background: e.peak ? C.cyan : 'rgba(143,244,247,.45)' }} />
+												</span>
+											</button>
+										))}
+									</div>
+								</li>
+							);
+						})}
+					</ol>
+					<p className="mt-6 text-xs" style={{ color: C.faint }}>
+						Bold effects are mentioned most in that stretch. Mood is how the moments in it felt, on average.
+					</p>
+					<button className="rd-btn mt-4 text-sm" onClick={() => setDetail(!detail)} aria-expanded={detail}>
+						{detail ? 'Hide the detailed chart' : 'Show the detailed chart'}
+					</button>
+					{detail && (
 					<>
 					<div className="mt-6">
 						<ScrubChart
@@ -5182,6 +5262,8 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 							))}
 						</div>
 					</div>
+					</>
+					)}
 					</>
 					)}
 				</section>
@@ -6108,32 +6190,52 @@ function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boole
 		</span>
 	);
 }
-// Spunion with a piece missing, for "not enough data yet": a puzzle-shaped notch in his side, the piece bobbing
-// beside him, his eyes on it.
+// Spunion with pieces missing, for "not enough data yet", drawn as line art: dashed outlines where the pieces belong,
+// the pieces themselves bobbing around him. The thinner the data, the more pieces are missing (1 to 3).
 const PUZZLE_PIECE = 'M0 0 h30 a15 15 0 1 1 30 0 h30 v30 a15 15 0 1 1 0 30 v30 h-90 Z';
-function SpunionPuzzle({ size = 72 }: { size?: number }) {
+const PUZZLE_SPOTS = [
+	{ hole: 'translate(395 285) rotate(8)', piece: 'translate(540 230) rotate(24)' },
+	{ hole: 'translate(185 70) rotate(-8)', piece: 'translate(70 -60) rotate(-18)' },
+	{ hole: 'translate(55 350) rotate(-10)', piece: 'translate(-95 420) rotate(-22)' },
+];
+function SpunionPuzzle({ size = 72, missing = 1 }: { size?: number; missing?: number }) {
+	const spots = PUZZLE_SPOTS.slice(0, Math.max(1, Math.min(3, missing)));
+	const id = `sp-holes-${spots.length}`;
 	return (
-		<svg viewBox="0 0 640 500" width={size * 1.28} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
+		<svg viewBox="-110 -80 760 600" width={(size * 760) / 600} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
 			<defs>
-				<mask id="sp-notch">
-					<rect x="0" y="0" width="640" height="500" fill="#fff" />
-					<path d={PUZZLE_PIECE} transform="translate(318 318) rotate(8)" fill="#000" />
+				<mask id={id} maskUnits="userSpaceOnUse" x="-110" y="-80" width="760" height="600">
+					<rect x="-110" y="-80" width="760" height="600" fill="#fff" />
+					{spots.map((sp) => (
+						<path key={sp.hole} d={PUZZLE_PIECE} transform={sp.hole} fill="#000" />
+					))}
 				</mask>
 			</defs>
 			<path
 				d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
 				fill="#fff"
-				fillOpacity="0.92"
-				mask="url(#sp-notch)"
+				fillOpacity="0.08"
+				stroke="#fff"
+				strokeWidth="16"
+				strokeLinejoin="round"
+				mask={`url(#${id})`}
 			/>
-			{/* Eyes looking down and right, at the piece. */}
-			<circle cx="180" cy="268" r="54" fill={C.deep} />
-			<circle cx="198" cy="286" r="14" fill="#fff" />
-			<circle cx="340" cy="236" r="40" fill={C.deep} />
-			<circle cx="354" cy="250" r="11" fill="#fff" />
-			<g className="rd-piece">
-				<path d={PUZZLE_PIECE} transform="translate(505 290) rotate(20)" fill="#fff" fillOpacity="0.92" />
+			<g fill="none" stroke="#fff" strokeOpacity="0.45" strokeWidth="7" strokeDasharray="14 12" strokeLinejoin="round">
+				{spots.map((sp) => (
+					<path key={sp.hole} d={PUZZLE_PIECE} transform={sp.hole} />
+				))}
 			</g>
+			<g fill="none" stroke="#fff" strokeWidth="14">
+				<circle cx="180" cy="268" r="50" />
+				<circle cx="340" cy="236" r="37" />
+			</g>
+			<circle cx="196" cy="284" r="17" fill="#fff" />
+			<circle cx="352" cy="248" r="13" fill="#fff" />
+			{spots.map((sp, i) => (
+				<g key={sp.piece} className="rd-piece" style={{ animationDelay: `${i * 0.6}s` }}>
+					<path d={PUZZLE_PIECE} transform={sp.piece} fill="none" stroke="#fff" strokeWidth="14" strokeLinejoin="round" />
+				</g>
+			))}
 		</svg>
 	);
 }
