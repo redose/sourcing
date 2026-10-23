@@ -7424,14 +7424,13 @@ const BOUNCE_CSS = `
 @media (prefers-reduced-motion: reduce) { .rd-ghost-body { animation: none; } .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-skel, .rd-skel > span { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5cdfe4; opacity: .4; } }
 `;
 
-// The loader: Spunion bouncing over a shadow; his landings send waves through the start screen's molecules. Exported for the
+// The loader: Spunion bouncing; his landings send waves of colour through the start screen. Exported for the
 // preview's startup screen.
 export function BouncingSpunion({ size = 96, style }: { size?: number; style?: React.CSSProperties }) {
 	const ref = useRef<HTMLSpanElement | null>(null);
 	return (
 		<span ref={ref} className="rd-loader" style={{ width: size, height: size, ...style }}>
 			<style>{BOUNCE_CSS}</style>
-			<span className="rd-floor" />
 			<span className="rd-bounce">
 				<SpunionGhost />
 			</span>
