@@ -1,11 +1,30 @@
 import { createRoot } from 'react-dom/client';
+import { useEffect, useState } from 'react';
 import { MotherDuckSDKProvider, useConnectionStatus } from './md-sdk';
 import { AlertCircle } from 'lucide-react';
 import Dive, { StartScreen } from './dive';
 
+// The intro (Spunion bouncing down to the corner) takes about four seconds; let it finish before the site appears.
+const INTRO_MS = 4300;
+
+// ?intro shows just the intro, on a loop you can replay by clicking, to look at it properly.
+function IntroOnly() {
+	const [run, setRun] = useState(0);
+	return (
+		<div onClick={() => setRun(run + 1)} style={{ cursor: 'pointer' }} title="Click to replay">
+			<StartScreen key={run} />
+		</div>
+	);
+}
+
 function ConnectionGate({ children }: { children: React.ReactNode }) {
 	const { isConnected, isConnecting, error } = useConnectionStatus();
-	if (isConnecting) return <StartScreen />;
+	const [introDone, setIntroDone] = useState(false);
+	useEffect(() => {
+		const t = setTimeout(() => setIntroDone(true), INTRO_MS);
+		return () => clearTimeout(t);
+	}, []);
+	if (isConnecting || (!introDone && !error)) return <StartScreen />;
 	if (error)
 		return (
 			<div className="flex items-center justify-center h-screen gap-2 text-red-600">
@@ -23,10 +42,14 @@ if (!token) {
 		'<p style="padding:2rem;color:red">Missing VITE_MOTHERDUCK_TOKEN in .env</p>';
 } else {
 	createRoot(document.getElementById('root')!).render(
+		new URLSearchParams(window.location.search).has('intro') ? (
+			<IntroOnly />
+		) : (
 		<MotherDuckSDKProvider token={token}>
 			<ConnectionGate>
 				<Dive />
 			</ConnectionGate>
-		</MotherDuckSDKProvider>,
+		</MotherDuckSDKProvider>
+		),
 	);
 }
