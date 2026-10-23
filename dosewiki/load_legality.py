@@ -1,8 +1,9 @@
 """Load legal status by country from dose.wiki (Effect Index) into MotherDuck (sourcing database).
 
-Creates (or replaces) one table:
-  substance_legality  one row per substance and country: the status as dose.wiki words it, a simple group
-                      (illegal, prescription, restricted, decriminalized, legal, unclear), the note explaining it, and a link back.
+Creates (or replaces) two tables:
+  substance_legality                one row per substance and country: the status as dose.wiki words it, a simple group
+                                    (illegal, prescription, restricted, decriminalized, legal, unclear), its note, a link back.
+  substance_legality_international  one row per substance and statement about its status under the UN conventions.
 
 Source: dose.wiki's downloadable SubstanceIndex.json (https://effectindex.com/SubstanceIndex.json). Its legality
 field is dose.wiki's own writing, released under CC0 1.0 (https://effectindex.com/docs/license); we credit them anyway.
@@ -51,13 +52,16 @@ def main(path: str, dry_run: bool):
         for a in aka:
             by_alias.setdefault(a.lower(), n)
     fetched = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    rows, matched, unmatched = [], 0, []
+    rows, intl, matched, unmatched = [], [], 0, []
     for item in data:
         title = item.get("title") or ""
         sub = by_name.get(title.lower()) or by_alias.get(title.lower())
         if not sub:
             unmatched.append(title)
             continue
+        for text in (item.get("legality") or {}).get("international") or []:
+            if clean(text):
+                intl.append((sub, clean(text), f"https://effectindex.com/{item.get('slug')}", fetched))
         countries = (item.get("legality") or {}).get("countries") or {}
         if not countries:
             continue
@@ -84,7 +88,9 @@ def main(path: str, dry_run: bool):
             notes VARCHAR, source_url VARCHAR, fetched_at VARCHAR)""")
     con.executemany("INSERT INTO substance_legality VALUES (?, ?, ?, ?, ?, ?, ?, ?)", rows)
     con.execute("COMMENT ON TABLE substance_legality IS 'Legal status by country from dose.wiki SubstanceIndex.json (CC0 1.0); see source_url.'")
-    print("Loaded substance_legality into md:sourcing.")
+    con.execute("CREATE OR REPLACE TABLE substance_legality_international (substance VARCHAR, statement VARCHAR, source_url VARCHAR, fetched_at VARCHAR)")
+    con.executemany("INSERT INTO substance_legality_international VALUES (?, ?, ?, ?)", intl)
+    print(f"Loaded substance_legality ({len(rows)} rows) and substance_legality_international ({len(intl)} rows) into md:sourcing.")
 
 
 if __name__ == "__main__":

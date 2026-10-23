@@ -1,5 +1,6 @@
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
+import * as d3 from "d3";
 import { Activity, AlertTriangle, BarChart3, BookOpen, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, FileText, FlaskConical, Link2, MessageCircle, MessageSquareQuote, Search, Sparkles, Pause, Play, Repeat, RotateCcw, Scale, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
@@ -692,6 +693,7 @@ eff AS (
 SELECT s.name, s.summary, s.url, coalesce(s.psychoactive_class, []) AS cls, coalesce(s.chemical_class, []) AS chem,
   coalesce(s.common_names, []) AS aka, coalesce(s.cross_tolerances, []) AS cross_tol,
   s.tolerance_full, s.tolerance_zero, s.addiction_potential AS addiction, coalesce(s.toxicity, []) AS tox,
+  (SELECT lead FROM ${DB}."substance_overviews" o WHERE o.substance = q.q) AS lead,
   EXISTS (SELECT 1 FROM ${DB}."tripsit_group_members" WHERE group_key = 'maois' AND substance = q.q) AS maoi,
   (SELECT count(*) FROM fd) AS n_read,
   (SELECT count(DISTINCT report_id) FROM ${DB}."report_doses" WHERE canonical_substance = '${esc(name)}') AS n_reports,
@@ -756,6 +758,7 @@ const SERIF = '"Iowan Old Style", "Charter", "Palatino Linotype", Palatino, Geor
 const BG = 'linear-gradient(170deg, #3a2e74 0%, #4f42a0 55%, #6152b4 100%)';
 
 const CSS = `
+::selection { background: rgba(252,108,132,.45); color: #fff; }
 /* Headings in serif (editorial, matches the serif lead line); everything else stays sans for reading data. */
 .rd h1, .rd h2 { font-family: ${SERIF}; letter-spacing: -0.01em; font-weight: 600; }
 /* Links take the colour around them; hosts (the Dive frame) otherwise paint visited links blue. Inline colours still win. */
@@ -1535,8 +1538,9 @@ const CLASS_ICON: Record<string, JSX.Element> = {
 	),
 	entactogen: <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />,
 	nootropic: <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />,
+	// A seven-leaflet cannabis leaf.
 	cannabinoid: (
-		<path d="M12 21v-5M12 16c-1.4-4-1.4-8 0-12 1.4 4 1.4 8 0 12zM12 16c-2.6-2.2-5.4-3.3-8-3 2 2.4 4.8 3.4 8 3zM12 16c2.6-2.2 5.4-3.3 8-3-2 2.4-4.8 3.4-8 3zM12 16c-1.8-3.2-4-5.4-6.5-6.5.8 3.2 3 5.4 6.5 6.5zM12 16c1.8-3.2 4-5.4 6.5-6.5-.8 3.2-3 5.4-6.5 6.5z" />
+		<path d="M12 16.5v5M12 16.5Q14.6 9.3 12.0 3.5Q9.4 9.3 12 16.5M12 16.5Q17.2 12.7 18.2 7.4Q13.6 10.3 12 16.5M12 16.5Q10.4 10.3 5.8 7.4Q6.8 12.7 12 16.5M12 16.5Q16.8 16.2 19.5 13.2Q15.5 13.2 12 16.5M12 16.5Q8.5 13.2 4.5 13.2Q7.2 16.2 12 16.5M12 16.5Q14.6 18.0 17.1 17.4Q15.0 16.0 12 16.5M12 16.5Q9.0 16.0 6.9 17.4Q9.4 18.0 12 16.5" />
 	),
 	hallucinogen: <path d="M12 12.5a1.2 1.2 0 1 1 1.2-1.2 2.6 2.6 0 0 1-2.6 2.6A3.9 3.9 0 0 1 6.7 10a5.2 5.2 0 0 1 5.2-5.2 6.5 6.5 0 0 1 6.5 6.5A7.8 7.8 0 0 1 10.6 19" />,
 	deliriant: <path d="M7 18h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.5A3.3 3.3 0 0 0 7 18z" />,
@@ -1614,6 +1618,8 @@ function RouteIcon({ route, size = 14, color = C.faint }: { route: string; size?
 // ── Tags & detail panel ───────────────────────────────────────────
 
 type Open = { kind: 'effect' | 'substance'; name: string } | null;
+// Go to a substance's page, for links deep inside sections (like "Did you mean…?").
+const GoCtx = createContext<(name: string) => void>(() => {});
 const OpenCtx = createContext<{ open: (o: Open) => void; effectInfo: Map<string, EffectInfo>; classOf: (s: string) => string | undefined }>({ open: () => {}, effectInfo: new Map(), classOf: () => undefined });
 
 function EffectTag({ name }: { name: string }) {
@@ -2196,73 +2202,83 @@ const LANES = [
 ];
 type Mix = { key: string; label: string; lane: number; n: number; status: string; note: string; members: string[]; known: boolean; r?: Record<string, unknown> };
 
-// Mixing: what people actually mix it with, most common first. Each row shows how often, TripSit's rating and how it
-// went; open one for TripSit's note and the stories. Pairs TripSit warns about that people rarely mix are in Known Risks.
+// Mixing: what people actually mix it with, grouped by TripSit's rating (most dangerous first), most mixed first in each
+// group. Each row: the name, TripSit's note, how it went when there's enough to say, and a link to the stories.
+// Pairs TripSit warns about that people rarely mix are in Known Risks.
+const MIX_GROUPS = [
+	{ sev: 3, label: 'Dangerous', c: RISK[3].c },
+	{ sev: 2, label: 'Unsafe', c: RISK[2].c },
+	{ sev: 1, label: 'Caution', c: RISK[1].c },
+	{ sev: 0, label: 'Low risk', c: C.mint },
+	{ sev: -1, label: 'No rating', c: 'rgba(255,255,255,.55)' },
+];
 function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
 	const commonQ = useSQLQuery(focusCombosSQL(name, 12));
 	const knownQ = useSQLQuery(knownMixSQL(name));
-	const [pick, setPick] = useState<string | null>(null);
 	const known = rows(knownQ).map((r) => ({ rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
 	const mixes = rows(commonQ).map((r) => {
 		const g = known.find((k) => k.members.includes(S(r.s)));
 		const sev = r.sev != null ? N(r.sev) : r.status ? 0 : -1;
 		return { key: S(r.s), label: short(S(r.s)), sev, n: N(r.n), status: S(r.status) || g?.status || '', note: S(r.note) || (sev >= 0 ? g?.note ?? '' : ''), r };
 	});
-	if (commonQ.isLoading || knownQ.isLoading) return <Loading height={300} className="mt-5" quiet />;
-	if (!mixes.length) return <EmptyNote>No combinations on record yet.</EmptyNote>;
-	const maxN = Math.max(1, ...mixes.map((m) => m.n));
+	const head = <ArticleH2 icon={Link2} sub="What people mix it with, and how risky TripSit rates each mix.">Mixing</ArticleH2>;
+	if (commonQ.isLoading || knownQ.isLoading)
+		return (
+			<section id="mixes" className="mt-24" style={{ scrollMarginTop: 16 }}>
+				{head}
+				<Loading height={300} className="mt-5" quiet />
+			</section>
+		);
+	if (!mixes.length) return null;
 	const risky = mixes.filter((m) => m.sev >= 2);
-	const top = mixes.slice(0, 3).map((m) => m.label);
+	const top = [...mixes].sort((a, b) => b.n - a.n).slice(0, 3).map((m) => m.label);
 	return (
+		<section id="mixes" className="mt-24" style={{ scrollMarginTop: 16 }}>
+		{head}
 		<div className="mt-5">
 			<p style={{ color: C.soft, lineHeight: 1.6 }}>
 				People most often mix it with <b style={{ color: '#fff' }}>{top.slice(0, -1).join(', ')}{top.length > 1 ? ' and ' : ''}{top[top.length - 1]}</b>.{' '}
 				{risky.length ? `TripSit rates ${risky.map((m) => m.label).join(' and ')} as ${risky.some((m) => m.sev === 3) ? 'dangerous or unsafe' : 'unsafe'} with it.` : 'None of these common mixes is rated unsafe by TripSit.'}
 			</p>
-			<div className="mt-6" role="list">
-				{mixes.map((m) => {
-					const on = pick === m.key;
+			<div className="mt-8 grid gap-8">
+				{MIX_GROUPS.map((g) => {
+					const list = mixes.filter((m) => m.sev === g.sev).sort((a, b) => b.n - a.n);
+					if (!list.length) return null;
 					return (
-						<div key={m.key} role="listitem" style={{ borderTop: `1px solid ${C.line}` }}>
-							<button onClick={() => setPick(on ? null : m.key)} aria-expanded={on} className="rd-hover grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-2 py-3 text-left" style={{ gridTemplateColumns: 'minmax(110px, 1.1fr) minmax(0, 2fr) auto 16px' }}>
-								<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.key}>{m.label}</span>
-								<span className="flex min-w-0 items-center gap-3">
-									<span className="block flex-1" style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,.07)', maxWidth: 260 }}>
-										<span className="block h-full" style={{ width: `${Math.max(3, (100 * m.n) / maxN)}%`, borderRadius: 3, background: 'rgba(255,255,255,.55)' }} />
-									</span>
-									<span className="text-xs tabular-nums" style={{ color: C.faint, whiteSpace: 'nowrap' }}>{m.n.toLocaleString()} stories</span>
-								</span>
-								<span style={{ whiteSpace: 'nowrap' }}>
-									{m.sev >= 1 ? <RiskPill sev={m.sev} small /> : m.sev === 0 ? <span className="text-xs font-semibold" style={{ color: C.mint }}>Low risk</span> : <span className="text-xs" style={{ color: C.faint }}>No rating</span>}
-								</span>
-								<ChevronDown size={14} color={C.faint} style={{ transform: on ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
-							</button>
-							{on && (
-								<div className="rd-fade grid gap-3 px-2 pb-5 pt-1">
-									{m.sev >= 0 ? (
-										<p style={{ lineHeight: 1.6 }}>
-											<b>{TS_PHRASE[m.status] ?? ''}</b> <span style={{ color: C.soft }}>{m.note || TS_FALLBACK[m.sev] || ''}</span>
+						<div key={g.sev}>
+							<div className="mb-2 flex items-center gap-2 text-sm font-semibold" style={{ color: g.c }}>
+								{g.sev >= 1 ? <AlertTriangle size={14} strokeWidth={2.5} /> : <span className="rd-dot" style={{ width: 8, height: 8, background: g.c }} />}
+								{g.label}
+								<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{list.length}</span>
+							</div>
+							{list.map((m) => (
+								<div key={m.key} className="grid items-start gap-x-6 py-3" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto', borderTop: `1px solid ${C.line}` }}>
+									<div className="min-w-0">
+										<div className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.key}>{m.label}</div>
+										<p className="mt-0.5 text-sm" style={{ color: C.soft, lineHeight: 1.55, maxWidth: 680 }}>
+											{m.sev >= 0 ? m.note || TS_FALLBACK[m.sev] || TS_PHRASE[m.status] || '' : 'TripSit’s chart doesn’t rate this pair. That doesn’t make it safe.'}
 										</p>
-									) : (
-										<p className="text-sm" style={{ color: C.soft }}>TripSit’s chart doesn’t rate this pair. That doesn’t make it safe.</p>
-									)}
-									<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-										<OutcomeBar pos={m.r.pos} neg={m.r.neg} n={N(m.r.n_llm)} />
-										<button className="rd-btn text-sm" style={{ background: '#fff', color: C.deep }} onClick={() => onCombo(name, m.key)}>
-											Read the stories
-										</button>
+										{N(m.r.n_llm) >= 3 && (
+											<p className="mt-1 text-xs tabular-nums" style={{ color: C.faint }}>
+												In the stories: <span style={{ color: C.mint }}>{Math.round(100 * N(m.r.pos))}% went well</span>, <span style={{ color: C.coral }}>{Math.round(100 * N(m.r.neg))}% rough</span>
+											</p>
+										)}
 									</div>
+									<button onClick={() => onCombo(name, m.key)} className="text-sm tabular-nums" style={{ color: '#fff', whiteSpace: 'nowrap', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.3)', textUnderlineOffset: 4 }} title={`Read the stories with both ${m.label} and ${short(name)}`}>
+										{m.n.toLocaleString()} {m.n === 1 ? 'story' : 'stories'} →
+									</button>
 								</div>
-							)}
+							))}
 						</div>
 					);
 				})}
 			</div>
-			<p className="mt-4 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint, borderTop: `1px solid ${C.line}`, paddingTop: 14 }}>
+			<p className="mt-6 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint }}>
 				Ratings from TripSit; numbers from our stories. Pairs TripSit warns about that people rarely mix are under Known Risks.
 				<TripSitBadge />
 			</p>
 		</div>
+		</section>
 	);
 }
 
@@ -2708,7 +2724,7 @@ function SubstanceEffects({ name }: { name: string }) {
 	const [all, setAll] = useState<Record<string, boolean>>({});
 	const list = rows(q);
 	if (q.isLoading) return <Loading height={220} className="mt-5" quiet />;
-	if (!list.length) return <EmptyNote>Not enough closely read stories to say yet.</EmptyNote>;
+	if (!list.length) return null;
 	const n = N(list[0].n_stories);
 	const groups = new Map<string, Record<string, unknown>[]>();
 	for (const r of list) {
@@ -2770,7 +2786,8 @@ function describeSubstance(name: string, r: Record<string, unknown>, timing: Rec
 	const kind = [cls.join(' and '), chem[0] ? `from the ${chem[0].toLowerCase()} family` : ''].filter(Boolean).join(' ');
 	const article = /^[aeiou]/i.test(kind) ? 'An' : 'A';
 	const group = isGroup(name);
-	const kindLine = group ? 'A group of drugs, not a single one, so effects and timing vary a lot between them.' : kind ? `${article} ${kind}.` : '';
+	// The line under the name: dose.wiki's opening sentence when there is one, otherwise what kind of drug it is.
+	const kindLine = group ? 'A group of drugs, not a single one, so effects and timing vary a lot between them.' : S(r.lead) || (kind ? `${article} ${kind}.` : '');
 	const desc = [
 		kindLine,
 		t && !group ? `In reports, people usually notice it within ${fmtDur(N(t.on_m))}, feel it most around ${fmtDur(N(t.pk_m))}, and it fades by about ${fmtDur(N(t.end_m))}.` : '',
@@ -2927,13 +2944,13 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 			{(tolZero || tolFull) && (
 				<li>
 					<span className="rd-label">{tolZero ? 'Tolerance resets in' : 'Tolerance'}</span>
-					<span className="v">{tolZero || 'Builds up'}</span>
+					<span className="v">{tolZero || (/^does not/i.test(tolFull) ? 'Barely builds' : 'Builds up')}</span>
 					{tolFull && <span className="s">{toleranceLine(tolFull)}</span>}
 				</li>
 			)}
 			{L(r.cross_tol).length > 0 && <CrossTolLine name={name} />}
 			<li>
-				<span className="rd-label">Stories</span>
+				<span className="rd-label">Experiences</span>
 				<span className="v tabular-nums">{N(r.n_reports).toLocaleString()}</span>
 				<span className="s">{N(r.n_read).toLocaleString()} read closely</span>
 			</li>
@@ -3013,7 +3030,8 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 						</div>
 					)}
 				</div>
-				{!molecule && <div className="mt-12">{glance}</div>}
+				{!molecule && N(r.n_reports) > 0 && <div className="mt-12">{glance}</div>}
+				{N(r.n_reports) === 0 && (S(r.name) || N(r.n_read) > 0 ? <EmptyNote className="mt-10" suggest={name} /> : <NotFound what="substance" name={name} />)}
 				{warning && (
 					<div className="mt-12 flex items-start gap-3 rounded-2xl px-5 py-4" style={{ background: 'rgba(255,110,130,.14)', border: '1px solid rgba(255,125,142,.4)', lineHeight: 1.5 }}>
 						<AlertTriangle size={17} color={RISK[3].c} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -3021,10 +3039,7 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 					</div>
 				)}
 			</section>
-			<section id="dosage" className="mt-24" style={{ scrollMarginTop: 16 }}>
-				<ArticleH2 icon={Clock}>Dosage &amp; Duration</ArticleH2>
-				<DosageDuration name={name} timing={rows(timingQ)} />
-			</section>
+			<DosageDuration name={name} timing={rows(timingQ)} />
 			{afterDosage}
 		</>
 	);
@@ -3104,77 +3119,122 @@ WHERE substance = '${esc(name)}'
   AND NOT regexp_matches(lower(coalesce(description, '')), 'pipe|crew|sham|seller|dealer|user|vial|paraphernalia|equipment|house|amount|price|person|police|addict|buy|sell|smok|inject|money')
 ORDER BY combo, len(sources) DESC, term`;
 
+// Every name it goes by, grouped by kind (chemical, brand, slang, mixes), each with where it's listed. Kinds were
+// sorted by an AI model (aliases/load_aliases.py); a mix is whatever the slang lists themselves flag as one.
+const aliasesSQL = (name: string) => `
+SELECT a.alias,
+  CASE WHEN coalesce(sn.is_combo, false) THEN 'mix'
+       WHEN a.kind = 'chemical' AND NOT (list_contains(a.sources, 'psychonautwiki') OR list_contains(a.sources, 'pubchem')) THEN 'slang'
+       ELSE a.kind END AS kind, a.sources,
+  coalesce(sn.ai_model IS NOT NULL, false) AS ai, sn.citations, sn.description
+FROM ${DB}."substance_aliases" a
+LEFT JOIN ${DB}."street_names" sn ON sn.substance = a.substance AND lower(sn.street_name) = lower(a.alias)
+WHERE a.substance = '${esc(name)}' AND lower(a.alias) <> lower('${esc(name)}')
+QUALIFY row_number() OVER (PARTITION BY lower(a.alias) ORDER BY len(a.sources) DESC) = 1
+ORDER BY len(a.sources) DESC, a.alias`;
+// Line-art doodles for the alias groups, coloured in loosely (the colour sits a little off the lines, like marker).
+function AliasDoodle({ kind }: { kind: string }) {
+	const ink = { fill: 'none', stroke: '#fff', strokeWidth: 2.2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+	return (
+		<svg width="44" height="44" viewBox="0 0 48 48" aria-hidden style={{ flexShrink: 0, overflow: 'visible' }}>
+			{kind === 'brand' && (
+				<>
+					<path d="M17 19h17l1 21c0 2-1 3-3 3H18c-2 0-3-1-3-3z" fill={C.mint} opacity="0.75" transform="translate(2 2) rotate(-3 24 30)" />
+					<rect x="12" y="7" width="22" height="8" rx="2" {...ink} />
+					<path d="M14 15h18l1 23c0 2-1 3-3 3H16c-2 0-3-1-3-3z" {...ink} />
+					<path d="M17 24h12M17 29h8" {...ink} strokeWidth={1.6} />
+				</>
+			)}
+			{kind === 'chemical' && (
+				<>
+					<path d="M15 31h18l5 8c1 2 0 4-2 4H12c-2 0-3-2-2-4z" fill={C.coral} opacity="0.8" transform="translate(2 1) rotate(4 24 36)" />
+					<path d="M19 6h10M21 6v12L10 39c-1 2 0 4 2 4h24c2 0 3-2 2-4L27 18V6" {...ink} />
+					<path d="M15 30h18" {...ink} strokeWidth={1.6} />
+					<circle cx="22" cy="36" r="1.4" fill="#fff" />
+					<circle cx="28" cy="34" r="1" fill="#fff" />
+				</>
+			)}
+			{kind === 'slang' && (
+				<>
+					<path d="M8 12c0-3 2-5 5-5h22c3 0 5 2 5 5v14c0 3-2 5-5 5H22l-8 7v-7h-1c-3 0-5-2-5-5z" fill={C.lav} opacity="0.7" transform="translate(3 3)" />
+					<path d="M6 10c0-3 2-5 5-5h22c3 0 5 2 5 5v14c0 3-2 5-5 5H20l-8 7v-7h-1c-3 0-5-2-5-5z" {...ink} />
+					<path d="M14 15h16M14 20h10" {...ink} strokeWidth={1.6} />
+				</>
+			)}
+			{kind === 'mix' && (
+				<>
+					<rect x="6" y="18" width="26" height="12" rx="6" fill={C.cyan} opacity="0.7" transform="translate(2 2) rotate(-20 19 24)" />
+					<g transform="rotate(-20 19 24)">
+						<rect x="6" y="18" width="26" height="12" rx="6" {...ink} />
+						<path d="M19 18v12" {...ink} />
+					</g>
+					<g transform="rotate(25 30 28)">
+						<rect x="18" y="22" width="24" height="11" rx="5.5" {...ink} />
+						<path d="M30 22v11" {...ink} />
+					</g>
+				</>
+			)}
+		</svg>
+	);
+}
+const ALIAS_KINDS = [
+	{ k: 'chemical', label: 'Chemical names' },
+	{ k: 'brand', label: 'Brand names' },
+	{ k: 'slang', label: 'Slang' },
+	{ k: 'mix', label: 'Names for mixes' },
+];
+const ALIAS_SOURCE: Record<string, string> = { psychonautwiki: 'PsychonautWiki', pubchem: 'PubChem', dea: 'DEA', noslang: 'NoSlang', dope_lookup: 'Dope Lookup', lists: 'slang lists' };
 function SlangSection({ name }: { name: string }) {
-	const q = useSQLQuery(slangSQL(name));
-	const [pick, setPick] = useState<string>('all');
-	const [all, setAll] = useState(false);
-	const list = rows(q).map((r) => ({ term: S(r.term), combo: !!r.combo, ai: !!r.ai, src: L(r.sources).map(String), cite: S(r.citations) }));
+	const q = useSQLQuery(aliasesSQL(name));
+	const [all, setAll] = useState<Record<string, boolean>>({});
+	const list = rows(q).map((r) => ({ term: S(r.alias), kind: S(r.kind), src: L(r.sources).map(String), ai: !!r.ai, cite: S(r.citations), desc: S(r.description) }));
 	if (!list.length) return null;
-	const count = (k: string) => list.filter((r) => (k === 'ai' ? r.ai : r.src.includes(k))).length;
-	const filters = [['all', 'All', list.length], ...Object.keys(SLANG_SOURCES).map((k) => [k, SLANG_SOURCES[k].name, count(k)]), ['ai', 'Matched by AI', count('ai')]].filter(([, , n]) => n) as [string, string, number][];
-	const shown = list.filter((r) => pick === 'all' || (pick === 'ai' ? r.ai : r.src.includes(pick)));
 	const cell = (r: (typeof list)[number]) => (
 		<div key={r.term} className="min-w-0 py-1">
 			<div className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.term}>{r.term}</div>
 			<div className="mt-0.5 text-xs" style={{ color: C.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-				{r.ai ? (
-					/^https?:/.test(r.cite) ? (
-						<a href={r.cite} target="_blank" rel="noopener noreferrer" style={{ color: C.faint, textDecoration: 'underline', textUnderlineOffset: 3 }}>Matched by AI · source ↗</a>
-					) : 'Matched by AI'
+				{r.kind === 'mix' && r.desc ? (
+					<span title={r.desc}>{r.desc}</span>
+				) : r.ai && /^https?:/.test(r.cite) ? (
+					<a href={r.cite} target="_blank" rel="noopener noreferrer" style={{ color: C.faint, textDecoration: 'underline', textUnderlineOffset: 3 }}>matched by AI · source ↗</a>
 				) : (
-					Object.keys(SLANG_SOURCES).filter((k) => r.src.includes(k)).map((k) => SLANG_SOURCES[k].name).join(' · ')
+					['psychonautwiki', 'pubchem', 'dea', 'noslang', 'dope_lookup', 'lists'].filter((k) => r.src.includes(k)).map((k) => ALIAS_SOURCE[k]).join(' · ')
 				)}
 			</div>
 		</div>
 	);
-	const names = shown.filter((r) => !r.combo), mixes = shown.filter((r) => r.combo);
-	const cap = all ? Infinity : 48;
-	const grid = 'mt-4 grid gap-x-6 gap-y-2';
-	const cols = { gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))' };
 	return (
 		<section id="slang" className="mt-24" style={{ scrollMarginTop: 16 }}>
-			<ArticleH2 icon={MessageCircle} sub="What people call it on the street, and which public lists each name comes from. Slang changes fast and varies by place.">Slang</ArticleH2>
-			<div className="mt-5">
-				<div className="flex flex-wrap gap-2">
-					{filters.map(([k, label, n]) => (
-						<button key={k} className="rd-nav" aria-current={pick === k ? 'page' : undefined} onClick={() => setPick(k)} style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }}>
-							{label} <span style={{ color: C.faint }}>{n}</span>
-						</button>
-					))}
-				</div>
-				{names.length > 0 && (
-					<div className={grid} style={cols}>
-						{names.slice(0, cap).map(cell)}
-					</div>
-				)}
-				{mixes.length > 0 && names.length < cap && (
-					<>
-						<div className="rd-label mt-6">Names for mixes</div>
-						<div className={grid} style={cols}>
-							{mixes.slice(0, Math.max(0, cap - names.length)).map(cell)}
-						</div>
-					</>
-				)}
-				{shown.length > 48 && (
-					<button className="rd-btn mt-4 text-sm" onClick={() => setAll(!all)}>
-						{all ? 'Show fewer' : `Show all ${shown.length}`}
-					</button>
-				)}
-				<p className="mt-5 text-xs" style={{ color: C.faint, lineHeight: 1.6 }}>
-					From{' '}
-					{Object.values(SLANG_SOURCES).map((src, i, arr) => (
-						<Fragment key={src.name}>
-							{i > 0 && (i === arr.length - 1 ? ' and ' : ', ')}
-							{src.href ? (
-								<a href={src.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>{src.about}</a>
-							) : (
-								src.about
+			<ArticleH2 icon={MessageCircle} sub="Every name it goes by, and where each one is listed. Slang changes fast and varies by place.">Aliases</ArticleH2>
+			<div className="mt-8 grid gap-10">
+				{ALIAS_KINDS.map((g) => {
+					const items = list.filter((r) => r.kind === g.k);
+					if (!items.length) return null;
+					const cap = all[g.k] ? Infinity : g.k === 'slang' ? 36 : 18;
+					return (
+						<div key={g.k}>
+							<div className="flex items-center gap-3 text-sm font-semibold">
+								<AliasDoodle kind={g.k} />
+								<span>{g.label}</span>
+								<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{items.length}</span>
+							</div>
+							<div className="mt-3 grid gap-x-6 gap-y-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))' }}>
+								{items.slice(0, cap).map(cell)}
+							</div>
+							{items.length > cap && (
+								<button className="rd-btn mt-3 text-sm" onClick={() => setAll({ ...all, [g.k]: true })}>
+									Show all {items.length}
+								</button>
 							)}
-						</Fragment>
-					))}
-					. Names that describe paraphernalia or dealing are left out. Names matched by AI link to the page they were matched from.
-				</p>
+						</div>
+					);
+				})}
 			</div>
+			<p className="mt-8 text-xs" style={{ color: C.faint, lineHeight: 1.6 }}>
+				From PsychonautWiki’s common names, PubChem’s chemical name and public slang lists (the{' '}
+				<a href={SLANG_SOURCES.dea.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>DEA</a>,{' '}
+				<a href={SLANG_SOURCES.noslang.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>NoSlang</a> and Dope Lookup). Which kind each name is was sorted by AI, so the odd one may be misfiled. Names about paraphernalia or dealing are left out.
+			</p>
 		</section>
 	);
 }
@@ -3453,7 +3513,7 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport }: { subs: Record<
 				<div className="mt-2 overflow-y-auto rounded-2xl p-1.5" style={{ maxHeight: '62vh', background: C.panel, border: `1px solid ${C.line}`, boxShadow: '0 20px 50px rgba(10,4,40,.5)' }}>
 					{group('Substances', subHits, 0)}
 					{group('Effects', effHits, subHits.length)}
-					{group('Stories', repHits, subHits.length + effHits.length)}
+					{group('Experiences', repHits, subHits.length + effHits.length)}
 					{(searching || repQ.isLoading) && <div className="px-3 py-2 text-xs" style={{ color: C.faint }}>Searching stories…</div>}
 					{!items.length && !searching && !repQ.isLoading && <div className="px-3 py-3 text-sm" style={{ color: C.faint }}>Nothing found for “{q.trim()}”.</div>}
 				</div>
@@ -3498,7 +3558,7 @@ function StoriesBrowse({ onOpen }: { onOpen: (id: string, sub: string) => void }
 	];
 	return (
 		<section className="rd-in">
-			<h1 className="text-4xl font-semibold">Stories</h1>
+			<h1 className="text-4xl font-semibold">Experiences</h1>
 			<p className="mt-2" style={{ color: C.soft }}>
 				Real experiences, in the words of the people who had them. Pick one to replay it.
 			</p>
@@ -3848,19 +3908,27 @@ function pwIsMin(p: Record<string, unknown>, key: string): boolean {
 	// Peak and offset: longer than the whole experience must be minutes.
 	return total > 0 ? top > total : top > 24;
 }
-const pwDur = (v: unknown, minutes: boolean) => {
+// Read as minutes, a stage longer than the whole experience must be seconds (injected DMT's "70-100" come-up).
+function pwIsSec(p: Record<string, unknown>, key: string): boolean {
+	if (key === 'duration_total' || key === 'duration_aftereffects' || !pwIsMin(p, key)) return false;
+	const total = pwTop(p.duration_total) / (pwIsMin(p, 'duration_total') ? 60 : 1);
+	return total > 0 && pwTop(p[key]) / 60 > total;
+}
+// unit: true = minutes, 'sec' = seconds, false = hours.
+const pwDur = (v: unknown, minutes: boolean | 'sec') => {
 	const t = S(v).trim();
 	if (!t) return '';
 	const [a, b] = t.split('-').map((x) => num(x));
 	const range = b && b !== a ? `${a}–${b}` : a;
-	return `${range} ${minutes ? 'min' : Number(b || a) === 1 ? 'hour' : 'hours'}`;
+	return `${range} ${minutes === 'sec' ? 'sec' : minutes ? 'min' : Number(b || a) === 1 ? 'hour' : 'hours'}`;
 };
-const pwHours = (v: unknown, minutes: boolean) => {
+const pwHours = (v: unknown, minutes: boolean | 'sec') => {
 	const [a, b] = S(v).split('-').map(Number);
 	if (!Number.isFinite(a)) return 0;
 	const mid = Number.isFinite(b) ? (a + b) / 2 : a;
-	return minutes ? mid / 60 : mid;
+	return minutes === 'sec' ? mid / 3600 : minutes ? mid / 60 : mid;
 };
+const pwUnit = (p: Record<string, unknown>, key: string): boolean | 'sec' => (pwIsSec(p, key) ? 'sec' : pwIsMin(p, key));
 // PsychonautWiki's phases (onset, come-up, peak, offset) in hours, for the duration chart and its stages.
 const pwPhases = (p: Record<string, unknown>) =>
 	(
@@ -3871,7 +3939,7 @@ const pwPhases = (p: Record<string, unknown>) =>
 			['Offset', 'duration_offset', 'rgba(217,207,255,.55)'],
 		] as const
 	)
-		.map(([label, key, color]) => [label, pwHours(p[key], pwIsMin(p, key)), pwDur(p[key], pwIsMin(p, key)), color] as [string, number, string, string])
+		.map(([label, key, color]) => [label, pwHours(p[key], pwUnit(p, key)), pwDur(p[key], pwUnit(p, key)), color] as [string, number, string, string])
 		.filter(([, h]) => h > 0);
 // Dose ranges as rows that grow left to right: threshold, light, common, strong, heavy, each bar longer than the last,
 // its range at the end.
@@ -4132,9 +4200,18 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	const stage = stages.find((st) => pt >= st.from && pt < st.to);
 	const waiting = stages.length > 0 && pt < stages[0].from;
 	// Early returns only after every hook, so the hook order never changes between loading and loaded.
-	if (q.isLoading) return <Loading height={260} className="mt-5" quiet />;
-	if (!p && !t) return <EmptyNote>No dose or timing information on file yet.</EmptyNote>;
+	const head = <ArticleH2 icon={Clock}>Dosage &amp; Duration</ArticleH2>;
+	if (q.isLoading)
+		return (
+			<section id="dosage" className="mt-24" style={{ scrollMarginTop: 16 }}>
+				{head}
+				<Loading height={260} className="mt-5" quiet />
+			</section>
+		);
+	if (!p && !t) return null;
 	return (
+		<section id="dosage" className="mt-24" style={{ scrollMarginTop: 16 }}>
+		{head}
 		<div className="mt-5">
 			{routes.length > 0 && (
 				<div className="flex flex-wrap gap-2">
@@ -4245,6 +4322,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 				</div>
 			</div>
 		</div>
+		</section>
 	);
 }
 
@@ -4480,8 +4558,14 @@ function SubstanceReferences({ name }: { name: string }) {
 
 // Legal status by country, from dose.wiki (CC0): grouped by what the status means, each with dose.wiki's own wording;
 // open a country for the note behind it.
+const legalityIntlSQL = (name: string) => `SELECT statement FROM ${DB}."substance_legality_international" WHERE substance = '${esc(name)}'`;
+// "United States - Florida", "United States (Florida)": a local rule, shown under its country.
+const localOf = (c: string) => {
+	const m = c.match(/^(United States|Canada|Australia|United Kingdom|Germany|Switzerland)\s*(?:-|\()\s*([^)]+?)\)?$/);
+	return m ? { parent: m[1], region: m[2] } : null;
+};
 const legalitySQL = (name: string) => `
-SELECT country, status, status_group, notes, source_url FROM ${DB}."substance_legality" WHERE substance = '${esc(name)}' ORDER BY country`;
+SELECT country, status, status_group, notes, source_url, fetched_at FROM ${DB}."substance_legality" WHERE substance = '${esc(name)}' ORDER BY country`;
 const LEGAL_GROUPS: { k: string; label: string; c: string }[] = [
 	{ k: 'illegal', label: 'Illegal or controlled', c: '#ff9aab' },
 	{ k: 'prescription', label: 'Prescription only', c: C.amber },
@@ -4490,10 +4574,124 @@ const LEGAL_GROUPS: { k: string; label: string; c: string }[] = [
 	{ k: 'legal', label: 'Not controlled', c: C.mint },
 	{ k: 'unclear', label: 'Unclear', c: 'rgba(255,255,255,.5)' },
 ];
+// A world map of legal status: outlines only, coloured by group, hatched where it's decriminalized or unclear, faint
+// where there's nothing on file. Hover or tap a country for its status and note.
+const worldSQL = `SELECT country, geojson FROM ${DB}."world_countries"`;
+const LEGAL_FILL: Record<string, string> = { illegal: 'rgba(255,154,171,.55)', prescription: 'rgba(255,213,154,.5)', restricted: 'rgba(255,176,114,.5)', decriminalized: 'url(#lg-hatch-lav)', legal: 'rgba(166,242,228,.5)', unclear: 'url(#lg-hatch-grey)' };
+const countryKey = (c: string) => ({ 'russian federation': 'russia', 'slovak republic': 'slovakia' } as Record<string, string>)[c.toLowerCase()] ?? c.toLowerCase();
+function LegalityMap({ list, locals = [], here, setHere, pick, setPick }: { list: Record<string, unknown>[]; locals?: Record<string, unknown>[]; here: string | null; setHere: (c: string | null) => void; pick: string | null; setPick: (c: string | null) => void }) {
+	const q = useSQLQuery(worldSQL);
+	const feats = useMemo(
+		() =>
+			rows(q).flatMap((r) => {
+				try {
+					return [{ type: 'Feature' as const, properties: { name: S(r.country) }, geometry: JSON.parse(S(r.geojson)) }];
+				} catch {
+					return [];
+				}
+			}),
+		[q.data],
+	);
+	const shapes = useMemo(() => {
+		if (!feats.length) return [];
+		const W = 960, H = 470;
+		const proj = d3.geoNaturalEarth1().fitExtent([[4, 4], [W - 4, H - 4]], { type: 'FeatureCollection', features: feats } as never);
+		const path = d3.geoPath(proj);
+		return feats.map((f) => ({ name: f.properties.name, d: path(f as never) ?? '' }));
+	}, [feats]);
+	if (q.isLoading) return <Loading height={300} className="mt-6" quiet />;
+	if (!shapes.length) return null;
+	const by = new Map(list.map((r) => [countryKey(S(r.country)), r]));
+	const focus = here ?? pick;
+	const fr = focus ? by.get(countryKey(focus)) : undefined;
+	const fg = fr ? LEGAL_GROUPS.find((g) => g.k === S(fr.status_group)) : undefined;
+	return (
+		<div className="mt-6">
+			<svg viewBox="0 0 960 470" width="100%" style={{ display: 'block', maxHeight: 460 }} role="img" aria-label="World map of legal status" onMouseLeave={() => setHere(null)}>
+				<defs>
+					<pattern id="lg-hatch-lav" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+						<rect width="6" height="6" fill="rgba(217,207,255,.12)" />
+						<line x1="0" y1="0" x2="0" y2="6" stroke="#d9cfff" strokeWidth="2.2" />
+					</pattern>
+					<pattern id="lg-hatch-grey" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+						<line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,255,255,.45)" strokeWidth="1.4" />
+					</pattern>
+				</defs>
+				{shapes.map((sh) => {
+					const r = by.get(countryKey(sh.name));
+					const g = r ? S(r.status_group) : '';
+					const col = LEGAL_GROUPS.find((x) => x.k === g)?.c;
+					const on = !!focus && countryKey(focus) === countryKey(sh.name);
+					return (
+						<path
+							key={sh.name}
+							d={sh.d}
+							fill={r ? LEGAL_FILL[g] ?? 'transparent' : 'transparent'}
+							stroke={on ? '#fff' : r ? col : 'rgba(255,255,255,.2)'}
+							strokeWidth={on ? 1.6 : r ? 0.9 : 0.6}
+							style={{ cursor: r ? 'pointer' : 'default', transition: 'stroke .15s' }}
+							onMouseEnter={() => setHere(sh.name)}
+							onClick={() => setPick(pick === sh.name ? null : sh.name)}
+						>
+							<title>{r ? `${sh.name}: ${S(r.status)}` : `${sh.name}: nothing on file`}</title>
+						</path>
+					);
+				})}
+			</svg>
+			<div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs" style={{ color: C.soft }}>
+				{LEGAL_GROUPS.filter((g) => list.some((r) => S(r.status_group) === g.k)).map((g) => (
+					<span key={g.k} className="flex items-center gap-1.5">
+						<svg width="14" height="10" aria-hidden>
+							<rect x="0.5" y="0.5" width="13" height="9" rx="2" fill={LEGAL_FILL[g.k].startsWith('url') ? (g.k === 'decriminalized' ? 'rgba(217,207,255,.35)' : 'rgba(255,255,255,.15)') : LEGAL_FILL[g.k]} stroke={g.c} />
+						</svg>
+						{g.label}
+					</span>
+				))}
+				<span className="flex items-center gap-1.5" style={{ color: C.faint }}>
+					<svg width="14" height="10" aria-hidden>
+						<rect x="0.5" y="0.5" width="13" height="9" rx="2" fill="none" stroke="rgba(255,255,255,.3)" />
+					</svg>
+					Nothing on file
+				</span>
+			</div>
+			<div className="mt-4 overflow-hidden rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,.05)', height: 118 }}>
+				{focus ? (
+					<>
+						<div className="flex flex-wrap items-baseline gap-x-3">
+							<span className="font-semibold">{focus}</span>
+							<span className="text-sm" style={{ color: fg?.c ?? C.faint }}>{fr ? S(fr.status) : 'Nothing on file'}</span>
+						</div>
+						{locals.filter((l) => localOf(S(l.country))?.parent === focus).map((l) => (
+							<p key={S(l.country)} className="mt-1 text-xs" style={{ color: C.soft }}>
+								<b style={{ color: '#fff' }}>{localOf(S(l.country))!.region}:</b> {S(l.status)}
+							</p>
+						))}
+						{fr && S(fr.notes) && (
+							<p className="mt-1 text-sm" style={{ color: C.soft, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={S(fr.notes)}>
+								{S(fr.notes)}
+							</p>
+						)}
+					</>
+				) : (
+					<span className="text-sm" style={{ color: C.faint }}>Hover or tap a country to see its status.</span>
+				)}
+			</div>
+		</div>
+	);
+}
+
 function SubstanceLegality({ name }: { name: string }) {
 	const q = useSQLQuery(legalitySQL(name));
-	const list = rows(q);
+	const intlQ = useSQLQuery(legalityIntlSQL(name));
+	const [here, setHere] = useState<string | null>(null);
+	const [pick, setPick] = useState<string | null>(null);
+	const all = rows(q);
+	const list = all.filter((r) => !localOf(S(r.country)));
+	const locals = all.filter((r) => localOf(S(r.country)));
+	const intl = rows(intlQ).map((r) => S(r.statement));
 	if (q.isLoading || !list.length) return null;
+	const first = LEGAL_GROUPS.map((g) => list.find((r) => S(r.status_group) === g.k)).find(Boolean);
+	const focus = here ?? pick ?? (first ? S(first.country) : null);
 	const by = (k: string) => list.filter((r) => S(r.status_group) === k);
 	const n = (k: string) => by(k).length;
 	const summary = [
@@ -4507,7 +4705,13 @@ function SubstanceLegality({ name }: { name: string }) {
 			<ArticleH2 icon={Scale} sub={`Of the ${list.length} countries on file, it’s ${summary.length > 1 ? summary.slice(0, -1).join(', ') + ' and ' + summary[summary.length - 1] : summary[0] ?? 'listed'}.`}>
 				Legal Status
 			</ArticleH2>
-			<div className="mt-8 grid gap-10">
+			{intl.length > 0 && (
+				<p className="mt-4 text-sm" style={{ color: C.soft, lineHeight: 1.6, maxWidth: 760 }}>
+					<b style={{ color: '#fff' }}>Internationally:</b> {intl.join(' ')}
+				</p>
+			)}
+			<LegalityMap list={list} locals={locals} here={here} setHere={setHere} pick={pick ?? (first ? S(first.country) : null)} setPick={setPick} />
+			<div className="mt-10 grid gap-10">
 				{LEGAL_GROUPS.filter((g) => n(g.k)).map((g) => (
 					<div key={g.k}>
 						<div className="flex items-center gap-2 text-sm font-semibold" style={{ color: g.c }}>
@@ -4516,15 +4720,27 @@ function SubstanceLegality({ name }: { name: string }) {
 							<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{n(g.k)}</span>
 						</div>
 						<div className="mt-3 grid gap-x-6 gap-y-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
-							{by(g.k).map((r) => (
-								<details key={S(r.country)} className="rd-legal min-w-0 rounded-lg px-2 py-1.5" style={{ marginLeft: -8 }}>
-									<summary className="flex cursor-pointer items-baseline justify-between gap-3" style={{ listStyle: 'none' }}>
-										<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{S(r.country)}</span>
-										<span className="text-xs" style={{ color: C.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '55%' }} title={S(r.status)}>{S(r.status)}</span>
-									</summary>
-									{S(r.notes) && <p className="mt-1.5 text-sm" style={{ color: C.soft, lineHeight: 1.55 }}>{S(r.notes)}</p>}
-								</details>
-							))}
+							{by(g.k).map((r) => {
+								const c = S(r.country);
+								const on = !!focus && countryKey(focus) === countryKey(c);
+								return (
+									<button
+										key={c}
+										className="flex min-w-0 items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-left"
+										style={{ marginLeft: -8, background: on ? 'rgba(255,255,255,.1)' : 'transparent', transition: 'background .15s' }}
+										onMouseEnter={() => setHere(c)}
+										onMouseLeave={() => setHere(null)}
+										onClick={() => setPick(pick === c ? null : c)}
+										aria-pressed={pick === c}
+									>
+										<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+											{c}
+											{locals.some((l) => localOf(S(l.country))?.parent === c) && <span className="ml-2 text-xs font-normal" style={{ color: C.faint }}>+ local rules</span>}
+										</span>
+										<span className="text-xs" style={{ color: on ? g.c : C.faint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '55%' }} title={S(r.status)}>{S(r.status)}</span>
+									</button>
+								);
+							})}
 						</div>
 					</div>
 				))}
@@ -4532,7 +4748,7 @@ function SubstanceLegality({ name }: { name: string }) {
 			<p className="mt-8 text-xs" style={{ color: C.faint, lineHeight: 1.6 }}>
 				From{' '}
 				<a href={S(list[0].source_url)} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>dose.wiki (Effect Index)</a>
-				, shared under CC0. Laws change and can differ by state or region. This isn’t legal advice.
+				, shared under CC0, as of {new Date(S(list[0].fetched_at)).toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' })}. Laws change and can differ by state or region. This isn’t legal advice.
 			</p>
 		</section>
 	);
@@ -4646,7 +4862,7 @@ function habitLevel(text: string): { level: number; word: string } | null {
 // "almost immediately after ingestion" → "Builds almost immediately after a dose."
 function toleranceLine(full: string) {
 	const t = full.trim().replace(/after ingestion/i, 'after a dose').replace(/couse/, 'course');
-	if (/^does not/i.test(t)) return 'Barely builds up at all.';
+	if (/^does not/i.test(t)) return 'Doesn’t seem to build up with repeated use.';
 	const how = t.replace(/^rapidly develops\s+/i, 'rapidly ').replace(/^develops\s+/i, '');
 	return `Builds ${/^(with|within|after|almost|rapidly|over)\b/i.test(how) ? '' : 'with '}${how}.`;
 }
@@ -4805,12 +5021,20 @@ function Loading({ height = 200, className = '', quiet }: { height?: number; cla
 	);
 }
 
+// Something broke loading data: dizzy Spunion, a plain message, a way to try again, the technical detail tucked away.
 function Err({ q }: { q: { isError: boolean; error: unknown } }) {
 	if (!q.isError) return null;
 	return (
-		<p role="alert" className="mt-2 text-sm" style={{ color: C.coral }}>
-			{String(q.error)}
-		</p>
+		<div role="alert" className="flex flex-col items-center py-10 text-center">
+			<SpunionDizzy size={72} />
+			<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>SOMETHING WENT WRONG</div>
+			<div className="mt-1.5 text-sm" style={{ color: C.soft }}>This part didn’t load.</div>
+			<button className="rd-btn mt-4 text-sm" onClick={() => window.location.reload()}>Try again</button>
+			<details className="mt-3 text-xs" style={{ color: C.faint }}>
+				<summary style={{ cursor: 'pointer' }}>Details</summary>
+				<p className="mt-1 max-w-md">{String(q.error)}</p>
+			</details>
+		</div>
 	);
 }
 
@@ -5123,6 +5347,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	const [detail, setDetail] = useState(false);
 	const unfoldTimingQ = useSQLQuery(timingSQL(withSub ? [] : [sub]), { enabled: !withSub });
 	const unfoldPwQ = useSQLQuery(dosageSQL(withSub ? '' : sub), { enabled: !withSub });
+	const effectsListQ = useSQLQuery(substanceEffectsSQL(withSub ? '' : sub), { enabled: !withSub });
 	const { open } = useContext(OpenCtx);
 	const w = horizon / SLICES;
 	const { series, denom } = useMemo(() => {
@@ -5204,14 +5429,26 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 	const span = (lo: number, hi: number, last: boolean) => (last ? `after ${fmtDur(lo)}` : lo <= 0 ? `first ${fmtDur(hi)}` : `${fmtDur(lo)} – ${fmtDur(hi)}`);
 	// Below this, a curve over time is just a line between two points; show what's mentioned instead.
 	const enoughToChart = closeReads >= 10;
+	// Which stories the timeline and story list are built from: every story with it, or only ones where nothing else
+	// was taken.
 	const onlyToggle = (
 		<div className="flex flex-wrap items-center gap-2">
-			{[false, true].map((v) => (
-				<button key={String(v)} className="rd-nav" aria-current={only === v ? 'page' : undefined} onClick={() => setOnly(v)} style={{ fontSize: 13, padding: '5px 12px', border: `1px solid ${C.line}` }}>
-					{v ? (withSub ? 'Only these two' : `Only ${short(sub)}`) : withSub ? 'Any reports with both' : 'Any reports with it'}
-				</button>
-			))}
-			<span className="text-xs" style={{ color: C.faint }}>{only ? 'Nothing else taken' : 'May include other substances'}</span>
+			<span className="text-sm" style={{ color: C.faint }}>Based on</span>
+			<div className="inline-flex rounded-full p-0.5" style={{ background: 'rgba(255,255,255,.06)', border: `1px solid ${C.line}` }} role="radiogroup" aria-label="Which stories">
+				{[false, true].map((v) => (
+					<button
+						key={String(v)}
+						role="radio"
+						aria-checked={only === v}
+						onClick={() => setOnly(v)}
+						className="rounded-full px-3 py-1 text-sm"
+						style={{ background: only === v ? 'rgba(255,255,255,.16)' : 'transparent', color: only === v ? '#fff' : C.soft, fontWeight: only === v ? 600 : 500, whiteSpace: 'nowrap' }}
+					>
+						{v ? (withSub ? 'Stories with only these two' : `Stories with only ${short(sub)}`) : withSub ? 'All stories with both' : 'All stories with it'}
+					</button>
+				))}
+			</div>
+			<span className="text-xs" style={{ color: C.faint }}>{only ? 'nothing else taken' : 'other drugs may be involved'}</span>
 		</div>
 	);
 	const shuffle = () => list.length && onOpen(S(list[Math.floor(Math.random() * list.length)].report_id));
@@ -5250,7 +5487,10 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				)}
 				{!enoughToChart ? null : (
 				<>
-				<ol className="rd-stretches mt-8" style={{ ['--n' as string]: phases.length }}>
+				<p className="mt-5 text-sm" style={{ color: C.soft, lineHeight: 1.6, maxWidth: 720 }}>
+					A typical dose, split into the same stretches as the Duration card. Under each stretch: what people mention feeling most at that point, and the share of experiences that mention it.
+				</p>
+				<ol className="rd-stretches mt-6" style={{ ['--n' as string]: phases.length }}>
 					{phases.map((ph) => {
 						const mood = moodWord(ph.mood);
 						const max = Math.max(...ph.list.map((e) => e.v), 1);
@@ -5285,7 +5525,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					})}
 				</ol>
 				<p className="mt-6 text-xs" style={{ color: C.faint }}>
-					Stretches match the Duration card above. Bold effects are mentioned most in that stretch; mood is how its moments felt, on average.
+					Bold means that effect peaks in that stretch. Mood is how people felt during it, on average.
 				</p>
 				<button className="rd-btn mt-4 text-sm" onClick={() => setDetail(!detail)} aria-expanded={detail}>
 					{detail ? 'Hide the detailed chart' : 'Show the detailed chart'}
@@ -5366,22 +5606,17 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 								{ id: 'mixes', label: 'Mixing', icon: Link2 },
 								{ id: 'risks', label: 'Known Risks', icon: AlertTriangle },
 								{ id: 'legal', label: 'Legal Status', icon: Scale },
-								{ id: 'slang', label: 'Slang', icon: MessageCircle },
-								{ id: 'stories', label: 'Stories', icon: BookOpen },
+								{ id: 'slang', label: 'Aliases', icon: MessageCircle },
+								{ id: 'stories', label: 'Experiences', icon: BookOpen },
 								{ id: 'references', label: 'References', icon: FileText },
 							]}
 						/>
 					</div>
 				)}
 				<div className="min-w-0">
-			{!withSub && <SubstanceOverview name={sub} afterDosage={curveQ.isLoading || kq.isLoading ? <Loading height={320} className="mt-24" quiet /> : unfoldSection} />}
+			{!withSub && <SubstanceOverview name={sub} afterDosage={curveQ.isLoading || kq.isLoading ? <Loading height={320} className="mt-24" quiet /> : enoughToChart || rows(effectsListQ).length > 0 ? unfoldSection : null} />}
 			{!withSub && <SubstanceNumbers name={sub} />}
-			{!withSub && (
-				<section id="mixes" className="mt-24" style={{ scrollMarginTop: 16 }}>
-					<ArticleH2 icon={Link2} sub="What people mix it with, and how risky TripSit rates each mix.">Mixing</ArticleH2>
-					<MixingBoard name={sub} onCombo={onCombo} />
-				</section>
-			)}
+			{!withSub && <MixingBoard name={sub} onCombo={onCombo} />}
 			{!withSub && <KnownRisks name={sub} />}
 			{!withSub && <SubstanceLegality name={sub} />}
 			{!withSub && <SlangSection name={sub} />}
@@ -5440,7 +5675,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 							<p className="mt-1 text-sm" style={{ color: C.faint }}>What people went through, in their own words. Closely read ones first.</p>
 						</>
 					) : (
-						<ArticleH2 icon={BookOpen} sub="What people went through, in their own words. Closely read ones first.">Stories</ArticleH2>
+						<ArticleH2 icon={BookOpen} sub="What people went through, in their own words. Closely read ones first.">Experiences</ArticleH2>
 					)}
 				</div>
 				{!withSub && series.length === 0 && <div className="order-last w-full">{onlyToggle}</div>}
@@ -6292,8 +6527,8 @@ export function BouncingSpunion({ size = 96 }: { size?: number }) {
 		<span className="rd-loader" style={{ width: size, height: size }}>
 			<style>{BOUNCE_CSS}</style>
 			<span className="rd-floor" />
+			<span className="rd-ring" />
 			<span className="rd-bounce">
-				<span className="rd-halo" />
 				<SpunionGhost />
 			</span>
 		</span>
@@ -6399,14 +6634,87 @@ function SpunionPuzzle({ size = 72 }: { size?: number }) {
 	);
 }
 
-// "Nothing here": the white, puzzled Spunion centred in its box, NO DATA YET! under him, then what's missing.
-function EmptyNote({ children, className = 'mt-4' }: { children: React.ReactNode; className?: string }) {
+// A substance with data that might be the one you meant: shares a word with this name ("Tabernanthe iboga" →
+// Ibogaine), or one of them lists the other as an alias. Most-written-about first.
+const didYouMeanSQL = (name: string) => `
+WITH toks AS (SELECT t FROM unnest(string_split(regexp_replace(lower('${esc(name)}'), '[^a-z0-9 ]', ' ', 'g'), ' ')) AS x(t) WHERE len(t) >= 4),
+cand AS (
+  SELECT s.name FROM ${DB}."substances" s
+  WHERE s.name <> '${esc(name)}' AND (
+    EXISTS (SELECT 1 FROM toks WHERE contains(lower(s.name), t) OR starts_with(t, lower(s.name)))
+    OR EXISTS (SELECT 1 FROM ${DB}."substance_aliases" a WHERE a.substance = s.name AND lower(a.alias) = lower('${esc(name)}'))
+    OR EXISTS (SELECT 1 FROM ${DB}."substance_aliases" a WHERE a.substance = '${esc(name)}' AND lower(a.alias) = lower(s.name)))
+)
+SELECT c.name, count(DISTINCT d.report_id) AS n FROM cand c JOIN ${DB}."report_doses" d ON d.canonical_substance = c.name
+GROUP BY 1 HAVING count(DISTINCT d.report_id) > 0 ORDER BY n DESC LIMIT 1`;
+function DidYouMean({ name }: { name: string }) {
+	const go = useContext(GoCtx);
+	const q = useSQLQuery(didYouMeanSQL(name));
+	const hit = rows(q)[0];
+	if (!hit) return null;
+	return (
+		<div className="mt-2 text-sm" style={{ color: C.soft }}>
+			Did you mean{' '}
+			<button onClick={() => go(S(hit.name))} style={{ color: '#fff', fontWeight: 600, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.35)', textUnderlineOffset: 4 }}>
+				{short(S(hit.name))}
+			</button>
+			?
+		</div>
+	);
+}
+
+// "Nothing here": the white, puzzled Spunion centred in its box, NO DATA YET! under him, and maybe a "Did you mean…?".
+function EmptyNote({ children, className = 'mt-4', suggest }: { children?: React.ReactNode; className?: string; suggest?: string }) {
 	return (
 		<div className={`flex flex-1 flex-col items-center justify-center py-8 text-center ${className}`}>
 			<SpunionLost size={68} />
 			<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NO DATA YET!</div>
-			<div className="mt-1.5 max-w-sm text-sm" style={{ color: C.soft }}>{children}</div>
+			{children && <div className="mt-1.5 max-w-sm text-sm" style={{ color: C.soft }}>{children}</div>}
+			{suggest && <DidYouMean name={suggest} />}
 		</div>
+	);
+}
+
+// Spunion searching with a magnifying glass, for a page that doesn't exist.
+function SpunionSearching({ size = 96 }: { size?: number }) {
+	return (
+		<svg viewBox="0 0 560 500" width={(size * 560) / 500} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0, transform: 'rotate(6deg)' }}>
+			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" fillOpacity="0.94" />
+			<circle cx="170" cy="282" r="40" fill={C.deep} />
+			<circle cx="183" cy="295" r="12" fill="#fff" />
+			<g className="rd-piece">
+				<line x1="410" y1="320" x2="520" y2="440" stroke={C.deep} strokeWidth="34" strokeLinecap="round" />
+				<line x1="410" y1="320" x2="520" y2="440" stroke="#fff" strokeWidth="18" strokeLinecap="round" />
+				<circle cx="335" cy="240" r="98" fill="rgba(217,207,255,.35)" stroke={C.deep} strokeWidth="22" />
+				<circle cx="335" cy="240" r="98" fill="none" stroke="#fff" strokeWidth="8" />
+				<circle cx="335" cy="240" r="58" fill={C.deep} />
+				<circle cx="356" cy="260" r="17" fill="#fff" />
+			</g>
+		</svg>
+	);
+}
+// A page that doesn't exist (a substance or story we don't have).
+function NotFound({ what, name }: { what: string; name?: string }) {
+	return (
+		<div className="flex flex-col items-center py-16 text-center">
+			<SpunionSearching size={110} />
+			<div className="mt-6 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT FOUND</div>
+			<div className="mt-1.5 text-sm" style={{ color: C.soft }}>We don’t have a page for {name ? <>“{name}”</> : `that ${what}`}.</div>
+			{name && <DidYouMean name={name} />}
+		</div>
+	);
+}
+// Spunion dizzy, spirals for eyes, for when something breaks.
+function SpunionDizzy({ size = 64 }: { size?: number }) {
+	const spiral = (cx: number, cy: number, r: number) => `M${cx} ${cy} m0 ${-r * 0.15} a${r * 0.15} ${r * 0.15} 0 1 1 ${-r * 0.01} 0 a${r * 0.4} ${r * 0.4} 0 1 1 ${r * 0.55} ${r * 0.2} a${r * 0.7} ${r * 0.7} 0 1 1 ${-r * 1.2} ${-r * 0.3}`;
+	return (
+		<svg viewBox="0 0 500 500" width={size} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0, transform: 'rotate(-10deg)' }}>
+			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="#fff" fillOpacity="0.94" />
+			<g fill="none" stroke={C.deep} strokeWidth="18" strokeLinecap="round">
+				<path d={spiral(180, 290, 90)} />
+				<path d={spiral(345, 260, 70)} />
+			</g>
+		</svg>
 	);
 }
 
@@ -6632,7 +6940,7 @@ export default function ReportTimelapse() {
 			view === 'effects' ? effect || 'Effects'
 			: view === 'reports' && reportId ? `Story #${reportId.replace('erowid-', '')}`
 			: view === 'reports' && sub ? (withSub ? `${short(sub)} + ${short(withSub)}` : short(sub))
-			: view === 'reports' ? 'Stories'
+			: view === 'reports' ? 'Experiences'
 			: 'Substances';
 		document.title = `${page} – re:dose`;
 	}, [view, sub, withSub, reportId, effect]);
@@ -6648,6 +6956,7 @@ export default function ReportTimelapse() {
 	};
 
 	return (
+		<GoCtx.Provider value={goSubstance}>
 		<OpenCtx.Provider value={{ open: setOpenItem, effectInfo, classOf: (n: string) => classMap.get(n) }}>
 			<main className="rd" style={{ minHeight: '100vh', background: BG, color: C.text }}>
 				<style>{CSS}</style>
@@ -6677,7 +6986,7 @@ export default function ReportTimelapse() {
 							{(
 								[
 									['substances', 'Substances'],
-									['reports', 'Stories'],
+									['reports', 'Experiences'],
 									['effects', 'Effects'],
 								] as const
 							).map(([v, label]) => (
@@ -6738,6 +7047,10 @@ export default function ReportTimelapse() {
 							</div>
 						)}
 						<div className="flex flex-wrap items-center gap-4">
+							<a className="rd-thanks" href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" title="Talk things through with the re:dose community" style={{ color: C.soft }}>
+								<DiscordIcon size={15} />
+								Join us on Discord
+							</a>
 							<a className="rd-thanks" href={SOURCES.motherduck.href} target="_blank" rel="noopener noreferrer" title="MotherDuck runs the database behind re:dose. Not affiliated with re:dose." style={{ color: C.soft }}>
 								<img src={SOURCES.motherduck.logo} alt="" width={15} height={15} />
 								Powered by MotherDuck
@@ -6750,5 +7063,6 @@ export default function ReportTimelapse() {
 				{!openItem && <Spunion tips={spunionTips} lift={onReport} autoOpen={spunionSpeaks} />}
 			</main>
 		</OpenCtx.Provider>
+		</GoCtx.Provider>
 	);
 }
