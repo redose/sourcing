@@ -774,11 +774,16 @@ const CSS = `
   92% { text-shadow: 0 0 10px rgba(90,224,228,.55); }
   95% { text-shadow: 0 0 10px rgba(179,168,240,.5); }
 }
+/* Drifting letters (TripLetters): originals go invisible, their copies drift; now and then a letter catches colour. */
+[data-rd-letters], [data-rd-letters] * { color: transparent !important; text-shadow: none !important; }
+.rd-letters { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 5; }
+.rd-letters > span { position: absolute; white-space: pre; line-height: 1; animation-name: rd-letter, rd-tint; animation-timing-function: ease-in-out, linear; animation-iteration-count: infinite; }
+@keyframes rd-letter { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(var(--dx), var(--dy)) rotate(var(--r)); } }
 /* The background molecules slowly cycle through the rainbow. */
 @keyframes rd-mol-hue { from { filter: sepia(1) saturate(3.2) hue-rotate(0deg); } to { filter: sepia(1) saturate(3.2) hue-rotate(360deg); } }
 .rd-tripping .rd-molecules { opacity: .11; animation: rd-drift 240s linear infinite, rd-mol-hue 16s linear infinite; }
 .rd-tripping .rd-molecules.b { opacity: .07; animation: rd-drift 340s linear infinite reverse, rd-mol-hue 22s linear infinite reverse; }
-.rd-tripping :is(h1, h2, h3, p, li) { animation: rd-wave 5.5s ease-in-out infinite, rd-tint 17s linear infinite; }
+.rd-tripping :is(h1, h2, h3, p, li):not([data-rd-letters]) { animation: rd-wave 5.5s ease-in-out infinite, rd-tint 17s linear infinite; }
 /* Different lengths and starting points per element, so the text seems to drift at random rather than in step. */
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 6.7s, 23s; animation-delay: -1.3s, -9s; }
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-duration: 4.9s, 19s; animation-delay: -2.9s, -4s; animation-direction: reverse, normal; }
@@ -5212,7 +5217,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 				) : (
 					<>
 						<p style={{ fontFamily: SERIF, fontSize: 19, lineHeight: 1.5 }}>
-							{lastLine(a, ta)}; {lastLine(b, tb).replace(/^./, (c) => c.toLowerCase())}.
+							{lastLine(a, ta)}; {lastLine(b, tb).replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())}.
 							{overlap != null && ` Taken at the same time, they usually overlap for about the first ${fmtDur(overlap)}.`}
 						</p>
 						<PairTypical a={a} b={b} timingQ={timingQ} moodQ={moodQ} bare />
@@ -5265,7 +5270,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 				{effectsQ.isLoading ? (
 					<div className="flex items-center justify-center" style={{ height: 100 }} aria-busy="true" />
 				) : togN < 3 ? (
-					<p className="text-sm" style={{ color: C.soft }}>Too few closely read reports with both to compare.</p>
+					<EmptyNote className="mt-0 py-2">Too few closely read reports with both to compare.</EmptyNote>
 				) : more.length + less.length === 0 ? (
 					<p className="text-sm" style={{ color: C.soft }}>Nothing stands out — together it reads much like each one alone.</p>
 				) : (
@@ -5305,7 +5310,7 @@ function PairAnswers({ a, b, timingQ, moodQ, summaryQ, effectsQ, seqQ }: { a: st
 				{seqQ.isLoading ? (
 					<div className="flex items-center justify-center" style={{ height: 60 }} aria-busy="true" />
 				) : !seq || N(seq.n) < 3 ? (
-					<p className="text-sm" style={{ color: C.soft }}>Not enough reports say when each one was taken.</p>
+					<EmptyNote className="mt-0 py-2">Not enough reports say when each one was taken.</EmptyNote>
 				) : (
 					(() => {
 						const af = N(seq.a_first), bf = N(seq.b_first), same = N(seq.same);
@@ -5353,7 +5358,7 @@ function PairTypical({ a, b, timingQ, moodQ, bare }: { a: string; b: string; tim
 		...exp.series.map((s) => ({ label: short(s.label), sub: s.sub, color: s.color, height: 44, min: 0, max: 1.15, series: [s] })),
 	];
 	if (timingQ.isLoading || moodQ.isLoading) return <Loading height={260} className="mt-6" quiet />;
-	if (!lanes.length) return <p className="rd-card mt-6 p-5 text-sm" style={{ color: C.soft }}>Not enough data on this pair yet to sketch a timeline.</p>;
+	if (!lanes.length) return <EmptyNote className="mt-2 py-2">Not enough data on this pair yet to sketch a timeline.</EmptyNote>;
 	const both = exp.series.filter((s) => (interp(s.points, x) ?? 0) > 0.05 && x >= s.points[0].x && x <= s.points[s.points.length - 1].x).map((s) => short(s.label));
 	if (bare)
 		return (
@@ -5685,20 +5690,16 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						<RiskCard p={pairNote} />
 					</div>
 				) : (
-					<div className="rd-card rd-in mt-6 p-5">
+					<div className="rd-in mt-6 rounded-2xl p-5" style={pairNote?.status ? { background: 'rgba(166,242,228,.12)', border: '1px solid rgba(166,242,228,.38)' } : { background: C.card, border: `1px solid ${C.line}` }}>
 						{pairNote?.status ? (
-							<div className="flex items-start gap-3">
-								<Check size={20} color={C.mint} style={{ flexShrink: 0, marginTop: 2 }} />
-								<div>
-									<div className="text-lg font-semibold" style={{ color: C.mint }}>{S(pairNote.status)}</div>
-									{pairNote.note && <p className="mt-2" style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5 }}>{S(pairNote.note)}</p>}
-									{S(pairNote.via) === 'TripSit' && (
-										<div className="mt-3">
-											<TripSitBadge />
-										</div>
-									)}
+							<>
+								<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+									<Check size={20} color={C.mint} style={{ flexShrink: 0 }} />
+									<span className="text-lg font-semibold" style={{ color: C.mint }}>{S(pairNote.status)}</span>
+									{S(pairNote.via) === 'TripSit' && <TripSitBadge />}
 								</div>
-							</div>
+								{pairNote.note && <p className="mt-2" style={{ fontFamily: SERIF, fontSize: 17, lineHeight: 1.5, color: C.soft }}>{S(pairNote.note)}</p>}
+							</>
 						) : (
 							<div className="text-sm" style={{ color: C.soft }}>No interaction note on file for this pair, which isn't the same as safe.</div>
 						)}
@@ -5727,7 +5728,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				<div className="min-w-0 flex-1">
 					{withSub ? (
 						<>
-							<h2 className="text-2xl font-semibold">Stories with both</h2>
+							<h2 className="text-2xl font-semibold">Experiences with both</h2>
 							<p className="mt-1 text-sm" style={{ color: C.faint }}>What people went through, in their own words. Closely read ones first.</p>
 						</>
 					) : (
@@ -5741,6 +5742,8 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 			</div>
 			{q.isLoading ? (
 				<Loading height={260} className="mt-4" quiet />
+			) : list.length === 0 ? (
+				<EmptyNote className="mt-4">No experiences with these yet.</EmptyNote>
 			) : (
 				<div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
 					{list.map((r) => (
@@ -6642,6 +6645,75 @@ function SpunionSvg() {
 	);
 }
 
+// Trip mode's drifting letters. For the headings and paragraphs on screen, every letter is copied into an overlay
+// at its exact spot and drifts on its own small random path; the original text goes invisible meanwhile (by a data
+// attribute React doesn't manage) and comes back untouched when it ends. Rebuilt after scrolling or resizing.
+function TripLetters({ scope }: { scope: React.RefObject<HTMLElement | null> }) {
+	const box = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		const layer = box.current, root = scope.current;
+		if (!layer || !root || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+		let marked: Element[] = [];
+		const clear = () => {
+			marked.forEach((el) => el.removeAttribute('data-rd-letters'));
+			marked = [];
+			layer.replaceChildren();
+		};
+		const build = () => {
+			clear();
+			const origin = layer.getBoundingClientRect();
+			const frag = document.createDocumentFragment();
+			let count = 0;
+			for (const el of root.querySelectorAll('h1, h2, h3, p, li')) {
+				if (count > 2200) break;
+				if (el.querySelector('p, li, h1, h2, h3')) continue; // innermost blocks only
+				const r = el.getBoundingClientRect();
+				if (r.bottom < -80 || r.top > window.innerHeight + 80 || !r.width) continue;
+				const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+				const range = document.createRange();
+				for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+					const t = n as Text;
+					const cs = t.parentElement ? getComputedStyle(t.parentElement) : null;
+					if (!cs || cs.visibility === 'hidden') continue;
+					for (let i = 0; i < t.data.length; i++) {
+						const ch = t.data[i];
+						if (!ch.trim()) continue;
+						range.setStart(t, i);
+						range.setEnd(t, i + 1);
+						const b = range.getClientRects()[0];
+						if (!b || !b.width) continue;
+						const sp = document.createElement('span');
+						sp.textContent = ch;
+						const far = Math.random() < 0.05;
+						const amp = far ? 6 : 1 + Math.random() * 2;
+						sp.style.cssText = `left:${b.left - origin.left}px;top:${b.top - origin.top}px;font:${cs.font};letter-spacing:${cs.letterSpacing};color:${cs.color};--dx:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--dy:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--r:${((Math.random() - 0.5) * (far ? 16 : 6)).toFixed(1)}deg;animation-duration:${(2.6 + Math.random() * 3.6).toFixed(2)}s,${(14 + Math.random() * 20).toFixed(1)}s;animation-delay:-${(Math.random() * 6).toFixed(2)}s,-${(Math.random() * 30).toFixed(1)}s`;
+						frag.appendChild(sp);
+						count++;
+					}
+				}
+				el.setAttribute('data-rd-letters', '');
+				marked.push(el);
+			}
+			layer.appendChild(frag);
+		};
+		build();
+		let t: ReturnType<typeof setTimeout> | undefined;
+		const later = () => {
+			clearTimeout(t);
+			t = setTimeout(build, 180);
+		};
+		window.addEventListener('scroll', later, { passive: true });
+		window.addEventListener('resize', later);
+		return () => {
+			clearTimeout(t);
+			window.removeEventListener('scroll', later);
+			window.removeEventListener('resize', later);
+			clear();
+		};
+	}, [scope]);
+	return <div ref={box} className="rd-letters" aria-hidden />;
+}
+
 // Spunion when there's nothing to show: white, X eyes, a slight puzzled tilt, question marks floating up off his head.
 function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boolean }) {
 	return (
@@ -6857,6 +6929,7 @@ export default function ReportTimelapse() {
 	// Easter egg: type "trip" (outside a text box) or poke the corner Spunion five times quickly. Esc comes down;
 	// it wears off by itself after 30 seconds.
 	const [trip, setTrip] = useState(false);
+	const pageRef = useRef<HTMLDivElement | null>(null);
 	const pokes = useRef<number[]>([]);
 	const poke = () => {
 		const now = Date.now();
@@ -7056,12 +7129,13 @@ export default function ReportTimelapse() {
 				<style>{CSS}</style>
 				{trip && (
 					<>
+						<TripLetters scope={pageRef} />
 						<button className="rd-btn text-sm" onClick={() => setTrip(false)} style={{ position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 70, background: '#fff', color: C.deep }}>
 							Come down (Esc)
 						</button>
 					</>
 				)}
-				<div className={`px-4 py-6 sm:px-8 sm:py-8 ${trip ? 'rd-tripping' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 110 }}>
+				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${trip ? 'rd-tripping' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 110 }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '90px 140px' }} />
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
@@ -7161,7 +7235,7 @@ export default function ReportTimelapse() {
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} onEffectPage={goEffect} />
-				{!openItem && <Spunion tips={trip ? ['Whoa… is the text lifting off the page? Press Esc to come down.', ...spunionTips] : spunionTips} lift={onReport} autoOpen={spunionSpeaks || trip} onPoke={poke} />}
+				{!openItem && <Spunion tips={trip ? ['Whoa… are the letters swimming? Press Esc to come down.', ...spunionTips] : spunionTips} lift={onReport} autoOpen={spunionSpeaks || trip} onPoke={poke} />}
 			</main>
 		</OpenCtx.Provider>
 		</GoCtx.Provider>
