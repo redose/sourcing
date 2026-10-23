@@ -3873,8 +3873,6 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	const p = pw.find((r) => normRoute(S(r.route)) === sel);
 	const t = ours.find((x) => S(x.route) === sel) ?? ours.find((x) => S(x.route) === '*');
 	const tOwn = ours.find((x) => S(x.route) === sel);
-	if (q.isLoading) return <Loading height={260} className="mt-5" quiet />;
-	if (!p && !t) return <p className="mt-4 text-sm" style={{ color: C.faint }}>No dose or timing information on file yet.</p>;
 	const units = S(p?.dose_units);
 	const dose = (k: string) => {
 		if (!p) return '';
@@ -3949,6 +3947,9 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	}, [playing, span]);
 	const stage = stages.find((st) => pt >= st.from && pt < st.to);
 	const waiting = stages.length > 0 && pt < stages[0].from;
+	// Early returns only after every hook, so the hook order never changes between loading and loaded.
+	if (q.isLoading) return <Loading height={260} className="mt-5" quiet />;
+	if (!p && !t) return <p className="mt-4 text-sm" style={{ color: C.faint }}>No dose or timing information on file yet.</p>;
 	return (
 		<div className="mt-5">
 			{routes.length > 0 && (
