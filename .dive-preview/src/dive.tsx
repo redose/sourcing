@@ -7228,12 +7228,13 @@ export default function ReportTimelapse() {
 								<DiscordIcon size={15} />
 								Join us on Discord
 							</a>
-							<a className="rd-thanks" href={SOURCES.motherduck.href} target="_blank" rel="noopener noreferrer" title="MotherDuck runs the database behind re:dose. Not affiliated with re:dose." style={{ color: C.soft }}>
-								<img src={SOURCES.motherduck.logo} alt="" width={15} height={15} />
-								Powered by MotherDuck
+							<a className="rd-thanks" href="https://duckdb.org" target="_blank" rel="noopener noreferrer" title="Every number here is a DuckDB query. Not affiliated with re:dose." style={{ color: C.soft }}>
+								Powered by DuckDB
 							</a>
-							<span className="text-xs" style={{ color: C.faint }}>Not medical advice.</span>
 						</div>
+						<p className="w-full text-xs" style={{ color: C.faint, lineHeight: 1.6, maxWidth: 860 }}>
+							<b style={{ color: C.soft }}>Not medical advice.</b> re:dose is for information and harm reduction only. It can’t tell you whether a substance, dose or combination is safe for you: bodies, health conditions, medications and tolerance differ, and drugs bought on the street often aren’t what they’re sold as. Experiences here are self-reported and may be wrong. Talk to a doctor or pharmacist before combining anything with prescribed medication. If you or someone with you is in danger, call your local emergency number right away.
+						</p>
 					</footer>
 				</div>
 				<DetailPanel item={openItem} onClose={() => setOpenItem(null)} effectQ={effectDetailQ} subQ={subDetailQ} timingQ={subTimingQ} onReplay={goSubstance} onEffectPage={goEffect} />
