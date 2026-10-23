@@ -799,7 +799,9 @@ const CSS = `
 .rd-article { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; align-items: start; }
 @media (max-width: 1100px) { .rd-article { grid-template-columns: minmax(0, 1fr); } .rd-contents { display: none; } }
 @media (min-width: 768px) { .rd-g-flow { grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; } }
-@media (min-width: 640px) { .rd-g-risk { grid-template-columns: 150px minmax(0, 1fr); } }
+.rd-risk-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+@media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
+@media (min-width: 1024px) { .rd-g-dose { grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); } }
 @media (min-width: 1024px) { .rd-g-hero { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
 .rd-glance > li { display: grid; align-content: start; gap: 3px; }
 .rd-glance .v { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; margin-top: 4px; }
@@ -824,7 +826,7 @@ const CSS = `
   .rd-steps .rd-reveal { clip-path: none !important; transition: none !important; }
 }
 .rd-thanks { display: inline-flex; align-items: center; gap: 6px; color: ${C.soft}; font-size: 12.5px; font-weight: 500; white-space: nowrap; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .2s, color .2s; }
-.rd-thanks:hover { color: #fff; border-color: rgba(255,255,255,.5); }
+.rd-thanks:hover { color: #fff !important; border-color: rgba(255,255,255,.5); }
 .rd-thanks img { display: block; border-radius: 4px; }
 .rd-logo { display: inline-flex; padding: 4px; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid ${C.line}; transition: background .2s, border-color .2s; }
 .rd-logo:hover { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.3); }
@@ -2261,11 +2263,9 @@ function KnownRisks({ name }: { name: string }) {
 	if (q.isLoading) return null;
 	const row = (k: (typeof list)[number]) => (
 		<div key={k.grp} className="grid gap-x-5 gap-y-1.5 py-4 rd-g-risk" style={{ borderTop: `1px solid ${C.line}` }}>
-			<div className="flex items-center gap-2 sm:block">
+			<div className="rd-risk-head">
 				<div className="font-semibold" style={{ whiteSpace: 'nowrap' }}>{tsGroup(k.grp)}</div>
-				<div className="sm:mt-1.5">
-					<RiskPill sev={k.rank} small />
-				</div>
+				<RiskPill sev={k.rank} small />
 			</div>
 			<div className="min-w-0">
 				<p style={{ color: C.soft, lineHeight: 1.6 }}>{k.note || TS_FALLBACK[k.rank]}</p>
@@ -4122,7 +4122,7 @@ function DoseSteps({ p }: { p: Record<string, unknown> }) {
 								}}
 							/>
 						</div>
-						<div className="rd-step mt-3 pl-0.5 text-xs font-semibold sm:text-sm" style={{ color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.2 + i * 0.12}s` }}>
+						<div className="rd-step mt-3 pl-0.5 text-xs font-semibold" style={{ color: C.soft, whiteSpace: 'nowrap', animationDelay: `${0.2 + i * 0.12}s` }}>
 							{d.label}
 						</div>
 						<div className="rd-step pl-0.5 tabular-nums" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', animationDelay: `${0.25 + i * 0.12}s` }}>
@@ -4347,8 +4347,8 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 					))}
 				</div>
 			)}
-			<div ref={box} key={sel} className={`rd-steps ${go ? 'go' : ''} mt-8 grid gap-14`}>
-				<div>
+			<div ref={box} key={sel} className={`rd-steps ${go ? 'go' : ''} rd-g-dose mt-6 grid gap-4`}>
+				<div className="rd-card flex flex-col p-6 sm:p-7">
 					<div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
 						<h3 className="text-lg font-semibold">Dosage</h3>
 						{units && <span className="text-sm" style={{ color: C.faint }}>in {units}</span>}
@@ -4356,7 +4356,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 					{p && DOSE_ROWS.some((d) => dose(d.key)) ? (
 						<>
 							<DoseSteps p={p} />
-							<p className="mt-5 text-xs" style={{ color: C.faint, lineHeight: 1.6 }}>
+							<p className="mt-auto pt-6 text-xs" style={{ color: C.faint, lineHeight: 1.6 }}>
 								Rough guides from{' '}
 								<a href={SOURCES.pw.href} target="_blank" rel="noopener noreferrer" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }}>
 									PsychonautWiki
@@ -6584,7 +6584,7 @@ export default function ReportTimelapse() {
 							<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 								<span className="text-xs" style={{ color: C.faint }}>With thanks to</span>
 								{(Object.keys(SOURCES) as (keyof typeof SOURCES)[]).map((k) => (
-									<a key={k} className="rd-thanks" href={SOURCES[k].href} target="_blank" rel="noopener noreferrer" title={SOURCES[k].gives}>
+									<a key={k} className="rd-thanks" href={SOURCES[k].href} target="_blank" rel="noopener noreferrer" title={SOURCES[k].gives} style={{ color: C.soft }}>
 										<img src={SOURCES[k].logo} alt="" width={15} height={15} />
 										{SOURCES[k].name}
 									</a>
