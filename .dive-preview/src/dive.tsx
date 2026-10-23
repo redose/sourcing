@@ -804,6 +804,9 @@ const CSS = `
 @media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
 @media (min-width: 1024px) { .rd-g-dose { grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); } }
 @media (min-width: 1024px) { .rd-g-hero { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+@keyframes rd-q { 0% { opacity: 0; transform: translateY(0) rotate(-6deg); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px) rotate(10deg); } }
+.rd-q { position: absolute; top: -6%; color: #fff; font-weight: 800; line-height: 1; pointer-events: none; opacity: 0; animation: rd-q 1.35s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .rd-q { animation: none; opacity: .8; } .rd-q + .rd-q { display: none; } }
 .rd-glance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 32px; }
 @media (min-width: 1024px) { .rd-glance.wide { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .rd-glance > li { display: grid; align-content: start; gap: 3px; }
@@ -5131,7 +5134,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					{!enoughToChart ? (
 						<div className="mt-6">
 							<p className="flex items-center gap-3" style={{ color: C.soft, lineHeight: 1.6 }}>
-								<SpunionLost />
+								<SpunionLost size={34} marks={false} />
 								<span>Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. What {closeReads === 1 ? 'it mentions' : 'they mention'} most:</span>
 							</p>
 							<div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
@@ -6077,34 +6080,37 @@ function SpunionSvg() {
 	);
 }
 
-// Spunion when there's nothing to show: X eyes, a question mark, a slight puzzled tilt.
-function SpunionLost({ size = 44 }: { size?: number }) {
+// Spunion when there's nothing to show: white, X eyes, a slight puzzled tilt, question marks floating up off his head.
+function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boolean }) {
 	return (
-		<svg viewBox="0 0 500 560" width={size} height={(size * 560) / 500} aria-hidden style={{ flexShrink: 0, overflow: 'visible', transform: 'rotate(-8deg)', filter: 'grayscale(1)', opacity: 0.5 }}>
-			<text x="400" y="120" fontSize="150" fontWeight="800" fill="#fff" opacity="0.85" fontFamily={SANS}>?</text>
-			<g transform="translate(0 60)">
+		<span className="relative inline-block" style={{ width: size, height: size * 0.94, flexShrink: 0 }} aria-hidden>
+			<svg viewBox="0 0 500 470" width={size} height={size * 0.94} style={{ display: 'block', overflow: 'visible', transform: 'rotate(-8deg)' }}>
 				<path
 					d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
-					fill="#5ae0e4"
-					stroke="#000"
-					strokeWidth="18"
-					strokeLinejoin="round"
+					fill="#fff"
+					fillOpacity="0.92"
 				/>
-				<g stroke="#000" strokeWidth="26" strokeLinecap="round">
+				<g stroke={C.deep} strokeWidth="26" strokeLinecap="round">
 					<path d="M140 255 L230 345 M230 255 L140 345" />
 					<path d="M322 233 L392 303 M392 233 L322 303" />
 				</g>
-			</g>
-		</svg>
+			</svg>
+			{marks &&
+				[0, 1, 2].map((k) => (
+					<span key={k} className="rd-q" style={{ left: `${62 + k * 14}%`, animationDelay: `${k * 0.45}s`, fontSize: Math.max(11, size * (0.32 - k * 0.04)) }}>
+						?
+					</span>
+				))}
+		</span>
 	);
 }
-// "Nothing here": the puzzled Spunion, greyed out and centred, NO DATA YET! under him, then what's missing.
+// "Nothing here": the white, puzzled Spunion centred in its box, NO DATA YET! under him, then what's missing.
 function EmptyNote({ children, className = 'mt-4' }: { children: React.ReactNode; className?: string }) {
 	return (
-		<div className={`flex flex-col items-center py-6 text-center ${className}`}>
-			<SpunionLost size={64} />
-			<div className="mt-4 text-xs font-bold" style={{ letterSpacing: '.16em', color: C.faint }}>NO DATA YET!</div>
-			<div className="mt-1.5 max-w-sm text-sm" style={{ color: C.faint }}>{children}</div>
+		<div className={`flex flex-1 flex-col items-center justify-center py-8 text-center ${className}`}>
+			<SpunionLost size={68} />
+			<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NO DATA YET!</div>
+			<div className="mt-1.5 max-w-sm text-sm" style={{ color: C.soft }}>{children}</div>
 		</div>
 	);
 }
