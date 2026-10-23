@@ -5211,21 +5211,11 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</>
 				)}
 				{!enoughToChart ? (
-					<div className="mt-6 flex flex-col items-center py-6 text-center">
-						<SpunionPuzzle size={110} />
-						<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
-						<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
-							{closeReads === 0 ? 'No closely read reports yet, so there’s no timeline to show.' : `Only ${closeReads} closely read ${closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time.`} Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
+					<div className="mt-6 flex items-center gap-4">
+						<SpunionPuzzle size={48} />
+						<p className="text-sm" style={{ color: C.soft, lineHeight: 1.55 }}>
+							{closeReads === 0 ? 'No closely read reports yet, so no timeline.' : `Only ${closeReads} closely read ${closeReads === 1 ? 'report' : 'reports'} so far, not enough for a timeline yet.`}
 						</p>
-						<div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-2">
-							{series
-								.map((s) => ({ ...s, peak: Math.max(0, ...s.points.map((p) => p.y)) }))
-								.sort((a, b) => b.peak - a.peak)
-								.slice(0, 8)
-								.map((r) => (
-									<EffectTag key={r.label} name={r.label} />
-								))}
-						</div>
 					</div>
 				) : (
 				<>
@@ -6349,14 +6339,14 @@ function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boole
 		</span>
 	);
 }
-// Spunion with a big piece missing, for "not enough data yet": a jigsaw-shaped bite out of his side, the piece
-// itself bobbing beside him, his eyes on it.
+// Spunion with a piece missing, for "not enough data yet": a jigsaw-shaped bite where his second eye would be, the
+// missing piece a dashed outline bobbing beside him.
 // A classic jigsaw piece, 100 square: necked tabs out on the top and right, matching blanks in on the bottom and left.
 const PUZZLE_PIECE =
 	'M0 0 L35 0 C38 0 40 -2 38 -6 C34 -14 37 -27 50 -27 C63 -27 66 -14 62 -6 C60 -2 62 0 65 0 L100 0 L100 35 C100 38 102 40 106 38 C114 34 127 37 127 50 C127 63 114 66 106 62 C102 60 100 62 100 65 L100 100 L65 100 C62 100 60 98 62 94 C66 86 63 73 50 73 C37 73 34 86 38 94 C40 98 38 100 35 100 L0 100 L0 65 C0 62 2 60 6 62 C14 66 27 63 27 50 C27 37 14 34 6 38 C2 40 0 38 0 35 Z';
 function SpunionPuzzle({ size = 72 }: { size?: number }) {
-	// Low on his right, clear of his eyes; mirrored so the tabs point into him and the flat side runs along his edge.
-	const hole = 'translate(462 318) rotate(8) scale(-1.15 1.15)';
+	// Where his right eye would be; mirrored so the tabs point into him and the flat side runs along his edge.
+	const hole = 'translate(452 178) rotate(8) scale(-1.2 1.2)';
 	return (
 		<svg viewBox="20 10 680 480" width={(size * 680) / 480} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
 			<defs>
@@ -6371,12 +6361,10 @@ function SpunionPuzzle({ size = 72 }: { size?: number }) {
 				fillOpacity="0.94"
 				mask="url(#sp-bite)"
 			/>
-			<circle cx="160" cy="262" r="54" fill={C.deep} />
-			<circle cx="178" cy="280" r="16" fill="#fff" />
-			<circle cx="282" cy="230" r="41" fill={C.deep} />
-			<circle cx="296" cy="244" r="12" fill="#fff" />
+			<circle cx="168" cy="268" r="56" fill={C.deep} />
+			<circle cx="186" cy="286" r="16" fill="#fff" />
 			<g className="rd-piece">
-				<path d={PUZZLE_PIECE} transform="translate(650 262) rotate(20) scale(-1.15 1.15)" fill="#fff" fillOpacity="0.94" />
+				<path d={PUZZLE_PIECE} transform="translate(668 150) rotate(20) scale(-1.2 1.2)" fill="none" stroke="#fff" strokeWidth="7" strokeDasharray="16 12" strokeLinejoin="round" strokeLinecap="round" />
 			</g>
 		</svg>
 	);
