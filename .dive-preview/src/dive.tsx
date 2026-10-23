@@ -782,12 +782,15 @@ const CSS = `
 /* Drifting letters (TripLetters): originals go invisible, their copies drift; now and then a letter catches colour. */
 [data-rd-letters], [data-rd-letters] * { color: transparent !important; text-shadow: none !important; }
 .rd-letters { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 5; }
-.rd-letters > span { position: absolute; white-space: pre; line-height: 1; animation-name: rd-letter, rd-tint; animation-timing-function: ease-in-out, linear; animation-iteration-count: infinite; }
+.rd-letters > span { position: absolute; white-space: pre; line-height: 1; will-change: transform; animation-name: rd-letter; animation-timing-function: ease-in-out, linear; animation-iteration-count: infinite; }
+.rd-letters > span.t { animation-name: rd-letter, rd-tint; }
 @keyframes rd-letter { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(var(--dx), var(--dy)) rotate(var(--r)); } }
 /* The background molecules slowly cycle through the rainbow. */
-@keyframes rd-mol-hue { from { filter: sepia(1) saturate(3.2) hue-rotate(0deg); } to { filter: sepia(1) saturate(3.2) hue-rotate(360deg); } }
-.rd-fx-rainbow .rd-molecules { opacity: .1; animation: rd-drift 240s ease-in-out infinite alternate, rd-mol-hue 16s linear infinite; }
-.rd-fx-rainbow .rd-molecules.b { opacity: .065; animation: rd-drift 340s ease-in-out infinite alternate-reverse, rd-mol-hue 22s linear infinite reverse; }
+.rd-fx-rainbow .rd-molecules { opacity: .1; }
+.rd-fx-rainbow .rd-molecules.b { opacity: .065; }
+.rd-fx-rainbow .rd-molecules.rd-tint1, .rd-fx-rainbow .rd-molecules.rd-tint2 { animation: rd-drift 240s ease-in-out infinite alternate, rd-tintfade-strong 16s ease-in-out infinite; }
+.rd-fx-rainbow .rd-molecules.rd-tint2 { animation-delay: 0s, -8s; }
+@keyframes rd-tintfade-strong { 0%, 100% { opacity: 0; } 50% { opacity: .12; } }
 .rd-tripping :is(h1, h2, h3, p, li):not([data-rd-letters]):not([data-rd-safe] *) { animation: rd-wave 5.5s ease-in-out infinite, rd-tint 17s linear infinite; }
 /* Different lengths and starting points per element, so the text seems to drift at random rather than in step. */
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 6.7s, 23s; animation-delay: -1.3s, -9s; }
@@ -830,11 +833,14 @@ const CSS = `
 @keyframes rd-fade { from { opacity: 0; } to { opacity: 1; } }
 .rd-fade { animation: rd-fade .4s ease-out both; }
 @keyframes rd-drift { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(180px, 90px) rotate(2deg); } }
-.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 1100px; opacity: .05; animation: rd-drift 240s ease-in-out infinite alternate, rd-mol-hue-soft 60s linear infinite;
+.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 1100px; opacity: .05; animation: rd-drift 240s ease-in-out infinite alternate; filter: sepia(1) saturate(1.3) hue-rotate(215deg); will-change: transform;
   -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); }
 .rd-molecules.b { background-size: 1530px; opacity: .03; animation-duration: 340s, 80s; animation-direction: alternate-reverse, reverse; }
 /* Every day: the molecules drift through a soft rainbow, slowly. */
-@keyframes rd-mol-hue-soft { from { filter: sepia(1) saturate(1.3) hue-rotate(0deg); } to { filter: sepia(1) saturate(1.3) hue-rotate(360deg); } }
+.rd-molecules.rd-tint1, .rd-molecules.rd-tint2 { opacity: 0; animation: rd-drift 240s ease-in-out infinite alternate, rd-tintfade 60s ease-in-out infinite; }
+.rd-molecules.rd-tint1 { filter: sepia(1) saturate(2.2) hue-rotate(300deg); }
+.rd-molecules.rd-tint2 { filter: sepia(1) saturate(2.2) hue-rotate(140deg); animation-delay: 0s, -30s; }
+@keyframes rd-tintfade { 0%, 100% { opacity: 0; } 50% { opacity: .05; } }
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-newfx { 0% { box-shadow: 0 0 0 0 rgba(166,242,228,.55); } 70% { box-shadow: 0 0 0 10px rgba(166,242,228,0); } 100% { box-shadow: 0 0 0 0 rgba(166,242,228,0); } }
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
@@ -906,12 +912,14 @@ const CSS = `
 .rd-mol-glow .rd-molecules { opacity: .1 !important; -webkit-mask-image: none; mask-image: none; }
 @media (hover: none) { .rd-mol-glow { display: none; } }
 @keyframes rd-drift-home { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(140px, 200px) rotate(5deg); } 100% { transform: translate(250px, 60px) rotate(-4deg); } }
-.rd-home.rd-fx-rainbow .rd-molecules { animation: rd-drift-home 70s ease-in-out infinite alternate, rd-mol-hue 16s linear infinite; }
-.rd-home.rd-fx-rainbow .rd-molecules.b { animation: rd-drift-home 95s ease-in-out infinite alternate-reverse, rd-mol-hue 22s linear infinite reverse; }
+.rd-home.rd-fx-rainbow .rd-molecules { animation: rd-drift-home 70s ease-in-out infinite alternate; }
+.rd-home.rd-fx-rainbow .rd-molecules.b { animation: rd-drift-home 95s ease-in-out infinite alternate-reverse; }
+.rd-home.rd-fx-rainbow .rd-molecules.rd-tint1, .rd-home.rd-fx-rainbow .rd-molecules.rd-tint2 { animation: rd-drift-home 70s ease-in-out infinite alternate, rd-tintfade-strong 16s ease-in-out infinite; }
+.rd-home.rd-fx-rainbow .rd-molecules.rd-tint2 { animation-delay: 0s, -8s; }
 @media (prefers-reduced-motion: reduce) { .rd-home.rd-fx-rainbow .rd-molecules { animation: none; } }
 /* Start screen: the wallpaper holds still. Each landing adds a circle of the next background colour that grows from
    his feet (newest on top), and a ring that grows the same way, seen only through the molecules' shapes. */
-.rd-start .rd-molecules { animation: rd-mol-hue-soft 60s linear infinite; }
+.rd-start .rd-molecules { animation: none; }
 .rd-start .rd-loader { margin-top: 0; }
 .rd-start .rd-bounce { animation-duration: .7s; }
 .rd-start .rd-ghost-body { animation: none; fill: #5cdfe4; fill-opacity: 1; transition: fill .1s; }
@@ -3891,7 +3899,7 @@ function StoryCard({ r, onOpen }: { r: Record<string, unknown>; onOpen: (id: str
 	const tags = L(r.tags).map(String).map((t) => THEME_LABEL.get(t)).filter((t): t is string => !!t && !['Glowing', 'Bad trip', 'Difficult', 'Mystical', 'Trip disaster'].includes(t)).slice(0, 2);
 	const who = [r.gender ? (S(r.gender).toLowerCase().startsWith('f') ? 'woman' : 'man') : '', r.age != null ? `${N(r.age)}` : ''].filter(Boolean).join(', ');
 	return (
-		<button onClick={() => onOpen(S(r.id), S(r.first_sub))} className="rd-card rd-hover grid w-full content-start gap-2 p-4 text-left">
+		<button onClick={() => onOpen(S(r.id), S(r.first_sub))} className="rd-card rd-hover grid w-full min-w-0 content-start gap-2 p-4 text-left" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
 			<div className="flex items-baseline gap-2">
 				<span className="min-w-0 flex-1 font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={subs.join(' · ')}>
 					{subs.slice(0, 2).map(short).join(' + ')}
@@ -3934,7 +3942,7 @@ function StoryColumn({ f, mood, label, onOpen }: { f: StoryFilter; mood: string;
 			) : list.length === 0 ? (
 				<p className="text-sm" style={{ color: C.faint }}>None match.</p>
 			) : (
-				<div className="grid gap-2">
+				<div className="grid gap-2" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
 					{list.map((r) => <StoryCard key={S(r.id)} r={r} onOpen={onOpen} />)}
 				</div>
 			)}
@@ -4074,7 +4082,7 @@ function StoriesBrowse({ onOpen }: { onOpen: (id: string, sub: string) => void }
 					) : (
 						<>
 							<div className="mb-3 text-sm tabular-nums" style={{ color: C.soft }}>{total.toLocaleString()} {total === 1 ? 'experience' : 'experiences'}</div>
-							<div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+							<div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px, 100%), 1fr))' }}>
 								{list.map((r) => <StoryCard key={S(r.id)} r={r} onOpen={onOpen} />)}
 							</div>
 							{list.length < total && (
@@ -7540,7 +7548,7 @@ function TripLetters({ scope, gentle }: { scope: React.RefObject<HTMLElement | n
 			const frag = document.createDocumentFragment();
 			let count = 0;
 			for (const el of root.querySelectorAll('h1, h2, h3, p, li')) {
-				if (count > 2200) break;
+				if (count > 900) break;
 				if (el.querySelector('p, li, h1, h2, h3') || el.closest('[data-rd-safe]')) continue; // innermost blocks; never warnings
 				const r = el.getBoundingClientRect();
 				if (r.bottom < -80 || r.top > window.innerHeight + 80 || !r.width) continue;
@@ -7559,6 +7567,7 @@ function TripLetters({ scope, gentle }: { scope: React.RefObject<HTMLElement | n
 						if (!b || !b.width) continue;
 						const sp = document.createElement('span');
 						sp.textContent = ch;
+						if (Math.random() < 0.05) sp.className = 't'; // only a few letters ever catch a glow
 						const far = Math.random() < 0.03;
 						const amp = (far ? 3 : 0.4 + Math.random() * 1.1) * (gentle ? 0.6 : 1);
 						sp.style.cssText = `left:${b.left - origin.left}px;top:${b.top - origin.top}px;font:${cs.font};letter-spacing:${cs.letterSpacing};color:${cs.color};--dx:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--dy:${((Math.random() - 0.5) * 2 * amp).toFixed(1)}px;--r:${((Math.random() - 0.5) * (far ? 8 : 3)).toFixed(1)}deg;animation-duration:${(3.2 + Math.random() * 4).toFixed(2)}s,${(14 + Math.random() * 20).toFixed(1)}s;animation-delay:-${(Math.random() * 6).toFixed(2)}s,-${(Math.random() * 30).toFixed(1)}s`;
@@ -7575,7 +7584,7 @@ function TripLetters({ scope, gentle }: { scope: React.RefObject<HTMLElement | n
 		let t: ReturnType<typeof setTimeout> | undefined;
 		const later = () => {
 			clearTimeout(t);
-			t = setTimeout(build, 180);
+			t = setTimeout(build, 350);
 		};
 		window.addEventListener('scroll', later, { passive: true });
 		window.addEventListener('resize', later);
@@ -8145,6 +8154,8 @@ export default function ReportTimelapse() {
 				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${fx.includes('sway') ? 'rd-tripping' : ''} ${fx.includes('rainbow') ? 'rd-fx-rainbow' : ''} ${fx.includes('tint') ? 'rd-fx-tint' : ''} ${fx.includes('desat') ? 'rd-fx-desat' : ''} ${fx.includes('breathe') ? 'rd-fx-breathe' : ''} ${fx.includes('shift') ? 'rd-fx-shift' : ''} ${fx.includes('replace') ? 'rd-fx-replace' : ''} ${fx.includes('enhance') ? 'rd-fx-enhance' : ''} ${view === 'home' && !trip ? 'rd-home' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 20, minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowX: 'clip' }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
+					<div aria-hidden className="rd-molecules rd-tint1" style={{ backgroundImage: MOLECULES }} />
+					<div aria-hidden className="rd-molecules rd-tint2" style={{ backgroundImage: MOLECULES }} />
 					{view === 'home' && !trip && <HomeMolecules onSubstance={goSubstance} />}
 					<div aria-hidden ref={glowRef} className="rd-mol-glow" style={{ opacity: view === 'home' && !trip ? 1 : 0 }}>
 						<div className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
