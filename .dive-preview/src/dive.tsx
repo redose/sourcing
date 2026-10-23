@@ -786,11 +786,10 @@ const CSS = `
 .rd-letters > span.t { animation-name: rd-letter, rd-tint; }
 @keyframes rd-letter { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(var(--dx), var(--dy)) rotate(var(--r)); } }
 /* The background molecules slowly cycle through the rainbow. */
-.rd-fx-rainbow .rd-molecules { opacity: .1; }
-.rd-fx-rainbow .rd-molecules.b { opacity: .065; }
-.rd-fx-rainbow .rd-molecules.rd-tint1, .rd-fx-rainbow .rd-molecules.rd-tint2 { animation: rd-drift 240s ease-in-out infinite alternate, rd-tintfade-strong 16s ease-in-out infinite; }
-.rd-fx-rainbow .rd-molecules.rd-tint2 { animation-delay: 0s, -8s; }
-@keyframes rd-tintfade-strong { 0%, 100% { opacity: 0; } 50% { opacity: .12; } }
+/* Effect previews and the easter egg only (it costs a repaint every frame, so never on ordinary pages). */
+@keyframes rd-mol-hue { from { filter: sepia(1) saturate(3.2) hue-rotate(0deg); } to { filter: sepia(1) saturate(3.2) hue-rotate(360deg); } }
+.rd-fx-rainbow .rd-molecules { opacity: .1; animation: rd-drift 240s ease-in-out infinite alternate, rd-mol-hue 16s linear infinite; }
+.rd-fx-rainbow .rd-molecules.b { opacity: .065; animation: rd-drift 340s ease-in-out infinite alternate-reverse, rd-mol-hue 22s linear infinite reverse; }
 .rd-tripping :is(h1, h2, h3, p, li):not([data-rd-letters]):not([data-rd-safe] *) { animation: rd-wave 5.5s ease-in-out infinite, rd-tint 17s linear infinite; }
 /* Different lengths and starting points per element, so the text seems to drift at random rather than in step. */
 .rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 6.7s, 23s; animation-delay: -1.3s, -9s; }
@@ -833,18 +832,12 @@ const CSS = `
 @keyframes rd-fade { from { opacity: 0; } to { opacity: 1; } }
 .rd-fade { animation: rd-fade .4s ease-out both; }
 @keyframes rd-drift { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(180px, 90px) rotate(2deg); } }
-.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 1100px; opacity: .05; animation: rd-drift 240s ease-in-out infinite alternate; filter: sepia(1) saturate(1.3) hue-rotate(215deg); will-change: transform;
+.rd-molecules { position: fixed; inset: -280px; z-index: -1; pointer-events: none; background-size: 1100px; opacity: .05; animation: rd-drift 240s ease-in-out infinite alternate; filter: sepia(1) saturate(1.3) hue-rotate(215deg);
   -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); }
 .rd-molecules.b { background-size: 1530px; opacity: .03; animation-duration: 340s, 80s; animation-direction: alternate-reverse, reverse; }
 /* Every day: the molecules drift through a soft rainbow, slowly. */
 div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules { opacity: .028; }
 div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
-div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.rd-tint1, div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.rd-tint2 { animation-name: rd-drift, rd-tintfade-quiet; }
-@keyframes rd-tintfade-quiet { 0%, 100% { opacity: 0; } 50% { opacity: .025; } }
-.rd-molecules.rd-tint1, .rd-molecules.rd-tint2 { opacity: 0; animation: rd-drift 240s ease-in-out infinite alternate, rd-tintfade 60s ease-in-out infinite; }
-.rd-molecules.rd-tint1 { filter: sepia(1) saturate(2.2) hue-rotate(300deg); }
-.rd-molecules.rd-tint2 { filter: sepia(1) saturate(2.2) hue-rotate(140deg); animation-delay: 0s, -30s; }
-@keyframes rd-tintfade { 0%, 100% { opacity: 0; } 50% { opacity: .05; } }
 @media (prefers-reduced-motion: reduce) { .rd-molecules { animation: none; } }
 @keyframes rd-newfx { 0% { box-shadow: 0 0 0 0 rgba(166,242,228,.55); } 70% { box-shadow: 0 0 0 10px rgba(166,242,228,0); } 100% { box-shadow: 0 0 0 0 rgba(166,242,228,0); } }
 .rd-newfx { animation: rd-newfx 1.6s ease-out 2; }
@@ -909,18 +902,11 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.rd-tint1, div:not(.rd-home
 @media (max-width: 900px) { .rd-filters { grid-template-columns: 1fr; } .rd-filters > aside { position: static; max-height: none; } }
 .rd .rd-home-search { transition: border-color .2s, box-shadow .2s; }
 .rd .rd-home-search:focus-within { border-color: rgba(217,207,255,.6) !important; box-shadow: 0 0 0 4px rgba(217,207,255,.12), 0 20px 50px rgba(10,4,40,.5) !important; }
-/* Homepage only: the molecules wander further and quicker, and light up around the pointer. */
-.rd-mol-glow { position: fixed; inset: 0; z-index: -1; pointer-events: none; transition: opacity .6s;
-  -webkit-mask-image: radial-gradient(circle 260px at var(--mx, -999px) var(--my, -999px), #000 0%, transparent 100%);
-  mask-image: radial-gradient(circle 260px at var(--mx, -999px) var(--my, -999px), #000 0%, transparent 100%); }
-.rd-mol-glow .rd-molecules { opacity: .1 !important; -webkit-mask-image: none; mask-image: none; }
-@media (hover: none) { .rd-mol-glow { display: none; } }
+/* Homepage only: the molecules wander further and quicker, a little brighter and warmer. */
 @keyframes rd-drift-home { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(140px, 200px) rotate(5deg); } 100% { transform: translate(250px, 60px) rotate(-4deg); } }
-.rd-home.rd-fx-rainbow .rd-molecules { animation: rd-drift-home 70s ease-in-out infinite alternate; }
-.rd-home.rd-fx-rainbow .rd-molecules.b { animation: rd-drift-home 95s ease-in-out infinite alternate-reverse; }
-.rd-home.rd-fx-rainbow .rd-molecules.rd-tint1, .rd-home.rd-fx-rainbow .rd-molecules.rd-tint2 { animation: rd-drift-home 70s ease-in-out infinite alternate, rd-tintfade-strong 16s ease-in-out infinite; }
-.rd-home.rd-fx-rainbow .rd-molecules.rd-tint2 { animation-delay: 0s, -8s; }
-@media (prefers-reduced-motion: reduce) { .rd-home.rd-fx-rainbow .rd-molecules { animation: none; } }
+.rd-home .rd-molecules { opacity: .075; filter: sepia(1) saturate(1.8) hue-rotate(200deg); animation: rd-drift-home 70s ease-in-out infinite alternate; }
+.rd-home .rd-molecules.b { opacity: .045; animation: rd-drift-home 95s ease-in-out infinite alternate-reverse; }
+@media (prefers-reduced-motion: reduce) { .rd-home .rd-molecules { animation: none; } }
 /* Start screen: the wallpaper holds still. Each landing adds a circle of the next background colour that grows from
    his feet (newest on top), and a ring that grows the same way, seen only through the molecules' shapes. */
 .rd-start .rd-molecules { animation: none; }
@@ -7937,20 +7923,6 @@ export default function ReportTimelapse() {
 	// quickly. Esc comes down; it wears off by itself after 30 seconds.
 	const [trip, setTrip] = useState(false);
 	const pageRef = useRef<HTMLDivElement | null>(null);
-	// Homepage: molecules light up around the pointer (a CSS mask that follows it; no re-renders).
-	const glowRef = useRef<HTMLDivElement | null>(null);
-	useEffect(() => {
-		let raf = 0;
-		const move = (e: PointerEvent) => {
-			cancelAnimationFrame(raf);
-			raf = requestAnimationFrame(() => {
-				glowRef.current?.style.setProperty('--mx', `${e.clientX}px`);
-				glowRef.current?.style.setProperty('--my', `${e.clientY}px`);
-			});
-		};
-		window.addEventListener('pointermove', move);
-		return () => (window.removeEventListener('pointermove', move), cancelAnimationFrame(raf));
-	}, []);
 	const pokes = useRef<number[]>([]);
 	const poke = () => {
 		const now = Date.now();
@@ -7995,7 +7967,7 @@ export default function ReportTimelapse() {
 	useEffect(() => {
 		if (effect?.toLowerCase() === 'synaesthesia') setSynOn(true);
 	}, [effect]);
-	const fx = trip ? ['letters', 'rainbow', 'sway'] : [...(fxOff ? [] : pageFx), ...(synOn ? ['rainbow', 'tint'] : []), ...(view === 'home' ? ['rainbow'] : [])];
+	const fx = trip ? ['letters', 'rainbow', 'sway'] : [...(fxOff ? [] : pageFx), ...(synOn ? ['rainbow', 'tint'] : [])];
 	const setOpenItem = (o: Open) => setOpenItemState((o ?? undefined) as Open);
 	const [, setAtLink] = useDiveState<number | null>('at', null);
 
@@ -8179,12 +8151,7 @@ export default function ReportTimelapse() {
 				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${fx.includes('sway') ? 'rd-tripping' : ''} ${fx.includes('rainbow') ? 'rd-fx-rainbow' : ''} ${fx.includes('tint') ? 'rd-fx-tint' : ''} ${fx.includes('desat') ? 'rd-fx-desat' : ''} ${fx.includes('breathe') ? 'rd-fx-breathe' : ''} ${fx.includes('shift') ? 'rd-fx-shift' : ''} ${fx.includes('replace') ? 'rd-fx-replace' : ''} ${fx.includes('enhance') ? 'rd-fx-enhance' : ''} ${view === 'home' && !trip ? 'rd-home' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 20, minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowX: 'clip' }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
-					<div aria-hidden className="rd-molecules rd-tint1" style={{ backgroundImage: MOLECULES }} />
-					<div aria-hidden className="rd-molecules rd-tint2" style={{ backgroundImage: MOLECULES }} />
 					{view === 'home' && !trip && <HomeMolecules onSubstance={goSubstance} />}
-					<div aria-hidden ref={glowRef} className="rd-mol-glow" style={{ opacity: view === 'home' && !trip ? 1 : 0 }}>
-						<div className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
-					</div>
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
 						<button onClick={() => goView('home')} aria-label="re:dose home">
 							<img src={LOGO_RE_WHITE} alt="re:dose" style={{ height: 24, width: 'auto', display: 'block' }} />
