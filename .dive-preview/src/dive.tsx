@@ -762,22 +762,29 @@ const CSS = `
    undulates in place. Only transforms and opacity
    animate, so it stays smooth; nothing flashes. */
 @keyframes rd-wave {
-  0%, 100% { transform: translateY(0) skewX(0deg); text-shadow: 0 1px 3px rgba(10,6,30,.18); }
-  25% { transform: translateY(-1.5px) skewX(.5deg); text-shadow: 0 3px 7px rgba(10,6,30,.24); }
-  75% { transform: translateY(-1px) skewX(-.5deg); text-shadow: 0 3px 6px rgba(10,6,30,.22); }
+  0%, 100% { transform: translateY(0) skewX(0deg); }
+  25% { transform: translateY(-3px) skewX(1deg); }
+  60% { transform: translateY(1px) skewX(-.6deg); }
+  80% { transform: translateY(-2px) skewX(-1deg); }
 }
-.rd-tripping :is(h1, h2, h3, p, li) { animation: rd-wave 5.5s ease-in-out infinite; }
+/* Now and then (a sliver of a long cycle) text catches a faint colour. */
+@keyframes rd-tint {
+  0%, 86%, 100% { text-shadow: none; }
+  89% { text-shadow: 0 0 10px rgba(252,108,132,.55); }
+  92% { text-shadow: 0 0 10px rgba(90,224,228,.55); }
+  95% { text-shadow: 0 0 10px rgba(179,168,240,.5); }
+}
+/* The background molecules slowly cycle through the rainbow. */
+@keyframes rd-mol-hue { from { filter: sepia(1) saturate(3.2) hue-rotate(0deg); } to { filter: sepia(1) saturate(3.2) hue-rotate(360deg); } }
+.rd-tripping .rd-molecules { opacity: .11; animation: rd-drift 240s linear infinite, rd-mol-hue 16s linear infinite; }
+.rd-tripping .rd-molecules.b { opacity: .07; animation: rd-drift 340s linear infinite reverse, rd-mol-hue 22s linear infinite reverse; }
+.rd-tripping :is(h1, h2, h3, p, li) { animation: rd-wave 5.5s ease-in-out infinite, rd-tint 17s linear infinite; }
 /* Different lengths and starting points per element, so the text seems to drift at random rather than in step. */
-.rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 6.7s; animation-delay: -1.3s; }
-.rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-duration: 4.9s; animation-delay: -2.9s; animation-direction: reverse; }
-.rd-tripping :is(h1, h2, h3, p, li):nth-child(5n) { animation-duration: 7.3s; animation-delay: -4.1s; }
-.rd-tripping :is(h1, h2, h3, p, li):nth-child(7n) { animation-duration: 5.1s; animation-delay: -0.6s; animation-direction: alternate-reverse; }
-/* A touch of colour: soft glows in the logo's colours drifting slowly behind everything. */
-@keyframes rd-glow-drift { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(-6%, 4%) rotate(8deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
-.rd-trip-glow { position: fixed; inset: -20%; pointer-events: none; z-index: 0; opacity: .5;
-  background: radial-gradient(35% 30% at 25% 30%, rgba(252,108,132,.28), transparent 70%), radial-gradient(30% 28% at 75% 25%, rgba(90,224,228,.24), transparent 70%), radial-gradient(40% 32% at 55% 80%, rgba(138,125,220,.3), transparent 70%);
-  animation: rd-glow-drift 22s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .rd-tripping :is(h1, h2, h3, p, li), .rd-trip-glow { animation: none; } }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(2n) { animation-duration: 6.7s, 23s; animation-delay: -1.3s, -9s; }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(3n) { animation-duration: 4.9s, 19s; animation-delay: -2.9s, -4s; animation-direction: reverse, normal; }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(5n) { animation-duration: 7.3s, 29s; animation-delay: -4.1s, -17s; }
+.rd-tripping :is(h1, h2, h3, p, li):nth-child(7n) { animation-duration: 5.1s, 13s; animation-delay: -0.6s, -11s; animation-direction: alternate-reverse, normal; }
+@media (prefers-reduced-motion: reduce) { .rd-tripping :is(h1, h2, h3, p, li), .rd-tripping .rd-molecules { animation: none; } }
 /* The accent is the logo coral, except on cannabis pages, where it goes green (safety colours stay as they are). */
 .rd { --rd-accent: ${C.coral}; --rd-select: rgba(252,108,132,.45); }
 .rd.rd-green { --rd-accent: #8fe3a4; --rd-select: rgba(120,220,140,.45); }
@@ -7049,7 +7056,6 @@ export default function ReportTimelapse() {
 				<style>{CSS}</style>
 				{trip && (
 					<>
-						<div className="rd-trip-glow" aria-hidden />
 						<button className="rd-btn text-sm" onClick={() => setTrip(false)} style={{ position: 'fixed', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 70, background: '#fff', color: C.deep }}>
 							Come down (Esc)
 						</button>
