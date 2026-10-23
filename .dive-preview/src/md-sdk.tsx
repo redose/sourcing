@@ -271,6 +271,7 @@ function readRoute(): [string, unknown][] {
 	const parts = path.split('/').filter(Boolean);
 	const out: [string, unknown][] = [];
 	if (parts[0] === 'substances' || parts[0] === 'effects' || parts[0] === 'about') out.push(['view', parts[0]]);
+	if (parts[0] === 'effects' && parts[1]) out.push(['effect', dec(parts[1])]);
 	else if (parts[0] === 'stories') out.push(['view', 'reports']);
 	else if (parts[0]) {
 		const [s1, s2] = parts[0].split('+').map(dec);
@@ -296,7 +297,9 @@ function writeRoute(state: Map<string, unknown>) {
 	const at = state.get('at') as number | undefined;
 	const open = state.get('open') as { kind: string; name: string } | undefined;
 	let path = '';
-	if (view && view !== 'reports') path = view;
+	const effect = state.get('effect') as string | undefined;
+	if (view === 'effects' && effect) path = `effects/${enc(effect)}`;
+	else if (view && view !== 'reports') path = view;
 	else if (view === 'reports' && !sub && !report) path = 'stories';
 	else if (sub) path = enc(sub) + (withSub ? '+' + enc(withSub) : '') + (report ? '/' + report.replace(/^erowid-/, '') : '');
 	const q: string[] = [];
