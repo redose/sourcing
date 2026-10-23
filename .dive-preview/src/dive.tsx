@@ -582,9 +582,24 @@ sel AS (
   SELECT report_id FROM ${DB}."report_doses" WHERE canonical_substance = '${esc(b)}'
   ${only ? `INTERSECT SELECT report_id FROM ${DB}."report_doses" WHERE ${onlyFilter([a, b])}` : ''}
 )`;
-const curveObs = (sub: string, other?: string | null, only?: boolean) => (other ? obsFrom(pairSel(sub, other, only)) : obsCTE(sub, !!only));
-const curveSQL = (sub: string, horizon: number, other?: string | null, only?: boolean) => `
-WITH ${curveObs(sub, other, only)},
+// One substance, only closely read stories whose first dose was taken this way (route as normalised by ROUTE_CASE).
+const routeSel = (sub: string, single: boolean, route: string) => `
+reports AS (
+  SELECT r.id AS report_id, coalesce(m.canonical, r.substance) AS primary_sub,
+         len(list_distinct(r.substances)) AS n_subs
+  FROM ${DB}."experience_reports" r
+  LEFT JOIN ${DB}."erowid_substance_map" m ON m.erowid_name = r.substance
+),
+sel AS (
+  SELECT r.report_id, r.n_subs FROM reports r
+  JOIN ${DB}."llm_extractions" x ON x.report_id = r.report_id
+  WHERE r.primary_sub = '${esc(sub)}'${single ? ' AND r.n_subs = 1' : ''}
+    AND ${ROUTE_CASE(`x.extraction->>'$.doses[0].route'`)} = '${esc(route)}'
+)`;
+const curveObs = (sub: string, other?: string | null, only?: boolean, route?: string | null) =>
+	other ? obsFrom(pairSel(sub, other, only)) : route ? obsFrom(routeSel(sub, !!only, route)) : obsCTE(sub, !!only);
+const curveSQL = (sub: string, horizon: number, other?: string | null, only?: boolean, route?: string | null) => `
+WITH ${curveObs(sub, other, only, route)},
 top AS (
   SELECT effect_name FROM eff WHERE hrs < ${horizon}
   GROUP BY 1 ORDER BY count(DISTINCT report_id) DESC, 1 LIMIT 5
@@ -593,8 +608,8 @@ SELECT e.effect_name, floor(e.hrs / ${horizon / SLICES})::INT AS bin, count(DIST
 FROM eff e JOIN top USING (effect_name)
 WHERE e.hrs < ${horizon}
 GROUP BY ALL`;
-const curveDenSQL = (sub: string, horizon: number, other?: string | null, only?: boolean) => `
-WITH ${curveObs(sub, other, only)}
+const curveDenSQL = (sub: string, horizon: number, other?: string | null, only?: boolean, route?: string | null) => `
+WITH ${curveObs(sub, other, only, route)}
 SELECT floor(hrs / ${horizon / SLICES})::INT AS bin, count(DISTINCT report_id) AS n,
   avg(CASE sentiment WHEN 'positive' THEN 1 WHEN 'negative' THEN -1 ELSE 0 END) AS mood,
   (SELECT count(DISTINCT report_id) FROM obs WHERE hrs < ${horizon}) AS total
@@ -810,6 +825,9 @@ const CSS = `
 @keyframes rd-q { 0% { opacity: 0; transform: translateY(0) rotate(-6deg); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px) rotate(10deg); } }
 .rd-q { position: absolute; top: -6%; color: #fff; font-weight: 800; line-height: 1; pointer-events: none; opacity: 0; animation: rd-q 1.35s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .rd-q { animation: none; opacity: .8; } .rd-q + .rd-q { display: none; } }
+.rd-story { display: grid; gap: 32px 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 1024px) { .rd-story { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); } }
+.rd-story > li { padding-right: 14px; }
 .rd-glance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 32px; }
 @media (min-width: 1024px) { .rd-glance.wide { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .rd-glance > li { display: grid; align-content: start; gap: 3px; }
@@ -2959,8 +2977,7 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 					<div className="min-w-0">
 						<div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
 							<div className="flex flex-wrap items-center gap-3">
-								<h1 className="flex items-center gap-3 text-4xl font-semibold sm:text-5xl" style={{ letterSpacing: '-0.02em' }}>
-									<SubstanceIcon name={name} />
+								<h1 className="text-4xl font-semibold sm:text-5xl" style={{ letterSpacing: '-0.02em' }}>
 									{short(name)}
 								</h1>
 								{isGroup(name) && <GroupBadge />}
@@ -3032,12 +3049,6 @@ function SubstanceOverview({ name, afterDosage }: { name: string; afterDosage?: 
 				<DosageDuration name={name} timing={rows(timingQ)} />
 			</section>
 			{afterDosage}
-			{L(r.effects).length > 0 && (
-				<section id="feel" className="mt-24" style={{ scrollMarginTop: 16 }}>
-					<ArticleH2 icon={Sparkles}>What People Feel</ArticleH2>
-					<SubstanceEffects name={name} />
-				</section>
-			)}
 		</>
 	);
 }
@@ -4033,8 +4044,14 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	const pw = rows(q);
 	const ours = timing.filter((t) => S(t.sub) === name);
 	const routes = [...new Set([...ours.filter((t) => S(t.route) !== '*').map((t) => S(t.route)), ...pw.map((r) => normRoute(S(r.route)))])];
-	const [route, setRoute] = useState<string | null>(null);
+	// Shared page state, so Effects follows whichever route is picked here.
+	const [route, setRoute] = useDiveState<string | null>('route', null);
 	const sel = route && routes.includes(route) ? route : routes.find((r) => pw.some((x) => normRoute(S(x.route)) === r && x.dose_common_min != null)) ?? routes[0] ?? '*';
+	// Once the ranges are in, record the route shown by default, so Effects starts on the same one.
+	useEffect(() => {
+		if (!q.isLoading && sel !== '*' && sel !== route) setRoute(sel);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [sel, q.isLoading]);
 	// Plays through once it scrolls into view; switching route replays it (the cards remount).
 	const box = useRef<HTMLDivElement | null>(null);
 	const [go, setGo] = useState(false);
@@ -4064,6 +4081,19 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	const span = Math.max(coreH * 1.08, t ? N(t.end_m) * 1.12 : 0, Number.isFinite(totalLow) ? totalLow : 0, 0.5);
 	// A time-lapse: a playhead sweeps from the dose to the end, and the caption says which stage you'd be in.
 	const stages = (() => {
+		const pwHasPeak = !!p && pwPhases(p).some(([l]) => l === 'Peak');
+		if (p && !pwHasPeak && t) {
+			const pwOn = pwPhases(p).find(([l]) => l === 'Onset');
+			const on = pwOn ? pwOn[1] : N(t.on_m);
+			const b1 = Math.max(on + 0.05, N(t.pk_m) * 0.8), b2 = N(t.pk_m) + (N(t.end_m) - N(t.pk_m)) * 0.45, b3 = N(t.end_m);
+			return [
+				{ label: 'Onset', from: 0, to: on, text: pwOn ? pwOn[2] : '' },
+				{ label: 'Come-up', from: on, to: b1, text: '' },
+				{ label: 'Peak', from: b1, to: b2, text: '' },
+				{ label: 'Offset', from: b2, to: b3, text: '' },
+				{ label: 'Mostly gone', from: b3, to: span * 2, text: '' },
+			];
+		}
 		if (p && pwPhases(p).length) {
 			let at = 0;
 			const out = pwPhases(p).map(([label, h, text]) => {
@@ -5047,12 +5077,13 @@ const niceTicks = (h: number) => {
 };
 const tickLabel = (h: number) => (h === 0 ? '0' : h < 1 ? `${Math.round(h * 60)}m` : `${Math.round(h * 10) / 10}h`);
 
-function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ, pairMoodQ, pairSummaryQ, pairEffectsQ, pairSeqQ, q, kq, curveQ, denQ, horizon, onOpen }: { sub: string; withSub: string | null; only: boolean; setOnly: (v: boolean) => void; onCombo: (a: string, b: string) => void; pairQ: Q; pairTimingQ: Q; pairMoodQ: Q; pairSummaryQ: Q; pairEffectsQ: Q; pairSeqQ: Q; q: Q; kq: Q; curveQ: Q; denQ: Q; horizon: number; onOpen: (id: string) => void }) {
+function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ, pairMoodQ, pairSummaryQ, pairEffectsQ, pairSeqQ, q, kq, curveQ, denQ, horizon, onOpen, effectsRoute }: { sub: string; withSub: string | null; only: boolean; setOnly: (v: boolean) => void; onCombo: (a: string, b: string) => void; pairQ: Q; pairTimingQ: Q; pairMoodQ: Q; pairSummaryQ: Q; pairEffectsQ: Q; pairSeqQ: Q; q: Q; kq: Q; curveQ: Q; denQ: Q; horizon: number; onOpen: (id: string) => void; effectsRoute?: { route: string; used: boolean; loading: boolean } | null }) {
 	const list = rows(q);
 	const k = rows(kq)[0];
 	const [x, setX] = useState<number | null>(null);
 	const [detail, setDetail] = useState(false);
 	const unfoldTimingQ = useSQLQuery(timingSQL(withSub ? [] : [sub]), { enabled: !withSub });
+	const unfoldPwQ = useSQLQuery(dosageSQL(withSub ? '' : sub), { enabled: !withSub });
 	const { open } = useContext(OpenCtx);
 	const w = horizon / SLICES;
 	const { series, denom } = useMemo(() => {
@@ -5090,15 +5121,25 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 		.sort((a, b) => (b.v as number) - (a.v as number));
 	const closeReads = N(rows(denQ)[0]?.total);
 	const phases = (() => {
-		const t = rows(unfoldTimingQ).find((r) => S(r.route) === '*');
-		const [b1, b2, b3] = t
-			? [N(t.pk_m) * 0.8, N(t.pk_m) + (N(t.end_m) - N(t.pk_m)) * 0.45, N(t.end_m)]
-			: [chartMax * 0.2, chartMax * 0.45, chartMax * 0.75];
+		// Boundaries match the Duration card: PsychonautWiki's stages for this route when they include a peak, otherwise
+		// the stories' own timing.
+		const route = effectsRoute?.route;
+		const pw = rows(unfoldPwQ);
+		const pwRow = pw.find((r) => route && normRoute(S(r.route)) === route && pwPhases(r).some(([l]) => l === 'Peak')) ?? pw.find((r) => pwPhases(r).some(([l]) => l === 'Peak'));
+		const t = rows(unfoldTimingQ).find((r) => S(r.route) === (effectsRoute?.used ? route : '*')) ?? rows(unfoldTimingQ).find((r) => S(r.route) === '*');
+		let b: [number, number, number];
+		if (pwRow) {
+			const h = Object.fromEntries(pwPhases(pwRow).map(([l, v]) => [l, v])) as Record<string, number>;
+			const b1 = (h.Onset ?? 0) + (h['Come-up'] ?? 0);
+			b = [b1, b1 + (h.Peak ?? 0), b1 + (h.Peak ?? 0) + (h.Offset ?? 0)];
+		} else if (t) b = [N(t.pk_m) * 0.8, N(t.pk_m) + (N(t.end_m) - N(t.pk_m)) * 0.45, N(t.end_m)];
+		else b = [chartMax * 0.2, chartMax * 0.45, chartMax * 0.75];
+		const [b1, b2, b3] = b;
 		const spans = [
-			{ label: 'Coming on', lo: 0, hi: b1 },
-			{ label: 'At its strongest', lo: b1, hi: b2 },
-			{ label: 'Easing off', lo: b2, hi: b3 },
-			{ label: 'After', lo: b3, hi: chartMax + w },
+			{ label: 'Coming on', color: C.lav, lo: 0, hi: b1 },
+			{ label: 'Peak', color: C.cyan, lo: b1, hi: b2 },
+			{ label: 'Offset', color: C.mint, lo: b2, hi: b3 },
+			{ label: 'After', color: 'rgba(166,242,228,.45)', lo: b3, hi: chartMax + w },
 		];
 		const mean = (pts: { x: number; y: number }[], lo: number, hi: number) => {
 			const v = pts.filter((q) => q.x >= lo && q.x < hi).map((q) => q.y);
@@ -5143,7 +5184,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 
 	// How It Unfolds sits right under Dosage & Duration on a substance page.
 	const unfoldSection = (
-		<section id="unfold" className={withSub ? 'mt-10 border-t pt-7' : 'mt-24'} style={{ borderColor: C.line, scrollMarginTop: 16 }}>
+		<section id="effects" className={withSub ? 'mt-10 border-t pt-7' : 'mt-24'} style={{ borderColor: C.line, scrollMarginTop: 16 }}>
 				{withSub ? (
 					<div className="flex flex-wrap items-baseline justify-between gap-2">
 						<h2 className="text-2xl font-semibold">How it tends to unfold together</h2>
@@ -5151,7 +5192,20 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</div>
 				) : (
 					<>
-						<ArticleH2 icon={Activity} sub={enoughToChart ? `A typical dose in four stretches, from ${closeReads} closely read reports.` : undefined}>How It Unfolds</ArticleH2>
+						<ArticleH2
+							icon={Activity}
+							sub={
+								effectsRoute && !effectsRoute.loading
+									? effectsRoute.used
+										? `A typical dose taken ${routeName(effectsRoute.route).toLowerCase()}, from ${closeReads} closely read reports.`
+										: `Too few ${routeName(effectsRoute.route).toLowerCase()} stories to show that route on its own, so this is all routes together.`
+									: enoughToChart
+										? `A typical dose in four stretches, from ${closeReads} closely read reports.`
+										: undefined
+							}
+						>
+							Effects
+						</ArticleH2>
 						<div className="mt-4">{onlyToggle}</div>
 					</>
 				)}
@@ -5160,7 +5214,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 						<SpunionPuzzle size={110} />
 						<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
 						<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
-							Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
+							{closeReads === 0 ? 'No closely read reports yet, so there’s no timeline to show.' : `Only ${closeReads} closely read ${closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time.`} Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
 						</p>
 						<div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-2">
 							{series
@@ -5174,19 +5228,16 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</div>
 				) : (
 				<>
-				<ol className="rd-story mt-8 grid gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-					{phases.map((ph, i) => {
+				<ol className="rd-story mt-8" style={{ ['--n' as string]: phases.length }}>
+					{phases.map((ph) => {
 						const mood = moodWord(ph.mood);
 						const max = Math.max(...ph.list.map((e) => e.v), 1);
 						return (
 							<li key={ph.label} className="min-w-0">
-								<div className="rd-story-step flex items-center gap-3">
-									<span className="flex items-center justify-center rounded-full text-xs font-bold tabular-nums" style={{ width: 26, height: 26, background: '#fff', color: C.deep, flexShrink: 0 }}>{i + 1}</span>
-									<span className="h-px flex-1" style={{ background: i < phases.length - 1 ? 'rgba(255,255,255,.22)' : 'transparent' }} />
-								</div>
+								<span className="block" style={{ height: 6, borderRadius: 3, background: ph.color }} />
 								<div className="mt-3 font-semibold" style={{ whiteSpace: 'nowrap' }}>{ph.label}</div>
 								<div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs" style={{ color: C.faint }}>
-									<span className="tabular-nums">{span(ph.lo, ph.hi, i === phases.length - 1 && ph.label === 'After')}</span>
+									<span className="tabular-nums">{span(ph.lo, ph.hi, ph.label === 'After')}</span>
 									{mood && (
 										<span className="flex items-center gap-1.5" style={{ color: mood.c }}>
 											<span className="rd-dot" style={{ width: 7, height: 7, background: mood.c }} />
@@ -5212,7 +5263,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					})}
 				</ol>
 				<p className="mt-6 text-xs" style={{ color: C.faint }}>
-					Bold effects are mentioned most in that stretch. Mood is how the moments in it felt, on average.
+					Stretches match the Duration card above. Bold effects are mentioned most in that stretch; mood is how its moments felt, on average.
 				</p>
 				<button className="rd-btn mt-4 text-sm" onClick={() => setDetail(!detail)} aria-expanded={detail}>
 					{detail ? 'Hide the detailed chart' : 'Show the detailed chart'}
@@ -5282,8 +5333,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 							items={[
 								{ id: 'overview', label: 'Overview', icon: FileText },
 								{ id: 'dosage', label: 'Dosage & Duration', icon: Clock },
-								{ id: 'unfold', label: 'How It Unfolds', icon: Activity },
-								{ id: 'feel', label: 'What People Feel', icon: Sparkles },
+								{ id: 'effects', label: 'Effects', icon: Sparkles },
 								{ id: 'numbers', label: 'By the Numbers', icon: BarChart3 },
 								{ id: 'mixes', label: 'Mixing', icon: Link2 },
 								{ id: 'risks', label: 'Known Risks', icon: AlertTriangle },
@@ -5295,7 +5345,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 					</div>
 				)}
 				<div className="min-w-0">
-			{!withSub && <SubstanceOverview name={sub} afterDosage={curveQ.isLoading || kq.isLoading ? <Loading height={320} className="mt-24" quiet /> : series.length > 0 ? unfoldSection : null} />}
+			{!withSub && <SubstanceOverview name={sub} afterDosage={curveQ.isLoading || kq.isLoading ? <Loading height={320} className="mt-24" quiet /> : unfoldSection} />}
 			{!withSub && <SubstanceNumbers name={sub} />}
 			{!withSub && (
 				<section id="mixes" className="mt-24" style={{ scrollMarginTop: 16 }}>
@@ -5392,6 +5442,12 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				</div>
 			</div>
 			<Err q={q} />
+				{!withSub && (
+					<>
+						<h3 className="mt-16 text-lg font-semibold">What people feel</h3>
+						<SubstanceEffects name={sub} />
+					</>
+				)}
 		</section>
 	);
 }
@@ -6190,37 +6246,56 @@ const BOUNCE_CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-/* Each landing changes his colour: logo coral, logo cyan, white (three bounces per cycle, switching on the squash). */
-@keyframes rd-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #fff; } }
-.rd-bounce { display: block; opacity: .85; color: #5ae0e4; animation: rd-bounce .62s infinite, rd-hue 1.86s steps(1, end) infinite; transform-origin: 50% 100%; pointer-events: none; margin-top: 60px; }
-@media (prefers-reduced-motion: reduce) { .rd-bounce { animation: none; } }
+/* The loader: his body is a gradient drifting through the logo's colours; a floor shadow breathes with the bounce;
+   each landing sends out a ring in the colour he's turning. One bounce is .62s; colours cycle over four. */
+.rd-loader { position: relative; display: block; margin-top: 60px; pointer-events: none; }
+.rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; }
+@keyframes rd-g1 { 0%, 100% { stop-color: #fc6c84; } 25% { stop-color: #8a7ddc; } 50% { stop-color: #5ae0e4; } 75% { stop-color: #58e2d8; } }
+@keyframes rd-g2 { 0%, 100% { stop-color: #8a7ddc; } 25% { stop-color: #5ae0e4; } 50% { stop-color: #58e2d8; } 75% { stop-color: #fc6c84; } }
+.rd-g1 { animation: rd-g1 2.48s linear infinite; }
+.rd-g2 { animation: rd-g2 2.48s linear infinite; }
+@keyframes rd-shadow { 0%, 100% { transform: translateX(-50%) scale(1.15, 1); opacity: .45; } 50% { transform: translateX(-50%) scale(.55, .7); opacity: .15; } }
+.rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
+@keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
+@keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 25% { border-color: #8a7ddc; } 50% { border-color: #5ae0e4; } 75% { border-color: #58e2d8; } }
+.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 2.48s steps(1, end) infinite; }
+@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-g1, .rd-g2 { animation: none; } .rd-ring { display: none; } }
 `;
 
-// The loader: Spunion bouncing, going coral, cyan, then white each time he lands. Exported for the
+// The loader: Spunion bouncing, his colour drifting through the logo's palette, a shadow and a landing ring under
+// him. Exported for the
 // preview's startup screen.
 export function BouncingSpunion({ size = 96 }: { size?: number }) {
 	return (
-		<span className="rd-bounce" style={{ width: size, height: size }}>
+		<span className="rd-loader" style={{ width: size, height: size }}>
 			<style>{BOUNCE_CSS}</style>
-			<SpunionGhost />
+			<span className="rd-floor" />
+			<span className="rd-ring" />
+			<span className="rd-bounce">
+				<SpunionGhost />
+			</span>
 		</span>
 	);
 }
 
-// Spunion as a one-colour silhouette for loading (the current text colour): eyes cut out, rings kept.
+// Spunion for loading: a body in a slowly shifting gradient of the logo's colours, eyes cut out, white rings.
 function SpunionGhost() {
 	return (
 		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden style={{ display: 'block', overflow: 'visible' }}>
 			<defs>
+				<linearGradient id="sp-load-grad" x1="0" y1="0" x2="1" y2="1">
+					<stop offset="0%" className="rd-g1" stopColor="#fc6c84" />
+					<stop offset="100%" className="rd-g2" stopColor="#8a7ddc" />
+				</linearGradient>
 				<mask id="sp-ghost-eyes">
 					<rect width="500" height="500" fill="#fff" />
 					<circle cx="185" cy="300" r="86" fill="#000" />
 					<circle cx="357" cy="268" r="64" fill="#000" />
 				</mask>
 			</defs>
-			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="currentColor" mask="url(#sp-ghost-eyes)" />
-			<circle cx="185" cy="300" r="70" fill="none" stroke="currentColor" strokeWidth="6" />
-			<circle cx="357" cy="268" r="49" fill="none" stroke="currentColor" strokeWidth="6" />
+			<path d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z" fill="url(#sp-load-grad)" mask="url(#sp-ghost-eyes)" />
+			<circle cx="185" cy="300" r="70" fill="none" stroke="#fff" strokeOpacity="0.9" strokeWidth="6" />
+			<circle cx="357" cy="268" r="49" fill="none" stroke="#fff" strokeOpacity="0.9" strokeWidth="6" />
 		</svg>
 	);
 }
@@ -6427,8 +6502,17 @@ export default function ReportTimelapse() {
 		return withSub ? Math.max(v, 6) : v;
 	})();
 	const curveReady = onSub && !kpiQ.isLoading;
-	const curveQ = useSQLQuery(curveSQL(sub ?? '', horizon, withSub, only), { enabled: curveReady });
-	const denQ = useSQLQuery(curveDenSQL(sub ?? '', horizon, withSub, only), { enabled: curveReady });
+	const curveAllQ = useSQLQuery(curveSQL(sub ?? '', horizon, withSub, only), { enabled: curveReady });
+	const denAllQ = useSQLQuery(curveDenSQL(sub ?? '', horizon, withSub, only), { enabled: curveReady });
+	// The route picked under Dosage & Duration also drives Effects, when that route has enough close readings.
+	const [routePick, setRoutePick] = useDiveState<string | null>('route', null);
+	const routeOn = curveReady && !withSub && !!routePick;
+	const curveRouteQ = useSQLQuery(curveSQL(sub ?? '', horizon, null, only, routePick), { enabled: routeOn });
+	const denRouteQ = useSQLQuery(curveDenSQL(sub ?? '', horizon, null, only, routePick), { enabled: routeOn });
+	const routeEnough = routeOn && !denRouteQ.isLoading && N(rows(denRouteQ)[0]?.total) >= 10;
+	const curveQ = routeEnough ? curveRouteQ : curveAllQ;
+	const denQ = routeEnough ? denRouteQ : denAllQ;
+	const effectsRoute = routeOn ? { route: routePick!, used: routeEnough, loading: routeOn && denRouteQ.isLoading } : null;
 	const pairTimingQ = useSQLQuery(timingSQL(withSub ? [sub ?? '', withSub] : []), { enabled: onSub && !!withSub });
 	const pairMoodQ = useSQLQuery(pairMoodSQL(sub ?? '', withSub ?? '', 24), { enabled: onSub && !!withSub });
 	const pairSummaryQ = useSQLQuery(pairSummarySQL(sub ?? '', withSub ?? ''), { enabled: onSub && !!withSub });
@@ -6455,6 +6539,7 @@ export default function ReportTimelapse() {
 	const goSubstance = (s: string) => {
 		setView('reports');
 		setSub(s);
+		setRoutePick(undefined as unknown as null);
 		setWithSub(undefined as unknown as null);
 		clearReport();
 		setOpenItem(null);
@@ -6515,6 +6600,7 @@ export default function ReportTimelapse() {
 	};
 	const goView = (v: 'reports' | 'substances' | 'effects') => {
 		setView(v);
+		setRoutePick(undefined as unknown as null);
 		setEffect(undefined as unknown as null);
 		setSub(undefined as unknown as null);
 		setWithSub(undefined as unknown as null);
@@ -6604,7 +6690,7 @@ export default function ReportTimelapse() {
 					)}
 
 					{view === 'reports' && !sub && !reportId && <StoriesBrowse onOpen={goReport} />}
-					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} onCombo={goCombo} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
+					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} onCombo={goCombo} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} effectsRoute={effectsRoute} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
 					{onReport && <TimelapseStep id={reportId!} reportQ={reportQ} marksQ={marksQ} dosesQ={dosesQ} obsQ={obsQ} timingQ={timingQ} pairsQ={pairsQ} frozen={!!openItem} />}
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
 					{view === 'effects' && effect && (
