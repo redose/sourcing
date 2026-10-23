@@ -6561,20 +6561,20 @@ const BOUNCE_CSS = `
   100% { transform: translateY(0) scale(1.22, .76); }
 }
 /* The loader: Spunion stays white; each landing sends out a ring from the floor in the next colour (coral, cyan,
-   lavender), and a floor shadow breathes with the bounce. One bounce is .62s; colours cycle over three. */
+   lavender), and a floor shadow breathes with the bounce. One bounce is .52s; colours cycle over three. */
 .rd-loader { position: relative; display: block; margin-top: 60px; pointer-events: none; }
-.rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; }
+.rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .52s infinite; transform-origin: 50% 100%; }
 @keyframes rd-shadow { 0%, 100% { transform: translateX(-50%) scale(1.15, 1); opacity: .45; } 50% { transform: translateX(-50%) scale(.55, .7); opacity: .15; } }
-.rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
+.rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .52s infinite; }
 @keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
 @keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5ae0e4; } 66.667% { border-color: #b3a8f0; } }
 @keyframes rd-exude { 0% { transform: scale(1.06); opacity: .4; } 60% { transform: scale(.94); opacity: .15; } 100% { transform: scale(1.06); opacity: .4; } }
 @keyframes rd-glow-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #b3a8f0; } }
 .rd-halo { position: absolute; inset: -10%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, currentColor, transparent 70%); filter: blur(6px); animation: rd-exude .62s ease-out infinite, rd-glow-hue 1.86s steps(1, end) infinite; }
 @keyframes rd-pound { 0%, 100% { transform: translateY(3px) scale(1.02, .9); } 18% { transform: none; } }
-.rd-pad { display: grid; gap: 7px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); transform-origin: 50% 0; animation: rd-pound .62s infinite; }
+.rd-pad { display: grid; gap: 7px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); transform-origin: 50% 0; animation: rd-pound .52s infinite; }
 .rd-pad > span { display: block; height: 7px; border-radius: 4px; background: rgba(255,255,255,.14); }
-.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
+.rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .52s ease-out infinite, rd-ring-hue 1.56s steps(1, end) infinite; }
 @media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo, .rd-pad { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5ae0e4; opacity: .4; } }
 `;
 
@@ -6584,17 +6584,19 @@ const BOUNCE_CSS = `
 // appears soon after hops over from there; if none does, the corner Spunion hops home from there.
 let lastSpunionSpot: { x: number; y: number; at: number } | null = null;
 // One big arcing hop: from (dx, dy) away to where the element sits now, up and over, landing with a squash.
-function hopFrom(el: HTMLElement, dx: number, dy: number, duration = 720) {
+function hopFrom(el: HTMLElement, dx: number, dy: number, duration = 470) {
 	if (Math.hypot(dx, dy) < 24 || typeof el.animate !== 'function') return;
-	const peak = Math.min(dy, 0) - Math.max(140, Math.abs(dx) * 0.35);
+	const peak = Math.min(dy, 0) - Math.max(110, Math.abs(dx) * 0.3);
 	el.animate(
 		[
-			{ transform: `translate(${dx}px, ${dy}px) scale(1.1, .85)` },
-			{ transform: `translate(${dx * 0.5}px, ${peak}px) scale(.95, 1.08)`, offset: 0.5 },
-			{ transform: 'translate(0, 0) scale(1.15, .82)', offset: 0.9 },
+			{ transform: `translate(${dx}px, ${dy}px) scale(1.18, .78)` },
+			{ transform: `translate(${dx * 0.92}px, ${dy - 18}px) scale(.88, 1.16)`, offset: 0.12 },
+			{ transform: `translate(${dx * 0.5}px, ${peak}px) scale(.96, 1.06)`, offset: 0.5 },
+			{ transform: 'translate(0, 0) scale(1.2, .78)', offset: 0.86 },
+			{ transform: 'translate(0, -6px) scale(.96, 1.05)', offset: 0.94 },
 			{ transform: 'translate(0, 0) scale(1, 1)' },
 		],
-		{ duration, easing: 'cubic-bezier(.33,.66,.4,1)' },
+		{ duration, easing: 'cubic-bezier(.25,.8,.35,1)' },
 	);
 }
 export function BouncingSpunion({ size = 96, style }: { size?: number; style?: React.CSSProperties }) {
@@ -6822,7 +6824,7 @@ function Spunion({ tips, lift, autoOpen }: { tips: string[]; lift: boolean; auto
 			const el = meRef.current, spot = lastSpunionSpot;
 			if (!el || !spot || Date.now() - spot.at > 2000 || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 			const r = el.getBoundingClientRect();
-			hopFrom(el, spot.x - window.scrollX - r.left, spot.y - window.scrollY - r.top, 900);
+			hopFrom(el, spot.x - window.scrollX - r.left, spot.y - window.scrollY - r.top, 620);
 		};
 		window.addEventListener('rd-spunion-home', home);
 		return () => window.removeEventListener('rd-spunion-home', home);
