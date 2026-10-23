@@ -4,8 +4,8 @@ import { MotherDuckSDKProvider, useConnectionStatus } from './md-sdk';
 import { AlertCircle } from 'lucide-react';
 import Dive, { StartScreen } from './dive';
 
-// The intro (Spunion bouncing down to the corner) takes about four seconds; let it finish before the site appears.
-const INTRO_MS = 4300;
+// Keep the start screen up long enough to see Spunion land a couple of times.
+const INTRO_MS = 1600;
 
 // ?intro shows just the intro, on a loop you can replay by clicking, to look at it properly.
 function IntroOnly() {
