@@ -901,9 +901,9 @@ const CSS = `
 .rd .rd-home-search:focus-within { border-color: rgba(217,207,255,.6) !important; box-shadow: 0 0 0 4px rgba(217,207,255,.12), 0 20px 50px rgba(10,4,40,.5) !important; }
 /* Homepage only: the molecules wander further and quicker, and light up around the pointer. */
 .rd-mol-glow { position: fixed; inset: 0; z-index: -1; pointer-events: none; transition: opacity .6s;
-  -webkit-mask-image: radial-gradient(circle 220px at var(--mx, -999px) var(--my, -999px), #000 0%, rgba(0,0,0,.5) 45%, transparent 100%);
-  mask-image: radial-gradient(circle 220px at var(--mx, -999px) var(--my, -999px), #000 0%, rgba(0,0,0,.5) 45%, transparent 100%); }
-.rd-mol-glow .rd-molecules { opacity: .32 !important; -webkit-mask-image: none; mask-image: none; }
+  -webkit-mask-image: radial-gradient(circle 260px at var(--mx, -999px) var(--my, -999px), #000 0%, transparent 100%);
+  mask-image: radial-gradient(circle 260px at var(--mx, -999px) var(--my, -999px), #000 0%, transparent 100%); }
+.rd-mol-glow .rd-molecules { opacity: .1 !important; -webkit-mask-image: none; mask-image: none; }
 @media (hover: none) { .rd-mol-glow { display: none; } }
 @keyframes rd-drift-home { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(140px, 200px) rotate(5deg); } 100% { transform: translate(250px, 60px) rotate(-4deg); } }
 .rd-home.rd-fx-rainbow .rd-molecules { animation: rd-drift-home 70s ease-in-out infinite alternate, rd-mol-hue 16s linear infinite; }
