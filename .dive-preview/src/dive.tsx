@@ -6724,6 +6724,8 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 	const [atH, setAt] = useDiveState<number | null>('at', null);
 	const [openKey, setOpenKey] = useState<string | null>(null);
 	const [tip, setTip] = useState<string | null>(null);
+	const [playing, setPlaying] = useState(false);
+	const [copied, setCopied] = useState(false);
 	const boxRef = useRef<HTMLDivElement>(null);
 	const dotRefs = useRef(new Map<number, HTMLSpanElement>());
 	const [pts, setPts] = useState<{ x: number; y: number; mins: number }[]>([]);
@@ -6768,6 +6770,18 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 	}, [dosesQ.data, obsQ.data, pairsQ.data]);
 
 	const now = atH == null ? null : Math.round(atH * 60);
+	// Play steps "now" through each moment in turn and keeps it in view.
+	const times = useMemo(() => [...new Set(events.map((e) => e.mins))], [events]);
+	useEffect(() => {
+		if (!playing) return;
+		const i = times.findIndex((t) => now == null || t > now);
+		if (i < 0) return setPlaying(false);
+		const h = setTimeout(() => setAt(times[i] / 60), now == null ? 0 : 1100);
+		return () => clearTimeout(h);
+	}, [playing, now, times]);
+	useEffect(() => {
+		if (playing && now != null) document.getElementById(`rd-now-${now}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+	}, [playing, now]);
 	const CX = 48, R = 40, CAP = 6;
 	const groupTotal = new Map<number, number>();
 	for (const e of events) if (e.kind === 'felt') groupTotal.set(e.mins, (groupTotal.get(e.mins) ?? 0) + e.total);
@@ -6817,11 +6831,36 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 			<header style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
 				<p style={{ margin: 0, fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', color: C.faint }}>{['Erowid', report.yr ? String(report.yr) : null, repeat].filter(Boolean).join(' · ')}</p>
 				<h2 style={{ margin: 0, fontSize: 30, lineHeight: 1.2 }}>{title}</h2>
-				{erowidId && (
-					<a href={`https://erowid.org/experiences/exp.php?ID=${erowidId}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: C.soft, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.35)', textUnderlineOffset: 3 }}>
-						Read the full story on Erowid ↗
-					</a>
-				)}
+				<div className="flex flex-wrap items-center justify-center gap-2" style={{ marginTop: 6 }}>
+					{erowidId && (
+						<a href={`https://erowid.org/experiences/exp.php?ID=${erowidId}`} target="_blank" rel="noopener noreferrer" className="rd-tag" title="Read the original report on Erowid" style={{ textDecoration: 'none', background: 'rgba(255,255,255,.08)' }}>
+							<img src={EROWID_ICON} alt="" width={16} height={16} style={{ display: 'block', borderRadius: 4 }} />
+							Erowid #{erowidId}
+							<span style={{ color: C.faint }}>↗</span>
+						</a>
+					)}
+					<button
+						className="rd-tag"
+						aria-label="Copy link to this moment"
+						title={copied ? 'Link copied' : 'Copy link to this moment'}
+						style={{ background: copied ? 'rgba(166,242,228,.18)' : 'rgba(255,255,255,.08)', padding: '6px 10px' }}
+						onClick={() => navigator.clipboard?.writeText(window.location.href).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)))}
+					>
+						{copied ? <Check size={14} color={C.mint} /> : <Link2 size={14} />}
+					</button>
+					<button
+						className="rd-tag"
+						style={{ background: 'rgba(255,255,255,.08)' }}
+						onClick={() => {
+							if (playing) return setPlaying(false);
+							if (now != null && now >= times[times.length - 1]) setAt(undefined as unknown as null);
+							setPlaying(true);
+						}}
+					>
+						{playing ? <Pause size={14} /> : <Play size={14} />}
+						{playing ? 'Pause' : 'Play'}
+					</button>
+				</div>
 			</header>
 
 			{key.length > 0 && (
@@ -6863,7 +6902,7 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 							<div style={{ position: 'relative', paddingTop: gap, display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
 								{big && <span style={{ position: 'absolute', right: 8, top: gap / 2 - 7, fontSize: 11, lineHeight: '14px', color: C.faint, whiteSpace: 'nowrap' }}>{Math.round(mins / 60)}h later</span>}
 								{!same && (
-									<button onClick={() => setAt(isNow ? (undefined as unknown as null) : e.mins / 60)} title="Set now to this moment" style={{ fontSize: 13, lineHeight: '24px', fontWeight: 600, padding: '0 8px', borderRadius: 999, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', userSelect: 'none', color: isNow ? C.deep : C.soft, background: isNow ? '#fff' : 'transparent' }}>
+									<button id={`rd-now-${e.mins}`} onClick={() => (setPlaying(false), setAt(isNow ? (undefined as unknown as null) : e.mins / 60))} title="Set now to this moment" style={{ fontSize: 13, lineHeight: '24px', fontWeight: 600, padding: '0 8px', borderRadius: 999, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', userSelect: 'none', color: isNow ? C.deep : C.soft, background: isNow ? '#fff' : 'transparent' }}>
 										{hm(e.mins)}
 									</button>
 								)}
