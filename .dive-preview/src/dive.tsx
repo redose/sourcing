@@ -1022,6 +1022,42 @@ const interp = (pts: Pt[], x: number) => {
 	return pts[pts.length - 1].y;
 };
 
+// Mood over time as a smooth curve: a Gaussian-weighted average of the moments around each point, broken where
+// there's too little nearby to say anything.
+function moodKernel(points: Pt[], xMax: number) {
+	const xs = points.map((p) => p.x);
+	const span = Math.max(Math.max(...xs) - Math.min(...xs), xMax * 0.05);
+	const h = Math.max(xMax / 45, span / 28);
+	const at = (x: number) => {
+		let sw = 0, sy = 0;
+		for (const p of points) {
+			const w = Math.exp(-0.5 * ((x - p.x) / h) ** 2);
+			sw += w;
+			sy += w * p.y;
+		}
+		return { v: sw ? sy / sw : 0, w: sw };
+	};
+	return at;
+}
+function moodSegments(points: Pt[], xMax: number): Pt[][] {
+	if (points.length < 2) return [points];
+	const at = moodKernel(points, xMax);
+	const lo = Math.min(...points.map((p) => p.x)), hi = Math.max(...points.map((p) => p.x));
+	const segs: Pt[][] = [];
+	let cur: Pt[] | null = null;
+	for (let i = 0; i <= 90; i++) {
+		const x = lo + ((hi - lo) * i) / 90;
+		const { v, w } = at(x);
+		if (w < 0.15) {
+			cur = null;
+			continue;
+		}
+		if (!cur) segs.push((cur = []));
+		cur.push({ x, y: v });
+	}
+	return segs;
+}
+
 function ScrubChart({
 	id,
 	lanes,
@@ -1153,19 +1189,16 @@ function ScrubChart({
 							{lane.series.map((s) => {
 								const pts = s.points.map((p) => ({ x: sx(p.x), y: sy(lane, li, clamp(p.y, lane.min, lane.max)) }));
 								if (!pts.length) return null;
-								// Linear lanes (mood) break where the data has gaps of more than 2 h, instead of drawing across them.
-								const segs: Pt[][] = [];
-								s.points.forEach((p, k) => {
-									if (k === 0 || (lane.linear && p.x - s.points[k - 1].x > 2)) segs.push([]);
-									segs[segs.length - 1].push(pts[k]);
-								});
-								const line = segs.map((g) => (lane.linear ? linePath(g) : smoothPath(g))).join('');
-								const area = segs.map((g) => `${lane.linear ? linePath(g) : smoothPath(g)}L${g[g.length - 1].x},${base}L${g[0].x},${base}Z`).join('');
+								// Mood lanes draw a smoothed curve (see moodSegments); other lanes join their points smoothly.
+								const toPx = (g: Pt[]) => g.map((p) => ({ x: sx(p.x), y: sy(lane, li, clamp(p.y, lane.min, lane.max)) }));
+								const segs: Pt[][] = lane.linear ? moodSegments(s.points, xMax).map(toPx).filter((g) => g.length > 1) : [pts];
+								const line = segs.map((g) => smoothPath(g)).join('');
+								const area = segs.map((g) => `${smoothPath(g)}L${g[g.length - 1].x},${base}L${g[0].x},${base}Z`).join('');
 								return (
 									<g key={s.key}>
 										<path d={area} fill={`url(#${id}-${li}-${s.key})`} />
 										<path d={line} fill="none" stroke={lane.diverging ? 'rgba(255,255,255,.85)' : s.color} strokeWidth="1.6" strokeLinejoin="round" />
-										{lane.linear && pts.map((p, k) => <circle key={k} cx={p.x} cy={p.y} r={2.2} fill="#fff" opacity="0.85" />)}
+										{lane.linear && pts.map((p, k) => <circle key={k} cx={p.x} cy={p.y} r={1.8} fill="#fff" opacity="0.35" />)}
 									</g>
 								);
 							})}
@@ -1174,7 +1207,8 @@ function ScrubChart({
 							))}
 							{lane.series.map((s) => {
 								const inside = s.points.length && x >= s.points[0].x && x <= s.points[s.points.length - 1].x;
-								const v = inside ? interp(s.points, x) : null;
+								const k = lane.linear && inside ? moodKernel(s.points, xMax)(x) : null;
+								const v = !inside ? null : k ? (k.w >= 0.15 ? k.v : null) : interp(s.points, x);
 								if (v == null) return null;
 								return <circle key={`dot-${s.key}`} cx={cx} cy={sy(lane, li, clamp(v, lane.min, lane.max))} r={4} fill="#fff" />;
 							})}
@@ -2162,128 +2196,70 @@ const LANES = [
 ];
 type Mix = { key: string; label: string; lane: number; n: number; status: string; note: string; members: string[]; known: boolean; r?: Record<string, unknown> };
 
-// The mixing board: what people actually mix it with, sorted into TripSit's risk levels from low to dangerous, plus
-// the pairs TripSit warns about that nobody wrote about. Pick one to see the note and how it went.
+// Mixing: what people actually mix it with, most common first. Each row shows how often, TripSit's rating and how it
+// went; open one for TripSit's note and the stories. Pairs TripSit warns about that people rarely mix are in Known Risks.
 function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: string) => void }) {
-	const commonQ = useSQLQuery(focusCombosSQL(name, 14));
+	const commonQ = useSQLQuery(focusCombosSQL(name, 12));
 	const knownQ = useSQLQuery(knownMixSQL(name));
 	const [pick, setPick] = useState<string | null>(null);
-	const known = rows(knownQ).map((r) => ({ grp: S(r.grp), rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
-	const common: Mix[] = rows(commonQ).map((r) => {
+	const known = rows(knownQ).map((r) => ({ rank: N(r.rank), status: S(r.status), note: S(r.note), members: L(r.members).map(String) }));
+	const mixes = rows(commonQ).map((r) => {
 		const g = known.find((k) => k.members.includes(S(r.s)));
-		const lane = r.sev != null ? N(r.sev) : r.status ? 0 : -1;
-		return { key: S(r.s), label: short(S(r.s)), lane, n: N(r.n), status: S(r.status) || g?.status || '', note: S(r.note) || (lane >= 0 ? g?.note ?? '' : ''), members: [], known: false, r };
+		const sev = r.sev != null ? N(r.sev) : r.status ? 0 : -1;
+		return { key: S(r.s), label: short(S(r.s)), sev, n: N(r.n), status: S(r.status) || g?.status || '', note: S(r.note) || (sev >= 0 ? g?.note ?? '' : ''), r };
 	});
-	const covered = new Set(common.flatMap((m) => known.filter((k) => k.members.includes(m.key)).map((k) => k.grp)));
-	const extra: Mix[] = known
-		.filter((k) => !covered.has(k.grp) && k.rank >= 1)
-		.map((k) => ({ key: `ts:${k.grp}`, label: tsGroup(k.grp), lane: k.rank, n: 0, status: k.status, note: k.note, members: k.members, known: true }));
-	const all = [...common, ...extra];
-	const unrated = all.filter((m) => m.lane < 0);
-	const maxN = Math.max(1, ...common.map((m) => m.n));
-	const sel = all.find((m) => m.key === pick) ?? common.find((m) => m.lane >= 0) ?? all[0];
 	if (commonQ.isLoading || knownQ.isLoading) return <Loading height={300} className="mt-5" quiet />;
-	if (!all.length) return <EmptyNote>No combinations on record yet.</EmptyNote>;
-	const top = common.slice(0, 3).map((m) => m.label);
-	const nBad = (k: number) => all.filter((m) => m.lane === k).length;
+	if (!mixes.length) return <EmptyNote>No combinations on record yet.</EmptyNote>;
+	const maxN = Math.max(1, ...mixes.map((m) => m.n));
+	const risky = mixes.filter((m) => m.sev >= 2);
+	const top = mixes.slice(0, 3).map((m) => m.label);
 	return (
 		<div className="mt-5">
 			<p style={{ color: C.soft, lineHeight: 1.6 }}>
-				{top.length > 0 && (
-					<>
-						People most often mix it with <b style={{ color: '#fff' }}>{top.slice(0, -1).join(', ')}{top.length > 1 ? ' and ' : ''}{top[top.length - 1]}</b>.{' '}
-					</>
-				)}
-				{nBad(3) + nBad(2) > 0
-					? `TripSit warns against ${[nBad(3) && `${nBad(3)} as dangerous`, nBad(2) && `${nBad(2)} as unsafe`].filter(Boolean).join(' and ')}.`
-					: 'TripSit doesn’t mark any of these as unsafe.'}
+				People most often mix it with <b style={{ color: '#fff' }}>{top.slice(0, -1).join(', ')}{top.length > 1 ? ' and ' : ''}{top[top.length - 1]}</b>.{' '}
+				{risky.length ? `TripSit rates ${risky.map((m) => m.label).join(' and ')} as ${risky.some((m) => m.sev === 3) ? 'dangerous or unsafe' : 'unsafe'} with it.` : 'None of these common mixes is rated unsafe by TripSit.'}
 			</p>
-			<div className="mt-6 grid gap-x-4 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-				{LANES.map((lane) => {
-					const list = all.filter((m) => m.lane === lane.k);
+			<div className="mt-6" role="list">
+				{mixes.map((m) => {
+					const on = pick === m.key;
 					return (
-						<div key={lane.k} className="min-w-0">
-							<div style={{ height: 4, borderRadius: 4, background: lane.c, opacity: 0.9 }} />
-							<div className="mt-2.5 flex items-baseline justify-between">
-								<span className="text-sm font-semibold" style={{ color: lane.c }}>{lane.label}</span>
-								<span className="text-xs tabular-nums" style={{ color: C.faint }}>{list.length || ''}</span>
-							</div>
-							<div className="mt-3 grid gap-1.5">
-								{list.length === 0 && <span className="text-xs" style={{ color: C.faint }}>None here</span>}
-								{list.map((m) => {
-									const on = sel?.key === m.key;
-									return (
-										<button
-											key={m.key}
-											onClick={() => setPick(m.key)}
-											className="rd-hover min-w-0 rounded-xl px-3 py-2 text-left"
-											aria-pressed={on}
-											style={{ background: on ? 'rgba(255,255,255,.15)' : m.known ? 'transparent' : 'rgba(255,255,255,.06)', border: `1px ${m.known ? 'dashed' : 'solid'} ${on ? lane.c : m.known ? 'rgba(255,255,255,.22)' : 'transparent'}` }}
-										>
-											<span className="flex items-baseline justify-between gap-2">
-												<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</span>
-												<span className="text-xs tabular-nums" style={{ color: C.faint, whiteSpace: 'nowrap' }}>{m.known ? 'less common' : m.n.toLocaleString()}</span>
-											</span>
-											{!m.known && (
-												<span className="mt-1.5 block" style={{ height: 3, borderRadius: 3, background: 'rgba(255,255,255,.08)' }}>
-													<span className="block h-full" style={{ width: `${Math.max(4, (100 * m.n) / maxN)}%`, borderRadius: 3, background: lane.c, opacity: 0.75 }} />
-												</span>
-											)}
+						<div key={m.key} role="listitem" style={{ borderTop: `1px solid ${C.line}` }}>
+							<button onClick={() => setPick(on ? null : m.key)} aria-expanded={on} className="rd-hover grid w-full items-center gap-x-4 gap-y-2 rounded-xl px-2 py-3 text-left" style={{ gridTemplateColumns: 'minmax(110px, 1.1fr) minmax(0, 2fr) auto 16px' }}>
+								<span className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.key}>{m.label}</span>
+								<span className="flex min-w-0 items-center gap-3">
+									<span className="block flex-1" style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,.07)', maxWidth: 260 }}>
+										<span className="block h-full" style={{ width: `${Math.max(3, (100 * m.n) / maxN)}%`, borderRadius: 3, background: 'rgba(255,255,255,.55)' }} />
+									</span>
+									<span className="text-xs tabular-nums" style={{ color: C.faint, whiteSpace: 'nowrap' }}>{m.n.toLocaleString()} stories</span>
+								</span>
+								<span style={{ whiteSpace: 'nowrap' }}>
+									{m.sev >= 1 ? <RiskPill sev={m.sev} small /> : m.sev === 0 ? <span className="text-xs font-semibold" style={{ color: C.mint }}>Low risk</span> : <span className="text-xs" style={{ color: C.faint }}>No rating</span>}
+								</span>
+								<ChevronDown size={14} color={C.faint} style={{ transform: on ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+							</button>
+							{on && (
+								<div className="rd-fade grid gap-3 px-2 pb-5 pt-1">
+									{m.sev >= 0 ? (
+										<p style={{ lineHeight: 1.6 }}>
+											<b>{TS_PHRASE[m.status] ?? ''}</b> <span style={{ color: C.soft }}>{m.note || TS_FALLBACK[m.sev] || ''}</span>
+										</p>
+									) : (
+										<p className="text-sm" style={{ color: C.soft }}>TripSit’s chart doesn’t rate this pair. That doesn’t make it safe.</p>
+									)}
+									<div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+										<OutcomeBar pos={m.r.pos} neg={m.r.neg} n={N(m.r.n_llm)} />
+										<button className="rd-btn text-sm" style={{ background: '#fff', color: C.deep }} onClick={() => onCombo(name, m.key)}>
+											Read the stories
 										</button>
-									);
-								})}
-							</div>
+									</div>
+								</div>
+							)}
 						</div>
 					);
 				})}
 			</div>
-			{unrated.length > 0 && (
-				<p className="mt-6 text-sm" style={{ color: C.faint }}>
-					Also often mixed with, but not on TripSit’s chart:{' '}
-					{unrated.map((m, i) => (
-						<Fragment key={m.key}>
-							{i > 0 && ', '}
-							<button onClick={() => setPick(m.key)} style={{ color: sel?.key === m.key ? '#fff' : C.soft, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.25)', textUnderlineOffset: 3, whiteSpace: 'nowrap' }}>
-								{m.label}
-							</button>
-						</Fragment>
-					))}
-					. Not being on the chart doesn’t make a mix safe.
-				</p>
-			)}
-			{sel && (
-				<div key={sel.key} className="rd-card rd-fade mt-6 p-5 sm:p-6">
-					<div className="flex flex-wrap items-center justify-between gap-3">
-						<h3 className="text-xl font-semibold" style={{ whiteSpace: 'nowrap' }}>
-							{short(name)} + {sel.label}
-						</h3>
-						{sel.lane >= 1 ? <RiskPill sev={sel.lane} /> : sel.lane === 0 ? <span className="text-sm font-semibold" style={{ color: C.mint }}>Low risk</span> : <span className="text-sm" style={{ color: C.faint }}>Not on TripSit’s chart</span>}
-					</div>
-					{sel.lane >= 0 && (
-						<p className="mt-3" style={{ lineHeight: 1.6 }}>
-							<b>{TS_PHRASE[sel.status] ?? ''}</b> <span style={{ color: C.soft }}>{sel.note || TS_FALLBACK[sel.lane] || ''}</span>
-						</p>
-					)}
-					{sel.known ? (
-						<p className="mt-3 text-sm" style={{ color: C.faint, lineHeight: 1.6 }}>
-							Covers {sel.members.slice(0, 6).map(short).join(', ')}
-							{sel.members.length > 6 ? ` and ${sel.members.length - 6} more` : ''}. Not one of the mixes people write about most, so it’s here for TripSit’s warning.
-						</p>
-					) : (
-						<div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-							<span className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" style={{ color: C.soft }}>
-								<span>{sel.n.toLocaleString()} stories together</span>
-								{sel.r && <OutcomeBar pos={sel.r.pos} neg={sel.r.neg} n={N(sel.r.n_llm)} />}
-							</span>
-							<button className="rd-btn text-sm" style={{ background: '#fff', color: C.deep }} onClick={() => onCombo(name, sel.key)}>
-								Read the stories
-							</button>
-						</div>
-					)}
-				</div>
-			)}
-			<p className="mt-4 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint }}>
-				Risk levels from TripSit’s combination chart; numbers from our stories.
+			<p className="mt-4 flex flex-wrap items-center gap-2 text-xs" style={{ color: C.faint, borderTop: `1px solid ${C.line}`, paddingTop: 14 }}>
+				Ratings from TripSit; numbers from our stories. Pairs TripSit warns about that people rarely mix are under Known Risks.
 				<TripSitBadge />
 			</p>
 		</div>
@@ -6302,8 +6278,11 @@ const BOUNCE_CSS = `
 .rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
 @keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
 @keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5ae0e4; } 66.667% { border-color: #b3a8f0; } }
+@keyframes rd-exude { 0% { transform: scale(1.25); opacity: .85; } 60% { transform: scale(.85); opacity: .25; } 100% { transform: scale(1.25); opacity: .85; } }
+@keyframes rd-glow-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #b3a8f0; } }
+.rd-halo { position: absolute; inset: -30%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, currentColor, transparent 72%); filter: blur(8px); animation: rd-exude .62s ease-out infinite, rd-glow-hue 1.86s steps(1, end) infinite; }
 .rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
-@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring { animation: none; } .rd-ring { display: none; } }
+@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5ae0e4; opacity: .4; } }
 `;
 
 // The loader: white Spunion bouncing, a shadow under him and a coloured ring on each landing. Exported for the
@@ -6315,6 +6294,7 @@ export function BouncingSpunion({ size = 96 }: { size?: number }) {
 			<span className="rd-floor" />
 			<span className="rd-ring" />
 			<span className="rd-bounce">
+				<span className="rd-halo" />
 				<SpunionGhost />
 			</span>
 		</span>
@@ -6574,6 +6554,7 @@ export default function ReportTimelapse() {
 		setAtLink(undefined as unknown as null);
 	};
 	const goSubstance = (s: string) => {
+		window.scrollTo?.({ top: 0 });
 		setView('reports');
 		setSub(s);
 		setRoutePick(undefined as unknown as null);
@@ -6622,6 +6603,7 @@ export default function ReportTimelapse() {
 	// He opens his bubble by himself only when it matters; otherwise he waits to be tapped.
 	const spunionSpeaks = pairSev >= 2 || (!greeted && !onSub && !onReport);
 	const goReport = (id: string, s: string) => {
+		window.scrollTo?.({ top: 0 });
 		setView('reports');
 		if (s) setSub(s);
 		setWithSub(undefined as unknown as null);
@@ -6636,6 +6618,7 @@ export default function ReportTimelapse() {
 		window.scrollTo?.({ top: 0 });
 	};
 	const goView = (v: 'reports' | 'substances' | 'effects') => {
+		window.scrollTo?.({ top: 0 });
 		setView(v);
 		setRoutePick(undefined as unknown as null);
 		setEffect(undefined as unknown as null);
@@ -6657,6 +6640,7 @@ export default function ReportTimelapse() {
 	// Which nav item is "here": a substance or pair page counts as Substances, a story as Stories.
 	const navHere = view === 'reports' ? (reportId || !sub ? 'reports' : 'substances') : view;
 	const goCombo = (a: string, b: string) => {
+		window.scrollTo?.({ top: 0 });
 		setView('reports');
 		setSub(a);
 		setWithSub(b);
