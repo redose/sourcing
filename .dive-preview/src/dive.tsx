@@ -6278,9 +6278,9 @@ const BOUNCE_CSS = `
 .rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
 @keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
 @keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 33.333% { border-color: #5ae0e4; } 66.667% { border-color: #b3a8f0; } }
-@keyframes rd-exude { 0% { transform: scale(1.25); opacity: .85; } 60% { transform: scale(.85); opacity: .25; } 100% { transform: scale(1.25); opacity: .85; } }
+@keyframes rd-exude { 0% { transform: scale(1.06); opacity: .4; } 60% { transform: scale(.94); opacity: .15; } 100% { transform: scale(1.06); opacity: .4; } }
 @keyframes rd-glow-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #b3a8f0; } }
-.rd-halo { position: absolute; inset: -30%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, currentColor, transparent 72%); filter: blur(8px); animation: rd-exude .62s ease-out infinite, rd-glow-hue 1.86s steps(1, end) infinite; }
+.rd-halo { position: absolute; inset: -10%; z-index: -1; border-radius: 50%; background: radial-gradient(closest-side, currentColor, transparent 70%); filter: blur(6px); animation: rd-exude .62s ease-out infinite, rd-glow-hue 1.86s steps(1, end) infinite; }
 .rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 1.86s steps(1, end) infinite; }
 @media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-halo { animation: none; } .rd-ring { display: none; } .rd-halo { color: #5ae0e4; opacity: .4; } }
 `;
@@ -6292,7 +6292,6 @@ export function BouncingSpunion({ size = 96 }: { size?: number }) {
 		<span className="rd-loader" style={{ width: size, height: size }}>
 			<style>{BOUNCE_CSS}</style>
 			<span className="rd-floor" />
-			<span className="rd-ring" />
 			<span className="rd-bounce">
 				<span className="rd-halo" />
 				<SpunionGhost />
