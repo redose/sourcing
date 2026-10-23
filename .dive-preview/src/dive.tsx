@@ -3473,347 +3473,6 @@ function GlobalSearch({ subs, onSubstance, onEffect, onReport }: { subs: Record<
 	);
 }
 
-// Live counts for the "How it works" page.
-const aboutSQL = `
-SELECT
-  (SELECT count(*) FROM ${DB}."experience_reports") AS reports,
-  (SELECT count(*) FROM ${DB}."llm_extractions") AS read_closely,
-  (SELECT count(*) FROM ${DB}."llm_observations") AS moments,
-  (SELECT count(DISTINCT canonical_substance) FROM ${DB}."report_doses") AS substances,
-  (SELECT count(DISTINCT effect_name) FROM ${DB}."llm_observation_effects") AS effects,
-  (SELECT count(*) FROM ${DB}."tripsit_combos") AS pairs,
-  (SELECT count(*) FROM ${DB}."street_names") AS street_names,
-  (SELECT count(*) FROM ${DB}."substance_structures") AS molecules,
-  (SELECT min(TRY_CAST(experience_year AS INTEGER)) FROM ${DB}."experience_reports" WHERE TRY_CAST(experience_year AS INTEGER) > 1950) AS first_year,
-  (SELECT max(TRY_CAST(experience_year AS INTEGER)) FROM ${DB}."experience_reports" WHERE TRY_CAST(experience_year AS INTEGER) < 2100) AS last_year`;
-
-// One real close reading, shown as stored, on the About page.
-const sampleReadingSQL = `SELECT report_id, extraction FROM ${DB}."llm_extractions" WHERE report_id = 'erowid-101907'`;
-// Downloadable, re:dose's own derived numbers (no story text): one row per substance, and effects by substance.
-const downloadSubstancesSQL = `
-SELECT d.canonical_substance AS substance, count(DISTINCT d.report_id) AS reports, count(DISTINCT x.report_id) AS read_closely,
-  round(avg((x.overall_sentiment = 'positive')::INT), 3) AS share_went_well, round(avg((x.overall_sentiment = 'negative')::INT), 3) AS share_rough,
-  round(avg(x.would_repeat::INT), 3) AS share_would_repeat
-FROM ${DB}."report_doses" d LEFT JOIN ${DB}."llm_extractions" x USING (report_id)
-WHERE d.canonical_substance IS NOT NULL
-GROUP BY 1 HAVING count(DISTINCT d.report_id) >= 10
-ORDER BY reports DESC`;
-const downloadEffectsSQL = `
-SELECT d.canonical_substance AS substance, e.effect_name AS effect, count(DISTINCT e.report_id) AS reports_mentioning
-FROM ${DB}."llm_observation_effects" e JOIN ${DB}."report_doses" d USING (report_id)
-WHERE e.confidence <> 'low' AND d.canonical_substance IS NOT NULL
-GROUP BY 1, 2 HAVING count(DISTINCT e.report_id) >= 3
-ORDER BY substance, reports_mentioning DESC`;
-
-// "How it works": where everything on the site comes from, how the numbers are worked out, and where they fall short.
-function AboutPage() {
-	const q = useSQLQuery(aboutSQL);
-	const sampleQ = useSQLQuery(sampleReadingSQL);
-	const subsDl = useSQLQuery(downloadSubstancesSQL, { enabled: false });
-	const effectsDl = useSQLQuery(downloadEffectsSQL, { enabled: false });
-	const sample = (() => {
-		try {
-			const x = JSON.parse(S(rows(sampleQ)[0]?.extraction) || '{}');
-			return JSON.stringify({ doses: (x.doses ?? []).slice(0, 2), observations: (x.observations ?? []).slice(1, 3), overall: x.overall }, null, 2);
-		} catch {
-			return '';
-		}
-	})();
-	const r = rows(q)[0];
-	const n = (v: unknown) => (r ? N(v).toLocaleString() : '…');
-	const pct = r ? Math.round((100 * N(r.read_closely)) / Math.max(1, N(r.reports))) : 0;
-	const link = { color: '#fff', textDecoration: 'underline', textUnderlineOffset: 3 } as const;
-	const mono = { fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: '0.86em' } as const;
-	// Reads like a paper: numbered sections, serif body at a comfortable measure, captioned figures and tables.
-	const SECTIONS = [
-		['purpose', 'Purpose'],
-		['sources', 'Data sources'],
-		['pipeline', 'The pipeline'],
-		['reading', 'Close reading'],
-		['measures', 'How each number is worked out'],
-		['motherduck', 'How MotherDuck fits in'],
-		['limits', 'Limitations'],
-		['raw', 'Raw data and downloads'],
-		['thanks', 'Acknowledgements'],
-	] as const;
-	const num = (id: string) => SECTIONS.findIndex(([k]) => k === id) + 1;
-	const Section = ({ id, children }: { id: (typeof SECTIONS)[number][0]; children: React.ReactNode }) => (
-		<section id={`about-${id}`} className="mt-16" style={{ scrollMarginTop: 16 }}>
-			<h2 className="flex items-baseline gap-3" style={{ fontFamily: SANS, fontSize: 24, fontWeight: 650, letterSpacing: '-0.015em', color: '#fff' }}>
-				<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{num(id)}.</span>
-				{SECTIONS.find(([k]) => k === id)![1]}
-			</h2>
-			<div className="mt-4 grid gap-4" style={{ fontFamily: SERIF, fontSize: 18.5, lineHeight: 1.72, color: 'rgba(255,255,255,.88)', maxWidth: 700 }}>
-				{children}
-			</div>
-		</section>
-	);
-	const H3 = ({ children }: { children: React.ReactNode }) => <h3 className="mt-3" style={{ fontFamily: SANS, fontSize: 17, fontWeight: 650, color: '#fff' }}>{children}</h3>;
-	const Caption = ({ children }: { children: React.ReactNode }) => <p className="text-sm" style={{ fontFamily: SANS, color: C.faint, lineHeight: 1.5 }}>{children}</p>;
-	const Table = ({ head, body }: { head: string[]; body: React.ReactNode[][] }) => (
-		<div className="overflow-x-auto" style={{ fontFamily: SANS }}>
-			<table className="w-full text-sm" style={{ borderCollapse: 'collapse', minWidth: 560 }}>
-				<thead>
-					<tr>
-						{head.map((h) => (
-							<th key={h} className="rd-label py-2 pr-4 text-left" style={{ borderBottom: `1px solid ${C.line}`, fontWeight: 600 }}>{h}</th>
-						))}
-					</tr>
-				</thead>
-				<tbody>
-					{body.map((row, i) => (
-						<tr key={i}>
-							{row.map((cell, j) => (
-								<td key={j} className="py-2.5 pr-4 align-top" style={{ borderBottom: `1px solid ${C.line}`, color: j === 0 ? '#fff' : C.soft, fontWeight: j === 0 ? 600 : 400, lineHeight: 1.5, whiteSpace: j === 0 ? 'nowrap' : undefined }}>
-									{cell}
-								</td>
-							))}
-						</tr>
-					))}
-				</tbody>
-			</table>
-		</div>
-	);
-	return (
-		<article className="rd-in max-w-3xl">
-			<div className="rd-label">re:dose · Technical overview · Version 1, October 2026</div>
-			<h1 className="mt-3" style={{ fontFamily: SANS, fontSize: 44, fontWeight: 650, letterSpacing: '-0.025em', lineHeight: 1.1 }}>How re:dose works</h1>
-			<p className="mt-5" style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.6, color: 'rgba(255,255,255,.92)', maxWidth: 700 }}>
-				<b style={{ fontFamily: SANS, fontSize: 13, letterSpacing: '.12em', textTransform: 'uppercase', color: C.faint, marginRight: 10 }}>Abstract</b>
-				re:dose turns {n(r?.reports)} first-hand experience reports into something you can explore: how a substance usually plays out over time, what people felt, how mixes went, and what’s known to be dangerous. An AI model reads a subset of the stories closely for doses, timed moments, effects and mood; those readings are joined with community reference data on effects, substances, combinations and slang. This page explains every step, how each number is calculated, where it falls short, and who made it possible.
-			</p>
-
-			<div className="mt-8 flex items-end gap-4">
-				<span className="sp-me" aria-hidden style={{ width: 64, height: 64, flexShrink: 0, cursor: 'default' }}>
-					<style>{SPUNION_CSS}</style>
-					<SpunionSvg />
-				</span>
-				<div className="sp-bubble" style={{ maxWidth: 560, marginBottom: 12, padding: '12px 16px', fontFamily: SERIF, fontSize: 17, lineHeight: 1.5 }}>
-					Hi, I’m Spunion. This is the long version. Skim the numbered headings, or read it all.
-				</div>
-			</div>
-
-			<div className="mt-10 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
-				{[
-					[n(r?.reports), 'stories'],
-					[n(r?.read_closely), `read closely (${pct}%)`],
-					[n(r?.moments), 'timed moments'],
-					[n(r?.substances), 'substances'],
-					[n(r?.effects), 'kinds of effect'],
-					[n(r?.pairs), 'TripSit pairings'],
-					[n(r?.street_names), 'street names'],
-					[n(r?.molecules), 'molecules'],
-				].map(([v, l]) => (
-					<div key={l}>
-						<div className="text-3xl font-light tabular-nums" style={{ letterSpacing: '-0.02em' }}>{v}</div>
-						<div className="rd-label mt-1">{l}</div>
-					</div>
-				))}
-			</div>
-
-			<nav className="mt-12" aria-label="Sections" style={{ fontFamily: SANS }}>
-				<div className="rd-label mb-3">Contents</div>
-				<ol className="grid gap-1.5 text-sm sm:grid-cols-2">
-					{SECTIONS.map(([id, title], i) => (
-						<li key={id}>
-							<button onClick={() => document.getElementById(`about-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ color: C.soft }}>
-								<span className="tabular-nums" style={{ color: C.faint }}>{i + 1}.</span> {title}
-							</button>
-						</li>
-					))}
-				</ol>
-			</nav>
-
-			<Section id="purpose">
-				<p>
-					re:dose is a harm-reduction project. People are going to take drugs either way; the aim is that they do it knowing more: how long something lasts, when not to redose, what it tends to feel like, and which mixes are known to go badly. Most of that knowledge already exists, scattered across thousands of personal stories and a handful of careful community references. re:dose brings it together in one place and shows its working.
-				</p>
-				<p>
-					Two kinds of evidence sit side by side throughout. <i>What people wrote</i>: the stories themselves, and what a close reading of them shows. <i>What the references say</i>: dose ranges, durations, effect descriptions and combination ratings maintained by communities who’ve done this for years. Where they disagree, both are shown.
-				</p>
-			</Section>
-
-			<Section id="sources">
-				<p>Every fact on the site comes from one of these sources. We link back wherever we use them.</p>
-				<Table
-					head={['Source', 'What we use', 'Terms']}
-					body={[
-						[<a href="https://erowid.org" target="_blank" rel="noopener noreferrer" style={link}>Erowid</a>, `${n(r?.reports)} experience reports${r ? `, ${N(r.first_year)}–${N(r.last_year)}` : ''}: text, substances, doses, and what the writer chose to share (year, age, gender).`, 'Stories belong to their writers and Erowid. Shown as written, always linked to the original.'],
-						[<a href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={link}>Subjective Effect Index</a>, 'Effect names, categories and descriptions (the vocabulary for what people feel).', <>CC BY-NC-SA 4.0. Descriptions shortened to their first sentence; shared under the same licence.</>],
-						[<a href="https://psychonautwiki.org" target="_blank" rel="noopener noreferrer" style={link}>PsychonautWiki</a>, 'Substance classes, dose ranges and durations per route, tolerance, addiction potential, interaction notes.', 'Community wiki; credited and linked on every page that uses it.'],
-						[<a href={TRIPSIT_COMBOS} target="_blank" rel="noopener noreferrer" style={link}>TripSit</a>, `Drug combinations chart: ${n(r?.pairs)} ratings between groups of drugs, with notes.`, 'Notes quoted in TripSit’s own words, credited wherever a rating appears.'],
-						['Slang lists', 'Street names from the DEA’s “Slang Terms and Code Words” (2018), NoSlang and Dope Lookup.', 'Each name is shown with the lists it came from.'],
-						[<a href="https://pubchem.ncbi.nlm.nih.gov" target="_blank" rel="noopener noreferrer" style={link}>PubChem</a>, 'Computed 3D structures (heavy atoms) for the rotating molecules; for plants and brews, their main active compounds.', 'Public domain data from the US National Library of Medicine; each molecule links to its record.'],
-						[<a href="https://www.anthropic.com" target="_blank" rel="noopener noreferrer" style={link}>Anthropic</a>, `Claude (${'claude-opus-4-6'}) for the close readings of ${n(r?.read_closely)} stories.`, 'A tool, not a source of facts: every reading points back to the story’s own words.'],
-					]}
-				/>
-				<Caption>Table 1. Sources and how they’re used.</Caption>
-			</Section>
-
-			<Section id="pipeline">
-				<p>From raw story to what you see on a page, data passes through five steps. Each one writes tables to a single database, so every number can be traced back to the rows it came from.</p>
-				<div className="grid items-stretch gap-3 rd-g-flow" style={{ fontFamily: SANS }}>
-					{(
-						[
-							['Collect', 'Load stories and reference data (Erowid, PsychonautWiki, Effect Index, TripSit, slang lists, PubChem) into tables.'],
-							['Match', 'Map the many ways people name a drug (“shrooms”, “4-AcO-DMT”, brand names) to one substance, and substances to TripSit’s groups.'],
-							['Read', 'Close-read stories for doses, timed moments, effects and mood. Repair broken time stamps.'],
-							['Derive', 'Typical timelines, “how it went”, effect shares, mix ratings, tolerance families.'],
-						] as const
-					).map(([title, text], i, all) => (
-						<Fragment key={title}>
-							<div className="rd-card p-4">
-								<div className="rd-label" style={{ color: C.mint }}>{`${i + 1}. ${title}`}</div>
-								<p className="mt-2 text-sm" style={{ color: C.soft, lineHeight: 1.5 }}>{text}</p>
-							</div>
-							{i < all.length - 1 && (
-								<div className="flex items-center justify-center" aria-hidden style={{ color: C.faint }}>
-									<ChevronRight size={20} className="rd-hide-sm" />
-								</div>
-							)}
-						</Fragment>
-					))}
-				</div>
-				<Caption>Figure 1. The pipeline. The fifth step, serving, is this page: every chart is a live query (section {num('motherduck')}).</Caption>
-				<H3>Matching names</H3>
-				<p>
-					Writers name drugs in hundreds of ways. A mapping table links each name in the stories to one substance from PsychonautWiki, so “molly”, “MDMA” and “ecstasy” land together. Some stories only say a group (“benzos”, “opioids”); those stay filed under the group rather than being guessed into a specific drug. Separately, each substance is placed in TripSit’s groups (MDMA in “MDMA”, alprazolam in “benzodiazepines”) so combination ratings can be looked up.
-				</p>
-			</Section>
-
-			<Section id="reading">
-				<p>
-					About {pct}% of stories have been read closely by an AI model. For each, it records every dose (substance, amount, route, and when), then each moment the writer describes: a time, a short quote, the effects in it (using the Subjective Effect Index’s vocabulary), how confident it is, and whether the moment felt good, rough, mixed or neutral. It also records how the experience went overall and whether the writer would do it again.
-				</p>
-				<H3>Keeping it honest</H3>
-				<ul className="grid gap-2" style={{ listStyle: 'disc', paddingLeft: 22 }}>
-					<li>Quotes are taken word for word from the story, and every story page shows the original text alongside, so any reading can be checked.</li>
-					<li>Effects tagged with low confidence are left out of the numbers.</li>
-					<li>Stories mark time in four ways: clock times, “T+” marks, dose tables and plain narrative. Clock times are often written from the wrong starting point or the wrong half of the day, and “T+15:00” can mean minutes or hours. These are repaired so the story only moves forward in time.</li>
-				</ul>
-				<H3>What a reading looks like</H3>
-				<p>
-					This is part of one close reading, exactly as stored, from{' '}
-					<a href="https://erowid.org/experiences/exp.php?ID=101907" target="_blank" rel="noopener noreferrer" style={link}>this story on Erowid</a>.
-				</p>
-				{sample ? (
-					<pre className="rd-card overflow-x-auto p-4" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12.5, lineHeight: 1.55, color: C.soft, whiteSpace: 'pre', maxHeight: 420 }}>
-						{sample}
-					</pre>
-				) : (
-					<Loading height={160} quiet />
-				)}
-				<Caption>Figure 2. Two doses and two timed moments from one reading. Every timeline on the site is built from thousands of these.</Caption>
-			</Section>
-
-			<Section id="measures">
-				<H3>Timing: kicks in, strongest, mostly gone</H3>
-				<p>
-					For each closely read story we take when effects were first noticed, when they were described as strongest, and the last moment effects were mentioned, measured from the dose. A substance’s typical timing is the middle of those values. We only show it when at least six stories give one, and use route-specific timing (swallowed, smoked, snorted…) when there are enough of those.
-				</p>
-				<H3>Dose ranges and stages</H3>
-				<p>
-					Dose levels (threshold to heavy) and duration stages (onset, come-up, peak, offset, after effects) are PsychonautWiki’s, per route. Their durations are stored without units and aren’t always in the same one, so we work out minutes or hours per value: onset and come-up are minutes unless that would take up most of the experience, and a peak or offset longer than the whole experience must be minutes. The duration chart overlays the stories’ curve on PsychonautWiki’s stages, on one time axis.
-				</p>
-				<H3>How it went</H3>
-				<p>
-					“Good” and “rough” are the share of closely read stories whose writer described the experience overall as positive or negative; “would do it again” is the share who said so. For a mix, the same is done for stories with both substances. These describe people who wrote reports, not everyone who has taken something.
-				</p>
-				<H3>What people feel</H3>
-				<p>
-					For each effect, the share of a substance’s closely read stories that mention it. The “×” figure (lift) compares that share with how often the effect appears across all stories, so it picks out what’s characteristic of a substance rather than what’s common to everything. The “How it unfolds” chart does the same over time, in time slices, and isn’t drawn from fewer than ten close readings.
-				</p>
-				<H3>Mixing ratings</H3>
-				<p>
-					Ratings come first from TripSit’s chart, looked up through each substance’s groups; when two groups rate a pair differently, the more cautious rating wins. Where TripSit has nothing, we fall back to PsychonautWiki’s interaction notes, but a match only through a broad word like “stimulants” is capped at caution, because that’s too blunt to call something dangerous. A mix with no rating is never presented as safe.
-				</p>
-				<H3>Tolerance and habit</H3>
-				<p>
-					“Shares tolerance with” groups PsychonautWiki’s cross-tolerance notes into families (psychedelics, stimulants, opioids, GABA drugs and so on) and links substances in the same family. The four-step habit-forming scale is read from PsychonautWiki’s wording (“not habit-forming”, “moderately addictive”, “extremely addictive”…); the full wording is always shown with it.
-				</p>
-				<H3>Street names and molecules</H3>
-				<p>
-					Street names are filtered to drop entries that describe paraphernalia, prices or dealing rather than the drug. A few were matched to a substance by AI, and are marked as such with the page they came from. Molecules are PubChem’s computed 3D conformers with hydrogens left out for clarity; plants and brews show their main active compounds (THC and CBD for cannabis, psilocybin and psilocin for mushrooms).
-				</p>
-			</Section>
-
-			<Section id="motherduck">
-				<p>
-					All of re:dose’s data lives in one database on <a href="https://motherduck.com" target="_blank" rel="noopener noreferrer" style={link}>MotherDuck</a>, a cloud service built on the open-source DuckDB database. The loaders and the close readings write their results there as ordinary tables (Table 2).
-				</p>
-				<p>
-					This explorer is a MotherDuck <i>Dive</i>: a small web app that runs in your browser and asks the database questions directly in SQL. There’s no re:dose server in between. When you open a substance page, its timeline, mixes and stories are each a separate live query, so the numbers you see are always computed from the current data, and anyone can follow a number back to the query that made it.
-				</p>
-				<p className="rd-card px-5 py-4" style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.6, color: C.soft }}>
-					<b style={{ color: '#fff' }}>Not affiliated.</b> MotherDuck powers re:dose, but isn’t affiliated with it and doesn’t endorse it. We use their platform like any other customer, and we’re grateful it makes a project like this possible.
-				</p>
-				<Table
-					head={['Table', 'What it holds']}
-					body={[
-						[<span style={mono}>experience_reports</span>, 'The stories: text and what Erowid lists about each.'],
-						[<span style={mono}>report_doses</span>, 'Each dose in each story, matched to one substance.'],
-						[<span style={mono}>llm_extractions</span>, 'One close reading per story, as stored (Figure 2).'],
-						[<span style={mono}>llm_observations · llm_observation_effects</span>, 'The timed moments, and the effects in each.'],
-						[<span style={mono}>report_timeline · timeline_sentiment</span>, 'Time marks found in the text, repaired, with the mood around each.'],
-						[<span style={mono}>substances · routes_of_administration · interactions</span>, 'PsychonautWiki’s substance details, doses and durations, interaction notes.'],
-						[<span style={mono}>effects</span>, 'The Subjective Effect Index vocabulary and descriptions.'],
-						[<span style={mono}>tripsit_combos · tripsit_group_members</span>, 'TripSit’s ratings between groups, and which substances are in each group.'],
-						[<span style={mono}>street_names</span>, 'Slang, with the lists each name appears on.'],
-						[<span style={mono}>substance_structures</span>, '3D molecules from PubChem, including plants’ active compounds.'],
-					]}
-				/>
-				<Caption>Table 2. The main tables behind the site.</Caption>
-			</Section>
-
-			<Section id="limits">
-				<ul className="grid gap-2.5" style={{ listStyle: 'disc', paddingLeft: 22 }}>
-					<li><b style={{ color: '#fff' }}>Self-reports.</b> Doses, timing and even what was taken can be wrong. Untested drugs often aren’t what they were sold as.</li>
-					<li><b style={{ color: '#fff' }}>Who writes.</b> People who write reports aren’t everyone. Unusual, intense and rough experiences are more likely to be written up.</li>
-					<li><b style={{ color: '#fff' }}>AI readings.</b> Close readings can misread a vague story, especially its timing. That’s why the original words are always shown next to them.</li>
-					<li><b style={{ color: '#fff' }}>Small numbers.</b> Many substances have only a handful of close readings. We hide charts below a minimum, but small samples still swing.</li>
-					<li><b style={{ color: '#fff' }}>Groups.</b> Some stories are filed under a group (“opioids”), so their numbers mix different drugs.</li>
-					<li><b style={{ color: '#fff' }}>Reference gaps.</b> TripSit rates groups, not every drug, and PsychonautWiki’s entries vary in completeness. A missing rating isn’t a safe rating.</li>
-					<li><b style={{ color: '#fff' }}>Not advice.</b> Typical timings are a middle point, not a promise. Nothing here is medical advice. If something feels wrong, get help.</li>
-				</ul>
-			</Section>
-
-			<Section id="raw">
-				<p>re:dose’s own derived numbers are free to download. The stories themselves belong to their writers and Erowid, so read them there.</p>
-				<div className="flex flex-wrap items-center gap-3" style={{ fontFamily: SANS }}>
-					<button className="rd-btn text-sm" onClick={() => subsDl.exportAs({ format: 'csv', filename: 'redose-substances' })}>
-						Download: substance summary (CSV)
-					</button>
-					<button className="rd-btn text-sm" onClick={() => effectsDl.exportAs({ format: 'csv', filename: 'redose-effects-by-substance' })}>
-						Download: effects by substance (CSV)
-					</button>
-				</div>
-			</Section>
-
-			<Section id="thanks">
-				<p>None of this exists without the people who did the hard part.</p>
-				<ul className="grid gap-3" style={{ listStyle: 'none', paddingLeft: 0 }}>
-					<li><b style={{ color: '#fff' }}>Everyone who wrote a report.</b> Thousands of people shared their experiences, good and bad, so others could be safer. This is their work first.</li>
-					<li><b style={{ color: '#fff' }}>Erowid</b>, for decades of collecting, reviewing and publishing those reports, and keeping them free.</li>
-					<li><b style={{ color: '#fff' }}>The Subjective Effect Index</b> at Effect Index, founded by Josie Kins, and its contributors, for giving people words for experiences that used to be called indescribable. Their replications, art and video of what effects look like, are theirs and only on their site.</li>
-					<li><b style={{ color: '#fff' }}>PsychonautWiki</b> and its editors, for the substance details, doses and durations.</li>
-					<li><b style={{ color: '#fff' }}>TripSit</b>, for the drug combinations chart behind every mixing warning, and years of keeping people safe in real time.</li>
-					<li><b style={{ color: '#fff' }}>PubChem</b> at the US National Library of Medicine, for open chemical data.</li>
-					<li><b style={{ color: '#fff' }}>MotherDuck</b>, whose platform runs every query here (not affiliated, see section {num('motherduck')}).</li>
-				</ul>
-				<H3>Get involved</H3>
-				<p>
-					re:dose is a community. To talk something through with people who get it, report a mistake, or help make this better, come say hi on{' '}
-					<a href={REDOSE_DISCORD} target="_blank" rel="noopener noreferrer" style={link}>Discord</a>.
-				</p>
-				<H3>Citing re:dose</H3>
-				<p className="rd-card px-5 py-4" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 13, lineHeight: 1.6, color: C.soft }}>
-					re:dose (2026). How re:dose works: technical overview, version 1. re:dose.org
-				</p>
-			</Section>
-		</article>
-	);
-}
-
 // A shuffled set of closely read stories, each with a line in the writer's own words (a quoted moment from the close
 // reading), optionally only the ones that went well, were mixed, or were rough.
 const storiesSQL = (seed: number, mood: string) => `
@@ -6483,7 +6142,9 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 type Q = ReturnType<typeof useSQLQuery>;
 
 export default function ReportTimelapse() {
-	const [view, setView] = useDiveState<'reports' | 'substances' | 'effects' | 'about'>('view', 'substances');
+	const [savedView, setView] = useDiveState<'reports' | 'substances' | 'effects'>('view', 'substances');
+	// Old links may still say "about", a page that's gone; they land on the home page.
+	const view = (savedView as string) === 'about' ? 'substances' : savedView;
 	const [sub, setSub] = useDiveState<string | null>('substance', null);
 	const [reportId, setReportId] = useDiveState<string | null>('report', null);
 	const [withSub, setWithSub] = useDiveState<string | null>('with', null);
@@ -6601,7 +6262,7 @@ export default function ReportTimelapse() {
 		setOpenItem(null);
 		window.scrollTo?.({ top: 0 });
 	};
-	const goView = (v: 'reports' | 'substances' | 'effects' | 'about') => {
+	const goView = (v: 'reports' | 'substances' | 'effects') => {
 		setView(v);
 		setEffect(undefined as unknown as null);
 		setSub(undefined as unknown as null);
@@ -6613,7 +6274,6 @@ export default function ReportTimelapse() {
 	useEffect(() => {
 		const page =
 			view === 'effects' ? effect || 'Effects'
-			: view === 'about' ? 'About'
 			: view === 'reports' && reportId ? `Story #${reportId.replace('erowid-', '')}`
 			: view === 'reports' && sub ? (withSub ? `${short(sub)} + ${short(withSub)}` : short(sub))
 			: view === 'reports' ? 'Stories'
@@ -6662,7 +6322,6 @@ export default function ReportTimelapse() {
 									['substances', 'Substances'],
 									['reports', 'Stories'],
 									['effects', 'Effects'],
-									['about', 'About'],
 								] as const
 							).map(([v, label]) => (
 								<button key={v} className="rd-nav" aria-current={navHere === v ? 'page' : undefined} onClick={() => goView(v)} style={{ whiteSpace: 'nowrap' }}>
@@ -6694,7 +6353,6 @@ export default function ReportTimelapse() {
 					)}
 
 					{view === 'reports' && !sub && !reportId && <StoriesBrowse onOpen={goReport} />}
-					{view === 'about' && <AboutPage />}
 					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} onCombo={goCombo} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
 					{onReport && <TimelapseStep id={reportId!} reportQ={reportQ} marksQ={marksQ} dosesQ={dosesQ} obsQ={obsQ} timingQ={timingQ} pairsQ={pairsQ} frozen={!!openItem} />}
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
@@ -6723,9 +6381,6 @@ export default function ReportTimelapse() {
 							</div>
 						)}
 						<div className="flex flex-wrap items-center gap-4">
-							<button className="text-xs" style={{ color: C.soft, textDecoration: 'underline', textUnderlineOffset: 3 }} onClick={() => goView('about')}>
-								About
-							</button>
 							<a className="rd-thanks" href={SOURCES.motherduck.href} target="_blank" rel="noopener noreferrer" title="MotherDuck runs the database behind re:dose. Not affiliated with re:dose." style={{ color: C.soft }}>
 								<img src={SOURCES.motherduck.logo} alt="" width={15} height={15} />
 								Powered by MotherDuck
