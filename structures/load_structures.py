@@ -8,9 +8,13 @@ For each substance we ask PubChem for a compound by its name (then its common na
 computed 3D conformer. Groups of drugs, plants and mixtures usually don't resolve, and are skipped.
 PubChem data is freely reusable; we credit PubChem and link the compound page.
 
+Plants, mushrooms and brews aren't one molecule, so --actives adds their main active compounds as extra rows
+(compound = the molecule's short name; NULL on the rows where the substance is the molecule itself).
+
 Run with a MotherDuck token in the `motherduck_token` environment variable:
     python load_structures.py            # look up every substance and load the table
     python load_structures.py --dry-run  # look up and print, write nothing
+    python load_structures.py --actives  # add the active compounds of plants and mixtures (keeps the rest)
 """
 
 import json
@@ -31,7 +35,29 @@ SKIP = {
     "Datura", "Salvia divinorum", "Peyote", "San Pedro",
 }
 # Where the name alone finds the wrong thing or nothing.
-ALIAS = {"Alcohol": "ethanol", "LSD": "lysergide", "MDMA": "3,4-methylenedioxymethamphetamine", "DMT": "N,N-dimethyltryptamine"}
+ALIAS = {"Alcohol": "ethanol", "LSD": "lysergide", "MDMA": "3,4-methylenedioxymethamphetamine", "DMT": "N,N-dimethyltryptamine",
+         "MDA": "3,4-methylenedioxyamphetamine"}
+# The main active compounds of substances that aren't one molecule: (short name, PubChem search name).
+ACTIVES = {
+    "Cannabis": [("THC", "dronabinol"), ("CBD", "cannabidiol")],
+    "Psilocybin mushrooms": [("Psilocybin", "psilocybin"), ("Psilocin", "psilocin")],
+    "Salvia divinorum": [("Salvinorin A", "salvinorin A")],
+    "Peganum harmala": [("Harmine", "harmine"), ("Harmaline", "harmaline")],
+    "Banisteriopsis caapi": [("Harmine", "harmine"), ("Harmaline", "harmaline")],
+    "Kratom": [("Mitragynine", "mitragynine"), ("7-OH-mitragynine", "7-hydroxymitragynine")],
+    "Datura": [("Scopolamine", "scopolamine"), ("Hyoscyamine", "hyoscyamine")],
+    "Atropa belladonna": [("Hyoscyamine", "hyoscyamine"), ("Scopolamine", "scopolamine")],
+    "Hyoscyamus niger (botany)": [("Hyoscyamine", "hyoscyamine"), ("Scopolamine", "scopolamine")],
+    "Amanita muscaria": [("Muscimol", "muscimol"), ("Ibotenic acid", "ibotenic acid")],
+    "Morning glory": [("LSA", "ergine")],
+    "Ayahuasca": [("DMT", "N,N-dimethyltryptamine"), ("Harmine", "harmine")],
+    "Changa": [("DMT", "N,N-dimethyltryptamine"), ("Harmine", "harmine")],
+    "Blue Lotus": [("Nuciferine", "nuciferine"), ("Aporphine", "aporphine")],
+    "Cocoa": [("Theobromine", "theobromine"), ("Caffeine", "caffeine")],
+    "Poppers": [("Amyl nitrite", "amyl nitrite")],
+    "Peyote": [("Mescaline", "mescaline")],
+    "San Pedro": [("Mescaline", "mescaline")],
+}
 
 
 def get(path: str):
@@ -68,6 +94,57 @@ def parse_sdf(sdf: str):
         if a in keep and b in keep:
             bonds.append([keep[a], keep[b], order])
     return atoms, bonds
+
+
+def structure(query: str):
+    """(cid, formula, iupac, atoms, bonds) for a PubChem name, or None."""
+    cid = cid_for(query)
+    time.sleep(0.25)
+    if not cid:
+        return None
+    try:
+        sdf = get(f"compound/cid/{cid}/SDF?record_type=3d")
+        time.sleep(0.25)
+        props = json.loads(get(f"compound/cid/{cid}/property/MolecularFormula,IUPACName/JSON"))["PropertyTable"]["Properties"][0]
+        time.sleep(0.25)
+        atoms, bonds = parse_sdf(sdf)
+    except Exception:
+        return None
+    return cid, props.get("MolecularFormula"), props.get("IUPACName"), atoms, bonds
+
+
+def actives(dry_run: bool):
+    con = duckdb.connect("md:sourcing")
+    have = {r[0] for r in con.sql("SELECT name FROM substances").fetchall()}
+    fetched = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    out = []
+    for sub, compounds in ACTIVES.items():
+        if sub not in have:
+            print(f"  -  {sub}: not in substances")
+            continue
+        for short, query in compounds:
+            got = structure(query)
+            if not got:
+                print(f"  -  {sub} / {short}: no 3D structure")
+                continue
+            cid, formula, iupac, atoms, bonds = got
+            out.append((sub, cid, formula, iupac, json.dumps(atoms), json.dumps(bonds), f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}", fetched, short))
+            print(f"  ok {sub} / {short}: CID {cid}, {formula}, {len(atoms)} atoms")
+    # Single molecules the first run missed (a name that needed an alias).
+    missing = [n for n in ALIAS if n in have and not con.execute("SELECT 1 FROM substance_structures WHERE substance = ?", [n]).fetchone()]
+    for name in missing:
+        got = structure(ALIAS[name])
+        if got:
+            cid, formula, iupac, atoms, bonds = got
+            out.append((name, cid, formula, iupac, json.dumps(atoms), json.dumps(bonds), f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}", fetched, None))
+            print(f"  ok {name}: CID {cid}, {formula}, {len(atoms)} atoms")
+    print(f"{len(out)} structures")
+    if dry_run:
+        return
+    con.execute("ALTER TABLE substance_structures ADD COLUMN IF NOT EXISTS compound VARCHAR")
+    con.execute("DELETE FROM substance_structures WHERE compound IS NOT NULL")
+    con.executemany("INSERT INTO substance_structures VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", out)
+    print("Added active compounds to substance_structures.")
 
 
 def main(dry_run: bool):
@@ -112,4 +189,7 @@ def main(dry_run: bool):
 
 
 if __name__ == "__main__":
-    main(dry_run="--dry-run" in sys.argv)
+    if "--actives" in sys.argv:
+        actives(dry_run="--dry-run" in sys.argv)
+    else:
+        main(dry_run="--dry-run" in sys.argv)
