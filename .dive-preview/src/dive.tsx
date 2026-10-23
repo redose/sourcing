@@ -4389,8 +4389,10 @@ function MoleculeCard({ list }: { list: Record<string, unknown>[] }) {
 	if (atoms.length < 2) return null;
 	const formula = S(r.formula).split(/(\d+)/).map((part, i) => (/^\d+$/.test(part) ? <sub key={i}>{part}</sub> : <span key={i}>{part}</span>));
 	return (
-		<figure className="flex flex-1 flex-col items-center justify-center" style={{ minHeight: 420, background: 'radial-gradient(closest-side at 50% 46%, rgba(217,207,255,.16), rgba(217,207,255,.05) 60%, transparent)' }}>
-			<Molecule3D key={i} atoms={atoms} bonds={bonds} size={310} />
+		<figure className="flex flex-1 flex-col items-center" style={{ minHeight: 380 }}>
+			<div className="flex w-full flex-1 items-center justify-center" style={{ background: 'radial-gradient(closest-side, rgba(217,207,255,.16), rgba(217,207,255,.05) 60%, transparent)' }}>
+				<Molecule3D key={i} atoms={atoms} bonds={bonds} size={300} />
+			</div>
 			{list.length > 1 && (
 				<div className="mt-4 flex flex-wrap justify-center gap-1.5" role="tablist" aria-label="Active compounds">
 					{list.map((m, j) => (
@@ -4400,7 +4402,7 @@ function MoleculeCard({ list }: { list: Record<string, unknown>[] }) {
 					))}
 				</div>
 			)}
-			<figcaption className="mt-3 flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+			<figcaption className="mt-3 flex items-center gap-2 text-xs" style={{ color: C.faint, lineHeight: 1.45 }}>
 				{list.length > 1 && <span className="text-sm font-semibold" style={{ color: '#fff' }}>{S(r.compound)}</span>}
 				<span className="text-sm" style={{ color: C.soft, fontFamily: SANS }}>{formula}</span>
 				<span>·</span>
@@ -6246,20 +6248,18 @@ const BOUNCE_CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-/* The loader: his body is a gradient drifting through the logo's colours; a floor shadow breathes with the bounce;
+/* The loader: his body is one colour drifting through the logo's palette; a floor shadow breathes with the bounce;
    each landing sends out a ring in the colour he's turning. One bounce is .62s; colours cycle over four. */
 .rd-loader { position: relative; display: block; margin-top: 60px; pointer-events: none; }
 .rd-bounce { position: relative; z-index: 1; display: block; width: 100%; height: 100%; animation: rd-bounce .62s infinite; transform-origin: 50% 100%; }
 @keyframes rd-g1 { 0%, 100% { stop-color: #fc6c84; } 25% { stop-color: #8a7ddc; } 50% { stop-color: #5ae0e4; } 75% { stop-color: #58e2d8; } }
-@keyframes rd-g2 { 0%, 100% { stop-color: #8a7ddc; } 25% { stop-color: #5ae0e4; } 50% { stop-color: #58e2d8; } 75% { stop-color: #fc6c84; } }
 .rd-g1 { animation: rd-g1 2.48s linear infinite; }
-.rd-g2 { animation: rd-g2 2.48s linear infinite; }
 @keyframes rd-shadow { 0%, 100% { transform: translateX(-50%) scale(1.15, 1); opacity: .45; } 50% { transform: translateX(-50%) scale(.55, .7); opacity: .15; } }
 .rd-floor { position: absolute; left: 50%; bottom: -6%; width: 70%; height: 12%; border-radius: 50%; background: radial-gradient(closest-side, rgba(10,6,30,.6), transparent); animation: rd-shadow .62s infinite; }
 @keyframes rd-ring { 0% { transform: translateX(-50%) scale(.35); opacity: .9; } 100% { transform: translateX(-50%) scale(1.5); opacity: 0; } }
 @keyframes rd-ring-hue { 0% { border-color: #fc6c84; } 25% { border-color: #8a7ddc; } 50% { border-color: #5ae0e4; } 75% { border-color: #58e2d8; } }
 .rd-ring { position: absolute; left: 50%; bottom: -10%; width: 80%; height: 20%; border-radius: 50%; border: 3px solid #5ae0e4; animation: rd-ring .62s ease-out infinite, rd-ring-hue 2.48s steps(1, end) infinite; }
-@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-g1, .rd-g2 { animation: none; } .rd-ring { display: none; } }
+@media (prefers-reduced-motion: reduce) { .rd-bounce, .rd-floor, .rd-ring, .rd-g1 { animation: none; } .rd-ring { display: none; } }
 `;
 
 // The loader: Spunion bouncing, his colour drifting through the logo's palette, a shadow and a landing ring under
@@ -6278,14 +6278,14 @@ export function BouncingSpunion({ size = 96 }: { size?: number }) {
 	);
 }
 
-// Spunion for loading: a body in a slowly shifting gradient of the logo's colours, eyes cut out, white rings.
+// Spunion for loading: a body in one colour that drifts through the logo's palette, eyes cut out, white rings.
 function SpunionGhost() {
 	return (
 		<svg viewBox="0 0 500 500" width="100%" height="100%" aria-hidden style={{ display: 'block', overflow: 'visible' }}>
 			<defs>
 				<linearGradient id="sp-load-grad" x1="0" y1="0" x2="1" y2="1">
 					<stop offset="0%" className="rd-g1" stopColor="#fc6c84" />
-					<stop offset="100%" className="rd-g2" stopColor="#8a7ddc" />
+					<stop offset="100%" className="rd-g1" stopColor="#fc6c84" />
 				</linearGradient>
 				<mask id="sp-ghost-eyes">
 					<rect width="500" height="500" fill="#fff" />
