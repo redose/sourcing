@@ -27,10 +27,26 @@ function plain(v: unknown): unknown {
 	if (typeof v === 'bigint') return Number(v);
 	if (typeof v !== 'object') return v;
 	if (v instanceof Date) return v;
-	const o = v as { toArray?: () => ArrayLike<unknown>; toJSON?: () => Record<string, unknown> };
+	if (ArrayBuffer.isView(v)) return Array.from(v as unknown as ArrayLike<unknown>, plain);
+	// Rows and structs turn into objects, lists into arrays (both have toJSON; rows also have a toArray of their bare
+	// values, so toJSON comes first or the column names get lost).
+	const o = v as { toJSON?: () => unknown; toArray?: () => ArrayLike<unknown> };
+	if (typeof o.toJSON === 'function') {
+		const j = o.toJSON();
+		if (Array.isArray(j)) return j.map(plain);
+		if (j && typeof j === 'object') return Object.fromEntries(Object.entries(j as Record<string, unknown>).map(([k, x]) => [k, plain(x)]));
+		return j;
+	}
 	if (typeof o.toArray === 'function') return Array.from(o.toArray(), plain);
-	if (typeof o.toJSON === 'function') return Object.fromEntries(Object.entries(o.toJSON()).map(([k, x]) => [k, plain(x)]));
 	return v;
+}
+
+// Arrow hands DECIMAL values over as four 32-bit words of the scaled integer; turn them into ordinary numbers.
+function decimal(v: unknown, scale: number): number | null {
+	if (v == null) return null;
+	const w = v as Uint32Array;
+	const big = BigInt(w[0]) | (BigInt(w[1]) << 32n) | (BigInt(w[2]) << 64n) | (BigInt(w[3]) << 96n);
+	return Number(BigInt.asIntN(128, big)) / 10 ** scale;
 }
 
 type Result = { status: 'success'; result: { data: { toRows: () => Record<string, unknown>[] } } } | { status: 'error'; err: Error };
@@ -60,7 +76,14 @@ export async function openStaticDatabase() {
 			const c = pool[next++ % pool.length];
 			try {
 				const table = await c.query(sql);
-				const rows = table.toArray().map((r) => plain(r) as Record<string, unknown>);
+				const decs = table.schema.fields
+					.filter((f) => String(f.type).startsWith('Decimal'))
+					.map((f) => [f.name, (f.type as unknown as { scale: number }).scale] as const);
+				const rows = table.toArray().map((r) => {
+					const o = plain(r) as Record<string, unknown>;
+					for (const [k, sc] of decs) o[k] = decimal((r as unknown as Record<string, unknown>)[k], sc);
+					return o;
+				});
 				return { status: 'success', result: { data: { toRows: () => rows } } };
 			} catch (err) {
 				return { status: 'error', err: err instanceof Error ? err : new Error(String(err)) };
