@@ -933,7 +933,6 @@ const CSS = `
   90% { transform: translateY(0) scale(1.04, .96); }
   100% { transform: translateY(0) scale(1, 1); }
 }
-.rd-start-sp.corner .rd-ghost-body { stroke: #000; stroke-width: 18; stroke-linejoin: round; }
 @media (max-width: 960px) { .rd-start-sp.corner { left: calc(100% - 45px); top: calc(100% - 45px); transform: scale(.614); } }
 .rd-start .rd-ripple { animation-duration: 1.8s; }
 .rd-ripples { position: fixed; inset: -280px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
@@ -7523,9 +7522,6 @@ function SpunionSvg() {
 				<path
 					d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
 					fill="#5cdfe4"
-					stroke="#000"
-					strokeWidth="18"
-					strokeLinejoin="round"
 				/>
 				{/* left eye */}
 				<g className="sp-eye">
