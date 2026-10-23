@@ -899,7 +899,12 @@ const CSS = `
 @media (max-width: 900px) { .rd-filters { grid-template-columns: 1fr; } .rd-filters > aside { position: static; max-height: none; } }
 .rd .rd-home-search { transition: border-color .2s, box-shadow .2s; }
 .rd .rd-home-search:focus-within { border-color: rgba(217,207,255,.6) !important; box-shadow: 0 0 0 4px rgba(217,207,255,.12), 0 20px 50px rgba(10,4,40,.5) !important; }
-/* Homepage only: the molecules wander further and quicker. */
+/* Homepage only: the molecules wander further and quicker, and light up around the pointer. */
+.rd-mol-glow { position: fixed; inset: 0; z-index: -1; pointer-events: none; transition: opacity .6s;
+  -webkit-mask-image: radial-gradient(circle 220px at var(--mx, -999px) var(--my, -999px), #000 0%, rgba(0,0,0,.5) 45%, transparent 100%);
+  mask-image: radial-gradient(circle 220px at var(--mx, -999px) var(--my, -999px), #000 0%, rgba(0,0,0,.5) 45%, transparent 100%); }
+.rd-mol-glow .rd-molecules { opacity: .32 !important; -webkit-mask-image: none; mask-image: none; }
+@media (hover: none) { .rd-mol-glow { display: none; } }
 @keyframes rd-drift-home { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(140px, 200px) rotate(5deg); } 100% { transform: translate(250px, 60px) rotate(-4deg); } }
 .rd-home.rd-fx-rainbow .rd-molecules { animation: rd-drift-home 70s ease-in-out infinite alternate, rd-mol-hue 16s linear infinite; }
 .rd-home.rd-fx-rainbow .rd-molecules.b { animation: rd-drift-home 95s ease-in-out infinite alternate-reverse, rd-mol-hue 22s linear infinite reverse; }
@@ -7726,6 +7731,20 @@ export default function ReportTimelapse() {
 	// quickly. Esc comes down; it wears off by itself after 30 seconds.
 	const [trip, setTrip] = useState(false);
 	const pageRef = useRef<HTMLDivElement | null>(null);
+	// Homepage: molecules light up around the pointer (a CSS mask that follows it; no re-renders).
+	const glowRef = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		let raf = 0;
+		const move = (e: PointerEvent) => {
+			cancelAnimationFrame(raf);
+			raf = requestAnimationFrame(() => {
+				glowRef.current?.style.setProperty('--mx', `${e.clientX}px`);
+				glowRef.current?.style.setProperty('--my', `${e.clientY}px`);
+			});
+		};
+		window.addEventListener('pointermove', move);
+		return () => (window.removeEventListener('pointermove', move), cancelAnimationFrame(raf));
+	}, []);
 	const pokes = useRef<number[]>([]);
 	const poke = () => {
 		const now = Date.now();
@@ -7954,6 +7973,9 @@ export default function ReportTimelapse() {
 				<div ref={pageRef} className={`px-4 py-6 sm:px-8 sm:py-8 ${fx.includes('sway') ? 'rd-tripping' : ''} ${fx.includes('rainbow') ? 'rd-fx-rainbow' : ''} ${fx.includes('tint') ? 'rd-fx-tint' : ''} ${fx.includes('desat') ? 'rd-fx-desat' : ''} ${fx.includes('breathe') ? 'rd-fx-breathe' : ''} ${fx.includes('shift') ? 'rd-fx-shift' : ''} ${fx.includes('replace') ? 'rd-fx-replace' : ''} ${fx.includes('enhance') ? 'rd-fx-enhance' : ''} ${view === 'home' && !trip ? 'rd-home' : ''}`} style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', isolation: 'isolate', paddingBottom: 20, minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowX: 'clip' }}>
 					<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 					<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
+					<div aria-hidden ref={glowRef} className="rd-mol-glow" style={{ opacity: view === 'home' && !trip ? 1 : 0 }}>
+						<div className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
+					</div>
 					<header className="mb-10 flex flex-wrap items-center justify-between gap-4" style={{ position: 'relative', zIndex: 2 }}>
 						<button onClick={() => goView('home')} aria-label="re:dose home">
 							<img src={LOGO_RE_WHITE} alt="re:dose" style={{ height: 24, width: 'auto', display: 'block' }} />
