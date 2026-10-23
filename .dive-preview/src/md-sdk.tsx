@@ -264,7 +264,7 @@ const parseAt = (s: string) => {
 	return Number.isFinite(h) ? h + (Number.isFinite(mm) ? mm / 60 : 0) : undefined;
 };
 
-// Every page has a link: #/ (substances, home) · #/stories · #/effects · #/effects/Anxiety ·
+// Every page has a link: #/ (home) · #/substances · #/substances/Stimulants (a kind) · #/stories · #/effects · #/effects/Anxiety ·
 // #/Cocaine (a substance) · #/Cocaine+Alcohol (a pair, ?only=1 for "only these two") · #/Cocaine/85370 (a story,
 // ?at=1:30 for a moment) · and ?effect=… / ?substance=… for an open side panel.
 function readRoute(): [string, unknown][] {
@@ -274,7 +274,10 @@ function readRoute(): [string, unknown][] {
 	const parts = path.split('/').filter(Boolean);
 	const out: [string, unknown][] = [];
 	const head = parts[0];
-	if (head === 'substances' || head === 'about') out.push(['view', 'substances']); // #/about: that page is gone
+	if (head === 'substances' || head === 'about') {
+		out.push(['view', 'substances']); // #/about: that page is gone
+		if (head === 'substances' && parts[1]) out.push(['kind', dec(parts[1])]);
+	}
 	else if (head === 'resources') out.push(['view', 'resources']);
 	else if (head === 'privacy') out.push(['view', 'privacy']);
 	else if (head === 'effects') {
@@ -312,7 +315,8 @@ function routeOf(state: Map<string, unknown>) {
 	const at = state.get('at') as number | undefined;
 	const open = state.get('open') as { kind: string; name: string } | undefined;
 	let path = '';
-	if (view === 'effects') path = effect ? `effects/${enc(effect)}` : 'effects';
+	if (view === 'substances') path = state.get('kind') ? `substances/${enc(state.get('kind') as string)}` : 'substances';
+	else if (view === 'effects') path = effect ? `effects/${enc(effect)}` : 'effects';
 	else if (view === 'resources') path = 'resources';
 	else if (view === 'privacy') path = 'privacy';
 	else if (view === 'reports' && sub) path = enc(sub) + (withSub ? '+' + enc(withSub) : '') + (report ? '/' + report.replace(/^erowid-/, '') : '');
