@@ -3120,11 +3120,12 @@ WHERE substance = '${esc(name)}'
 ORDER BY combo, len(sources) DESC, term`;
 
 // Every name it goes by, grouped by kind (chemical, brand, slang, mixes), each with where it's listed. Kinds were
-// sorted by an AI model (aliases/load_aliases.py); a mix is whatever the slang lists themselves flag as one.
+// sorted by an AI model (aliases/load_aliases.py); a mix is whatever the slang lists themselves flag as one, and only
+// PsychonautWiki or PubChem can supply chemical or brand names (the slang lists' guesses there were unreliable).
 const aliasesSQL = (name: string) => `
 SELECT a.alias,
   CASE WHEN coalesce(sn.is_combo, false) THEN 'mix'
-       WHEN a.kind = 'chemical' AND NOT (list_contains(a.sources, 'psychonautwiki') OR list_contains(a.sources, 'pubchem')) THEN 'slang'
+       WHEN a.kind IN ('chemical', 'brand') AND NOT (list_contains(a.sources, 'psychonautwiki') OR list_contains(a.sources, 'pubchem')) THEN 'slang'
        ELSE a.kind END AS kind, a.sources,
   coalesce(sn.ai_model IS NOT NULL, false) AS ai, sn.citations, sn.description
 FROM ${DB}."substance_aliases" a
