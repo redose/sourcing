@@ -5080,7 +5080,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				)}
 				{!enoughToChart ? (
 					<div className="mt-6 flex flex-col items-center py-6 text-center">
-						<SpunionPuzzle size={76} missing={closeReads <= 1 ? 5 : closeReads <= 3 ? 4 : closeReads <= 5 ? 3 : closeReads <= 7 ? 2 : 1} />
+						<SpunionPuzzle size={104} missing={closeReads <= 1 ? 5 : closeReads <= 3 ? 4 : closeReads <= 5 ? 3 : closeReads <= 7 ? 2 : 1} />
 						<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
 						<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
 							Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
@@ -6193,7 +6193,7 @@ function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boole
 		</span>
 	);
 }
-// Spunion with pieces missing, for "not enough data yet", drawn as line art: dashed outlines where pieces are gone,
+// Spunion with pieces missing, for "not enough data yet": solid white, holes cut out with dashed edges,
 // one loose piece bobbing beside him. The thinner the data, the more pieces are missing (1 to 5).
 const PUZZLE_PIECE = 'M0 0 h30 a15 15 0 1 1 30 0 h30 v30 a15 15 0 1 1 0 30 v30 h-90 Z';
 const PUZZLE_SPOTS = [
@@ -6219,25 +6219,20 @@ function SpunionPuzzle({ size = 72, missing = 1 }: { size?: number; missing?: nu
 			<path
 				d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
 				fill="#fff"
-				fillOpacity="0.08"
-				stroke="#fff"
-				strokeWidth="16"
-				strokeLinejoin="round"
+				fillOpacity="0.92"
 				mask={`url(#${id})`}
 			/>
-			<g fill="none" stroke="#fff" strokeOpacity="0.45" strokeWidth="7" strokeDasharray="14 12" strokeLinejoin="round">
+			<g fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="7" strokeDasharray="14 12" strokeLinejoin="round">
 				{spots.map((sp) => (
 					<path key={sp.hole} d={PUZZLE_PIECE} transform={sp.hole} />
 				))}
 			</g>
-			<g fill="none" stroke="#fff" strokeWidth="14">
-				<circle cx="180" cy="268" r="50" />
-				<circle cx="340" cy="236" r="37" />
-			</g>
-			<circle cx="196" cy="284" r="17" fill="#fff" />
-			<circle cx="352" cy="248" r="13" fill="#fff" />
+			<circle cx="180" cy="268" r="54" fill={C.deep} />
+			<circle cx="198" cy="286" r="15" fill="#fff" />
+			<circle cx="340" cy="236" r="40" fill={C.deep} />
+			<circle cx="354" cy="250" r="11" fill="#fff" />
 			<g className="rd-piece">
-				<path d={PUZZLE_PIECE} transform="translate(540 230) rotate(24)" fill="none" stroke="#fff" strokeWidth="14" strokeLinejoin="round" />
+				<path d={PUZZLE_PIECE} transform="translate(540 230) rotate(24)" fill="#fff" fillOpacity="0.92" />
 			</g>
 		</svg>
 	);
