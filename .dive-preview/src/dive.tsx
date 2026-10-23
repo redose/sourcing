@@ -750,6 +750,8 @@ const SERIF = '"Iowan Old Style", "Charter", "Palatino Linotype", Palatino, Geor
 const BG = 'linear-gradient(170deg, #3a2e74 0%, #4f42a0 55%, #6152b4 100%)';
 
 const CSS = `
+/* Headings in serif (editorial, matches the serif lead line); everything else stays sans for reading data. */
+.rd h1, .rd h2 { font-family: ${SERIF}; letter-spacing: -0.01em; font-weight: 600; }
 /* Links take the colour around them; hosts (the Dive frame) otherwise paint visited links blue. Inline colours still win. */
 .rd a:link, .rd a:visited { color: inherit; }
 @keyframes rd-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
