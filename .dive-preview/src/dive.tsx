@@ -913,19 +913,19 @@ const CSS = `
    his feet (newest on top), and a ring that grows the same way, seen only through the molecules' shapes. */
 .rd-start .rd-molecules { animation: rd-mol-hue-soft 60s linear infinite; }
 .rd-start .rd-loader { margin-top: 0; }
-.rd-start .rd-bounce { animation-duration: .42s; }
+.rd-start .rd-bounce { animation-duration: .7s; }
 .rd-start .rd-ghost-body { animation: none; fill: var(--sp-fill, #fff); fill-opacity: 1; transition: fill .1s; }
 .rd-start-sp { position: fixed; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2;
-  transition: left .75s cubic-bezier(.45,0,.25,1), top .75s cubic-bezier(.55,-0.45,.35,1), transform .75s ease; }
+  transition: left 1.3s cubic-bezier(.45,0,.25,1), top 1.3s cubic-bezier(.55,-0.45,.35,1), transform 1.3s ease; }
 .rd-start-sp.corner { left: calc(100% - 52px); top: calc(100% - 52px); transform: scale(.773); }
 .rd-start-sp.corner .rd-bounce { animation: none; }
 .rd-start-sp.corner .rd-ghost-body { stroke: #000; stroke-width: 18; stroke-linejoin: round; }
 @media (max-width: 960px) { .rd-start-sp.corner { left: calc(100% - 45px); top: calc(100% - 45px); transform: scale(.614); } }
-.rd-wash { position: fixed; left: 50%; top: calc(50% + 44px); width: 300vmax; height: 300vmax; margin: -150vmax 0 0 -150vmax; border-radius: 50%;
+.rd-wash { position: fixed; left: 50%; top: calc(50% + 44px); width: 300vmax; height: 300vmax; margin: -150vmax 0 0 -150vmax; border-radius: 50%; background-attachment: fixed !important;
   z-index: -2; pointer-events: none; animation: rd-wash .6s cubic-bezier(.15,.7,.3,1) both; }
 @keyframes rd-wash { from { transform: scale(0); } to { transform: scale(1); } }
-.rd-start .rd-wash { animation-duration: .45s; }
-.rd-start .rd-ripple { animation-duration: 1.2s; }
+.rd-start .rd-wash { animation-duration: .7s; }
+.rd-start .rd-ripple { animation-duration: 1.8s; }
 .rd-ripples { position: fixed; inset: -280px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
 .rd-ripple { position: absolute; left: 50%; top: calc(50% + 44px); width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; border-radius: 50%;
   background: radial-gradient(closest-side, transparent 50%, currentColor 72%, currentColor 86%, transparent 100%);
@@ -934,6 +934,16 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) { .rd-wash, .rd-ripple { animation: none; display: none; } }
 .rd-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .rd-board { grid-template-columns: 1fr; } }
+/* Homepage molecules: faint until you hover, then they light up and say what they are. */
+.rd-home-mols { position: absolute; inset: -40px -24px 0; pointer-events: none; z-index: -1; }
+.rd-home-mol { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; color: rgba(255,255,255,.16); --rd-mol-gap: #46389a;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; transition: color .25s; background: none; border: 0; padding: 6px; cursor: pointer; }
+.rd-home-mol .rd-mol-atom { opacity: .3; transition: opacity .25s; }
+.rd-home-mol-name { font-size: 12px; font-weight: 600; color: #fff; opacity: 0; transform: translateY(-4px); transition: opacity .2s, transform .2s; white-space: nowrap; }
+.rd-home-mol:hover, .rd-home-mol:focus-visible { color: rgba(255,255,255,.85); }
+.rd-home-mol:hover .rd-mol-atom, .rd-home-mol:focus-visible .rd-mol-atom { opacity: 1; }
+.rd-home-mol:hover .rd-home-mol-name, .rd-home-mol:focus-visible .rd-home-mol-name { opacity: 1; transform: none; }
+@media (max-width: 760px) { .rd-home-mols { display: none; } }
 .rd-g-3 { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .rd-g-3 { grid-template-columns: 1fr; } }
 @media (min-width: 640px) { .rd-g-risk { grid-template-columns: 190px minmax(0, 1fr); } .rd-risk-head { flex-direction: column; align-items: flex-start; gap: 6px; } }
@@ -5338,6 +5348,79 @@ let spunionGreeted = false;
 
 // ── Home ─────────────────────────────────────────────────────────
 // Search first: type anything (a substance, slang, an effect, a phrase from an experience); a few ways in underneath.
+// Real molecules scattered round the homepage's edges, drawn flat from their PubChem 3D structures (projected onto the
+// plane they spread out in most). Hover one for its name; click to open the substance.
+const HOME_MOLS: [string, number, number, number][] = [
+	// substance, left %, top %, rotation
+	['MDMA', 7, 20, -20], ['LSD', 83, 16, 15], ['Psilocybin mushrooms', 12, 74, 30], ['DMT', 86, 70, -35], ['Ketamine', 30, 9, 50],
+	['Caffeine', 66, 86, 10], ['Cocaine', 4, 47, 75], ['Mescaline', 91, 44, -60], ['Cannabis', 36, 88, -15], ['Nicotine', 64, 8, 25],
+	['Amphetamine', 22, 38, -40], ['2C-B', 76, 34, 40], ['GHB', 25, 62, 0], ['Alprazolam', 72, 60, -25],
+];
+const homeMolSQL = `SELECT substance, compound, atoms, bonds FROM ${DB}."substance_structures"
+WHERE substance IN (${HOME_MOLS.map(([n]) => `'${esc(n)}'`).join(', ')})
+QUALIFY row_number() OVER (PARTITION BY substance ORDER BY compound = 'THC' DESC, compound = 'Psilocin' DESC, compound NULLS FIRST) = 1`;
+function flatMolecule(atoms: [string, number, number, number][]) {
+	const n = atoms.length;
+	const c = [0, 1, 2].map((k) => atoms.reduce((s, a) => s + a[k + 1], 0) / n);
+	const pts = atoms.map((a) => [a[1] - c[0], a[2] - c[1], a[3] - c[2]]);
+	const cov = [0, 1, 2].map((i) => [0, 1, 2].map((j) => pts.reduce((s, p) => s + p[i] * p[j], 0)));
+	const top = (skip?: number[]) => {
+		let v = [1, 0.5, 0.25];
+		for (let it = 0; it < 40; it++) {
+			let w = cov.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+			if (skip) {
+				const d = w[0] * skip[0] + w[1] * skip[1] + w[2] * skip[2];
+				w = w.map((x, k) => x - d * skip[k]);
+			}
+			const len = Math.hypot(...w) || 1;
+			v = w.map((x) => x / len);
+		}
+		return v;
+	};
+	const e1 = top(), e2 = top(e1);
+	return pts.map((p) => [p[0] * e1[0] + p[1] * e1[1] + p[2] * e1[2], p[0] * e2[0] + p[1] * e2[1] + p[2] * e2[2]] as [number, number]);
+}
+const ATOM_TINT: Record<string, string> = { N: '#5cdfe4', O: '#fc6c84', Cl: '#a6f2e4', Br: '#ffb38a', P: '#ffd27a', S: '#ffd27a' };
+function HomeMolecules({ onSubstance }: { onSubstance: (s: string) => void }) {
+	const q = useSQLQuery(homeMolSQL);
+	const byName = new Map(rows(q).map((r) => [S(r.substance), r]));
+	return (
+		<div className="rd-home-mols" aria-label="Molecules">
+			{HOME_MOLS.map(([name, x, y, rot]) => {
+				const r = byName.get(name);
+				if (!r) return null;
+				let atoms: [string, number, number, number][] = [], bonds: [number, number, number][] = [];
+				try {
+					atoms = JSON.parse(S(r.atoms));
+					bonds = JSON.parse(S(r.bonds));
+				} catch {
+					return null;
+				}
+				if (atoms.length < 3) return null;
+				const xy = flatMolecule(atoms);
+				const k = 13;
+				const xs = xy.map((p) => p[0] * k), ys = xy.map((p) => p[1] * k);
+				const minX = Math.min(...xs) - 8, minY = Math.min(...ys) - 8, w = Math.max(...xs) - minX + 8, h = Math.max(...ys) - minY + 8;
+				const label = r.compound ? `${S(r.compound)} (${short(name)})` : short(name);
+				return (
+					<button key={name} className="rd-home-mol" onClick={() => onSubstance(name)} aria-label={`Open ${short(name)}`} style={{ left: `${x}%`, top: `${y}%` }}>
+						<svg width={w} height={h} viewBox={`${minX} ${minY} ${w} ${h}`} style={{ transform: `rotate(${rot}deg)` }} aria-hidden>
+							{bonds.map(([a, b, o], i) => (
+								<g key={i}>
+									<line x1={xs[a]} y1={ys[a]} x2={xs[b]} y2={ys[b]} stroke="currentColor" strokeWidth={o > 1 ? 3.6 : 1.6} strokeLinecap="round" />
+									{o > 1 && <line x1={xs[a]} y1={ys[a]} x2={xs[b]} y2={ys[b]} stroke="var(--rd-mol-gap)" strokeWidth={1.2} strokeLinecap="round" />}
+								</g>
+							))}
+							{atoms.map(([el], i) => (el === 'C' ? null : <circle key={i} cx={xs[i]} cy={ys[i]} r={3.4} fill={ATOM_TINT[el] ?? 'currentColor'} className="rd-mol-atom" />))}
+						</svg>
+						<span className="rd-home-mol-name">{label}</span>
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
 // The homepage search types out example searches by itself until you start typing.
 const TYPED_EXAMPLES = ['molly', 'candy flip', 'first time on shrooms', 'anxiety', 'ketamine and alcohol', 'time distortion', 'weed edibles'];
 function useTypedPlaceholder(on: boolean) {
@@ -5364,6 +5447,7 @@ function useTypedPlaceholder(on: boolean) {
 function HomePage({ q, onSubstance, onEffect, onReport, onCombo, onView }: { q: Q; onSubstance: (s: string) => void; onEffect: (e: string) => void; onReport: (id: string, s: string) => void; onCombo: (a: string, b: string) => void; onView: (v: 'substances' | 'reports' | 'effects' | 'resources') => void }) {
 	return (
 		<section className="rd-fade flex w-full min-w-0 flex-col items-center justify-center text-center" style={{ minHeight: 'calc(100vh - 150px)', paddingBottom: 90, position: 'relative', zIndex: 2 }}>
+			<HomeMolecules onSubstance={onSubstance} />
 			<h1 className="sr-only">re:dose</h1>
 			<div className="relative w-full">
 				<GlobalSearch inline subs={rows(q)} onSubstance={onSubstance} onEffect={onEffect} onReport={onReport} onCombo={onCombo} />
@@ -7831,7 +7915,8 @@ type Q = ReturnType<typeof useSQLQuery>;
 // down into the bottom-right corner, where the site's Spunion lives. Each landing (the bounce animation's own loop
 // event, so it stays in step) also rolls a ring of colour out through the molecules.
 const START_FILLS = ['#ffffff', '#fc6c84', '#5cdfe4'];
-const START_WASHES = ['#1f6a58', '#4a3d9c'];
+// Spunion's own green (so red Spunion stands on green, then green Spunion on purple), then the site's exact background.
+const START_WASHES = ['linear-gradient(170deg, #3cc6cc 0%, #5cdfe4 55%, #86ecef 100%)', BG];
 const START_RINGS = ['#fc6c84', '#5cdfe4', '#b3a8f0'];
 export function StartScreen() {
 	const [lands, setLands] = useState(0);
