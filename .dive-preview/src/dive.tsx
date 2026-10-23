@@ -1812,49 +1812,55 @@ function EffectsBrowse({ q, onEffect }: { q: Q; onEffect: (e: string) => void })
 			{seiOpen && (
 				<>
 					<div className="rd-scrim" onClick={() => setSeiOpen(false)} />
-					<div role="dialog" aria-label="About the Subjective Effect Index" className="rd-fade fixed left-1/2 top-1/2 overflow-y-auto rounded-3xl p-6 sm:p-8" style={{ zIndex: 41, width: 'min(680px, calc(100vw - 32px))', maxHeight: '86vh', transform: 'translate(-50%, -50%)', background: C.panel, border: `1px solid ${C.line}`, boxShadow: '0 30px 80px rgba(10,4,40,.6)' }}>
+					<div role="dialog" aria-label="About the Subjective Effect Index" className="rd-fade fixed left-1/2 top-1/2 overflow-y-auto rounded-3xl p-6 sm:p-8" style={{ zIndex: 41, width: 'min(640px, calc(100vw - 32px))', maxHeight: '86vh', transform: 'translate(-50%, -50%)', background: '#fbfaff', color: '#1d1440', boxShadow: '0 30px 80px rgba(10,4,40,.55)' }}>
 						<div className="flex items-start justify-between gap-4">
-							<span style={{ color: '#fff' }}>
-								<SeiLogo width={86} />
+							<span style={{ color: '#1d1440' }}>
+								<SeiLogo width={80} />
 							</span>
-							<button className="rd-btn" aria-label="Close" style={{ padding: 8 }} onClick={() => setSeiOpen(false)}>
+							<button aria-label="Close" onClick={() => setSeiOpen(false)} className="rounded-full p-2" style={{ color: '#4a3f78', background: 'rgba(29,20,64,.06)' }}>
 								<X size={16} />
 							</button>
 						</div>
-						<div className="mt-4">
-				<div>
-					<h2 className="text-2xl font-semibold" style={{ color: '#fff' }}>About the Subjective Effect Index</h2>
-					<div className="mt-3 grid gap-x-10 gap-y-3 sm:grid-cols-1" style={{ color: C.soft, lineHeight: 1.6 }}>
-						<p>
-							The effects on this page, their names, categories and descriptions, come from the <b style={{ color: '#fff' }}>Subjective Effect Index</b> (SEI), hosted at Effect Index. It’s a formal, structured documentation of the many distinct states people can experience under hallucinogens and other substances, each described on its own, apart from any one drug.
-						</p>
-						<p>
-							The aim is a shared vocabulary: words for experiences people used to call indescribable, so they can be talked about, compared and studied. Many effects there come with image, video or audio <i>replications</i> that show what they look or sound like, which you’ll only find on their site.
-						</p>
-						<p>
-							Effect Index was founded in 2017 by Josie Kins, who also founded PsychonautWiki, and is built by a community of contributors. It’s years of careful work, and it’s the reason this page can explain anything at all.
-						</p>
-						<p>
-							How re:dose uses it: our close readings tag which of these effects show up in each story, and when. That’s where the story counts and the “mostly good / rough” come from. Every effect links back to its full page on Effect Index.
-						</p>
-					</div>
-					<div className="mt-5 flex flex-wrap gap-2">
-						<a className="rd-btn text-sm" href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', background: '#fff', color: C.deep }}>
-							Visit Effect Index ↗
-						</a>
-						<a className="rd-btn text-sm" href="https://www.effectindex.com/donate" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-							Support their work ↗
-						</a>
-						<a className="rd-btn text-sm" href="https://www.effectindex.com/discord" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-							Their Discord ↗
-						</a>
-						<a className="rd-btn text-sm" href="https://reddit.com/r/replications" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-							r/replications ↗
-						</a>
-					</div>
-					<SeiLicence className="mt-5" />
-				</div>
+						<h2 className="mt-4 text-2xl font-semibold">About the Subjective Effect Index</h2>
+						<div className="mt-3 grid gap-3" style={{ color: '#4a3f78', lineHeight: 1.6 }}>
+							<p>
+								The effects on this page, their names, categories and descriptions, come from the <b style={{ color: '#1d1440' }}>Subjective Effect Index</b> (SEI), hosted at Effect Index. It’s a formal, structured documentation of the many distinct states people can experience under hallucinogens and other substances, each described on its own, apart from any one drug.
+							</p>
+							<p>
+								The aim is a shared vocabulary: words for experiences people used to call indescribable, so they can be talked about, compared and studied. Many effects there come with image, video or audio <i>replications</i> that show what they look or sound like, which you’ll only find on their site.
+							</p>
+							<p>
+								Effect Index was founded in 2017 by Josie Kins, who also founded PsychonautWiki, and is built by a community of contributors. It’s years of careful work, and it’s the reason this page can explain anything at all.
+							</p>
+							<p>
+								How re:dose uses it: our close readings tag which of these effects show up in each story, and when. That’s where the story counts and the “mostly good / rough” come from. Every effect links back to its full page on Effect Index.
+							</p>
 						</div>
+						<div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold">
+							{(
+								[
+									['Visit Effect Index', 'https://www.effectindex.com', true],
+									['Support their work', 'https://www.effectindex.com/donate', false],
+									['Their Discord', 'https://www.effectindex.com/discord', false],
+									['r/replications', 'https://reddit.com/r/replications', false],
+								] as const
+							).map(([label, href, main]) => (
+								<a key={label} href={href} target="_blank" rel="noopener noreferrer" className="rounded-full px-4 py-2" style={{ textDecoration: 'none', background: main ? '#1d1440' : 'transparent', color: main ? '#fff' : '#1d1440', border: `1px solid ${main ? '#1d1440' : 'rgba(29,20,64,.22)'}` }}>
+									{label} ↗
+								</a>
+							))}
+						</div>
+						<p className="mt-5 text-xs" style={{ color: '#6f6690', lineHeight: 1.6 }}>
+							Effect names, categories and descriptions ©{' '}
+							<a href="https://www.effectindex.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4a3f78', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+								Effect Index
+							</a>{' '}
+							and contributors, used under{' '}
+							<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: '#4a3f78', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+								CC BY-NC-SA 4.0
+							</a>
+							. We shorten descriptions to their first sentence; those shortened versions are shared under the same licence.
+						</p>
 					</div>
 				</>
 			)}
