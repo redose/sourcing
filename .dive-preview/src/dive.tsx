@@ -907,21 +907,12 @@ div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
 .rd-home .rd-molecules { opacity: .07; animation: rd-drift-home 70s ease-in-out infinite alternate; }
 .rd-home .rd-molecules.b { opacity: .045; animation: rd-drift-home 95s ease-in-out infinite alternate-reverse; }
 @media (prefers-reduced-motion: reduce) { .rd-home .rd-molecules { animation: none; } }
-/* Start screen: the wallpaper holds still. Each landing adds a circle of the next background colour that grows from
-   his feet (newest on top), and a ring that grows the same way, seen only through the molecules' shapes. */
+/* Start screen: the wallpaper holds still while Spunion bounces. */
 .rd-start .rd-molecules { animation: none; }
 .rd-start .rd-loader { margin-top: 0; }
 .rd-start .rd-bounce { animation-duration: .7s; }
 .rd-start .rd-ghost-body { animation: none; fill: var(--sp-fill, #fff); fill-opacity: 1; transition: fill .1s; }
 .rd-start-sp { position: fixed; left: 50%; top: 50%; width: 88px; height: 88px; margin: -44px 0 0 -44px; z-index: 2; }
-
-.rd-start .rd-ripple { animation-duration: 1.8s; }
-.rd-ripples { position: fixed; inset: -200px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
-.rd-ripple { position: absolute; left: 50%; top: calc(50% + 44px); width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; border-radius: 50%;
-  background: radial-gradient(closest-side, transparent 50%, currentColor 72%, currentColor 86%, transparent 100%);
-  animation: rd-ripple 1.7s cubic-bezier(.2,.6,.35,1) both; }
-@keyframes rd-ripple { from { transform: scale(.03); opacity: 1; } 65% { opacity: .95; } to { transform: scale(1); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .rd-ripple { animation: none; display: none; } }
 .rd-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .rd-board { grid-template-columns: 1fr; } }
 /* Homepage molecules: faint until you hover, then they light up and say what they are. */
@@ -2356,7 +2347,7 @@ function MixingBoard({ name, onCombo }: { name: string; onCombo: (a: string, b: 
 								<span className="tabular-nums" style={{ color: C.faint, fontWeight: 500 }}>{list.length}</span>
 							</div>
 							{list.map((m) => (
-								<div key={m.key} className="grid items-start gap-x-6 py-3" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto', borderTop: `1px solid ${C.line}` }}>
+								<div key={m.key || `group:${m.label}`} className="grid items-start gap-x-6 py-3" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto', borderTop: `1px solid ${C.line}` }}>
 									<div className="min-w-0">
 										<div className="font-semibold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.key}>{m.label}</div>
 										<p className="mt-0.5 text-sm" style={{ color: C.soft, lineHeight: 1.55, maxWidth: 680 }}>
@@ -7893,31 +7884,17 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG.rep
 
 type Q = ReturnType<typeof useSQLQuery>;
 
-// The preview's connecting screen: Spunion bouncing on the spot, white then green, swapping each time he lands. Each landing (the bounce animation's own loop event, so it stays in step) rolls a ring of
-// colour out through the molecules from his feet.
-// No red anywhere: he swaps between white and his own green, and each landing sends out the colour he just left.
+// The start screen (the Dive's first load): Spunion bouncing on the spot, swapping between white and his own green each
+// time he lands (the bounce animation's own loop event, so it stays in step).
 const START_COLORS = ['#ffffff', '#5cdfe4'];
 export function StartScreen() {
-	const [lands, setLands] = useState<{ x: number; y: number }[]>([]);
-	const me = useRef<HTMLDivElement | null>(null);
-	const land = (e: React.AnimationEvent) => {
-		if (e.animationName !== 'rd-bounce') return;
-		const b = me.current?.getBoundingClientRect();
-		if (b) setLands((l) => [...l.slice(-3), { x: b.left + b.width / 2, y: b.bottom }]);
-	};
-	const n = useRef(0);
+	const [lands, setLands] = useState(0);
 	return (
-		<main className="rd rd-fx-rainbow rd-start" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden' }}>
+		<main className="rd rd-start" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden' }}>
 			<style>{CSS}</style>
 			<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 			<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
-			<div aria-hidden className="rd-ripples" style={{ WebkitMaskImage: MOLECULES, maskImage: MOLECULES }}>
-				{lands.map((p, i) => {
-					const k = n.current - lands.length + i;
-					return <div key={k} className="rd-ripple" style={{ color: START_COLORS[k % 2], left: p.x + 200, top: p.y + 200 }} />;
-				})}
-			</div>
-			<div ref={me} className="rd-start-sp" onAnimationIteration={(e) => (e.animationName === 'rd-bounce' && n.current++, land(e))} style={{ '--sp-fill': START_COLORS[n.current % 2] } as React.CSSProperties}>
+			<div className="rd-start-sp" onAnimationIteration={(e) => e.animationName === 'rd-bounce' && setLands((l) => l + 1)} style={{ '--sp-fill': START_COLORS[lands % 2] } as React.CSSProperties}>
 				<BouncingSpunion size={88} />
 			</div>
 		</main>

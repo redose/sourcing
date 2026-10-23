@@ -3,8 +3,12 @@
  * Same API as the production dive runtime — useSQLQuery, useDiveState, useExport,
  * useConnection, useConnectionStatus, and MotherDuckSDKProvider.
  */
-import { MDConnection } from '@motherduck/wasm-client';
+import type { MDConnection } from '@motherduck/wasm-client';
 import type { DuckDBRow } from '@motherduck/wasm-client';
+import { openStaticDatabase } from './duck-static';
+
+// The static build (redose.org) uses DuckDB in the browser over exported Parquet files instead of MotherDuck.
+const STATIC = import.meta.env.VITE_STATIC === '1';
 import {
 	createContext,
 	useCallback,
@@ -153,18 +157,26 @@ export function MotherDuckSDKProvider({ token, children }: { token: string; chil
 	const [state, setState] = useState<ConnectionState>({ status: 'idle' });
 
 	useEffect(() => {
-		if (!token) {
+		if (!token && !STATIC) {
 			setState({ status: 'idle' });
 			return;
 		}
 		let cancelled = false;
-		let conn: MDConnection | null = null;
+		let conn: { close: () => unknown } | null = null;
 		(async () => {
 			setState({ status: 'connecting' });
 			try {
-				conn = MDConnection.create({ mdToken: token, useDuckDBWasmCOI: false });
-				await conn.isInitialized();
-				if (!cancelled) setState({ status: 'connected', connection: conn });
+				if (STATIC) {
+					const local = await openStaticDatabase();
+					conn = local;
+					if (!cancelled) setState({ status: 'connected', connection: local as unknown as MDConnection });
+					return;
+				}
+				const { MDConnection: MD } = await import('@motherduck/wasm-client');
+				const md = MD.create({ mdToken: token, useDuckDBWasmCOI: false });
+				conn = md;
+				await md.isInitialized();
+				if (!cancelled) setState({ status: 'connected', connection: md });
 			} catch (err) {
 				if (!cancelled)
 					setState({ status: 'error', error: err instanceof Error ? err : new Error(String(err)) });

@@ -29,7 +29,8 @@ function ConnectionGate({ children }: { children: React.ReactNode }) {
 	return <>{children}</>;
 }
 
-const token = import.meta.env.VITE_MOTHERDUCK_TOKEN;
+// The static build (VITE_STATIC=1) needs no token: it reads exported files in the browser.
+const token = import.meta.env.VITE_STATIC === '1' ? 'static' : import.meta.env.VITE_MOTHERDUCK_TOKEN;
 if (!token) {
 	document.getElementById('root')!.innerHTML =
 		'<p style="padding:2rem;color:red">Missing VITE_MOTHERDUCK_TOKEN in .env</p>';
