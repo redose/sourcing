@@ -837,6 +837,10 @@ const CSS = `
   -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, rgba(0,0,0,.25) 20%, #000 85%); }
 .rd-molecules.b { background-size: 1530px; opacity: .03; animation-duration: 340s, 80s; animation-direction: alternate-reverse, reverse; }
 /* Every day: the molecules drift through a soft rainbow, slowly. */
+div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules { opacity: .028; }
+div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.b { opacity: .016; }
+div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.rd-tint1, div:not(.rd-home):not(.rd-fx-rainbow) > .rd-molecules.rd-tint2 { animation-name: rd-drift, rd-tintfade-quiet; }
+@keyframes rd-tintfade-quiet { 0%, 100% { opacity: 0; } 50% { opacity: .025; } }
 .rd-molecules.rd-tint1, .rd-molecules.rd-tint2 { opacity: 0; animation: rd-drift 240s ease-in-out infinite alternate, rd-tintfade 60s ease-in-out infinite; }
 .rd-molecules.rd-tint1 { filter: sepia(1) saturate(2.2) hue-rotate(300deg); }
 .rd-molecules.rd-tint2 { filter: sepia(1) saturate(2.2) hue-rotate(140deg); animation-delay: 0s, -30s; }
@@ -3354,6 +3358,13 @@ function SlangSection({ name }: { name: string }) {
 	const q = useSQLQuery(aliasesSQL(name));
 	const [allSlang, setAllSlang] = useState(false);
 	const list = rows(q).map((r) => ({ term: S(r.alias), kind: S(r.kind), src: L(r.sources).map(String), ai: !!r.ai, cite: S(r.citations), desc: S(r.description), parts: L(r.parts).map(String) }));
+	if (q.isLoading)
+		return (
+			<section id="slang" className="mt-24" style={{ scrollMarginTop: 16 }}>
+				<ArticleH2>Aliases</ArticleH2>
+				<Loading height={240} className="mt-5" quiet />
+			</section>
+		);
 	if (!list.length) return null;
 	const of = (k: string) => list.filter((r) => r.kind === k);
 	const chem = of('chemical'), brand = of('brand'), slang = of('slang'), mix = of('mix');
@@ -5201,7 +5212,14 @@ function SubstanceLegality({ name }: { name: string }) {
 	const list = all.filter((r) => !localOf(S(r.country)));
 	const locals = all.filter((r) => localOf(S(r.country)));
 	const intl = rows(intlQ).map((r) => S(r.statement));
-	if (q.isLoading || !list.length) return null;
+	if (q.isLoading)
+		return (
+			<section id="legal" className="mt-24" style={{ scrollMarginTop: 16 }}>
+				<ArticleH2>Legality</ArticleH2>
+				<Loading height={340} className="mt-5" quiet />
+			</section>
+		);
+	if (!list.length) return null;
 	const first = LEGAL_GROUPS.map((g) => list.find((r) => S(r.status_group) === g.k)).find(Boolean);
 	const focus = here ?? pick ?? (first ? S(first.country) : null);
 	const by = (k: string) => list.filter((r) => S(r.status_group) === k);
@@ -5613,7 +5631,13 @@ function SubstanceAddiction({ name }: { name: string }) {
 	const { classOf } = useContext(OpenCtx);
 	const own = KIND_OVERRIDE[name] ?? classKey(classOf(name));
 	const kind = SUBSTANCE_KIND[own]?.label;
-	if (q.isLoading) return null;
+	if (q.isLoading)
+		return (
+			<section id="addiction" className="mt-24" style={{ scrollMarginTop: 16 }}>
+				<ArticleH2>Health</ArticleH2>
+				<Loading height={280} className="mt-5" quiet />
+			</section>
+		);
 	const src = S(rows(q)[0]?.source_url);
 	return (
 		<section id="addiction" data-rd-safe="" className="mt-24" style={{ scrollMarginTop: 16 }}>
@@ -7878,7 +7902,7 @@ type Q = ReturnType<typeof useSQLQuery>;
 
 // The preview's connecting screen: Spunion bouncing on the spot, white then green, swapping each time he lands. Each landing (the bounce animation's own loop event, so it stays in step) rolls a ring of
 // colour out through the molecules from his feet.
-// No red anywhere: he and his ripples take turns between white and his own green.
+// No red anywhere: he swaps between white and his own green, and each landing sends out the colour he just left.
 const START_COLORS = ['#ffffff', '#5cdfe4'];
 export function StartScreen() {
 	const [lands, setLands] = useState<{ x: number; y: number }[]>([]);
@@ -7897,7 +7921,7 @@ export function StartScreen() {
 			<div aria-hidden className="rd-ripples" style={{ WebkitMaskImage: MOLECULES, maskImage: MOLECULES }}>
 				{lands.map((p, i) => {
 					const k = n.current - lands.length + i;
-					return <div key={k} className="rd-ripple" style={{ color: START_COLORS[(k + 1) % 2], left: p.x + 280, top: p.y + 280 }} />;
+					return <div key={k} className="rd-ripple" style={{ color: START_COLORS[k % 2], left: p.x + 280, top: p.y + 280 }} />;
 				})}
 			</div>
 			<div ref={me} className="rd-start-sp" onAnimationIteration={(e) => (e.animationName === 'rd-bounce' && n.current++, land(e))} style={{ '--sp-fill': START_COLORS[n.current % 2] } as React.CSSProperties}>
