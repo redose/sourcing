@@ -797,6 +797,9 @@ const CSS = `
 .rd-contents { position: sticky; top: 16px; }
 .rd-article { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; align-items: start; }
 @media (max-width: 1100px) { .rd-article { grid-template-columns: minmax(0, 1fr); } .rd-contents { display: none; } }
+@media (min-width: 768px) { .rd-g-flow { grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; } }
+@media (min-width: 640px) { .rd-g-risk { grid-template-columns: 150px minmax(0, 1fr); } }
+@media (min-width: 1024px) { .rd-g-hero { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
 .rd-glance > li { display: grid; align-content: start; gap: 3px; }
 .rd-glance .v { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; margin-top: 4px; }
 .rd-glance .s { font-size: 13px; color: ${C.soft}; line-height: 1.45; }
@@ -2256,7 +2259,7 @@ function KnownRisks({ name }: { name: string }) {
 	const bad = list.filter((k) => k.rank >= 2), care = list.filter((k) => k.rank === 1);
 	if (q.isLoading) return null;
 	const row = (k: (typeof list)[number]) => (
-		<div key={k.grp} className="grid gap-x-5 gap-y-1.5 py-4 sm:grid-cols-[150px_minmax(0,1fr)]" style={{ borderTop: `1px solid ${C.line}` }}>
+		<div key={k.grp} className="grid gap-x-5 gap-y-1.5 py-4 rd-g-risk" style={{ borderTop: `1px solid ${C.line}` }}>
 			<div className="flex items-center gap-2 sm:block">
 				<div className="font-semibold" style={{ whiteSpace: 'nowrap' }}>{tsGroup(k.grp)}</div>
 				<div className="sm:mt-1.5">
@@ -2942,7 +2945,7 @@ function SubstanceOverview({ name }: { name: string }) {
 	return (
 		<>
 			<section id="overview" className="rd-in" style={{ scrollMarginTop: 16 }}>
-				<div className={`grid items-start gap-x-10 gap-y-6 ${molecule ? 'lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]' : ''}`}>
+				<div className={`grid items-start gap-x-10 gap-y-6 ${molecule ? 'rd-g-hero' : ''}`}>
 					<div className="min-w-0">
 						<div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
 							<div className="flex flex-wrap items-center gap-3">
@@ -3555,7 +3558,7 @@ function AboutPage() {
 
 			<section className="mt-12">
 				<h2 style={{ fontFamily: SANS, fontSize: 22, fontWeight: 650, letterSpacing: '-0.015em' }}>How it fits together</h2>
-				<div className="mt-4 grid items-stretch gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
+				<div className="mt-4 grid items-stretch gap-3 rd-g-flow">
 					{(
 						[
 							['Stories', `${n(r?.reports)} first-hand reports from Erowid, in the writers’ own words.`],
