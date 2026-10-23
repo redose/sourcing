@@ -798,6 +798,18 @@ const CSS = `
 .rd-article { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; align-items: start; }
 @media (max-width: 1100px) { .rd-article { grid-template-columns: minmax(0, 1fr); } .rd-contents { display: none; } }
 .rd-chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 10px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.06); border: 1px solid ${C.line}; white-space: nowrap; }
+@keyframes rd-step-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@keyframes rd-dot-in { to { transform: scale(1); opacity: 1; } }
+.rd-steps .rd-step { opacity: 0; }
+.rd-steps.go .rd-step { animation: rd-step-in .45s ease-out forwards; }
+.rd-steps .rd-fill-dot { transform: scale(.3); opacity: .25; }
+.rd-steps.go .rd-fill-dot { animation: rd-dot-in .25s ease-out forwards; }
+.rd-steps .rd-reveal { clip-path: inset(-12px 100% -12px -12px); }
+.rd-steps.go .rd-reveal { clip-path: inset(-12px -12px -12px -12px); transition: clip-path 1.7s cubic-bezier(.3,.1,.3,1); }
+@media (prefers-reduced-motion: reduce) {
+  .rd-steps .rd-step, .rd-steps .rd-fill-dot { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .rd-steps .rd-reveal { clip-path: none !important; transition: none !important; }
+}
 .rd-thanks { display: inline-flex; align-items: center; gap: 6px; color: ${C.soft}; font-size: 12.5px; font-weight: 500; white-space: nowrap; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .2s, color .2s; }
 .rd-thanks:hover { color: #fff; border-color: rgba(255,255,255,.5); }
 .rd-thanks img { display: block; border-radius: 4px; }
@@ -2538,7 +2550,7 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 	];
 	return (
 		<div>
-			<div className="relative" style={{ height: H }}>
+			<div className="rd-reveal relative" style={{ height: H }}>
 				<svg viewBox={`0 0 1000 ${H}`} preserveAspectRatio="none" width="100%" height={H} style={{ display: 'block', overflow: 'visible' }} aria-hidden>
 					<defs>
 						<linearGradient id="phase-fill" x1="0" x2="0" y1="0" y2="1">
@@ -2563,7 +2575,7 @@ function PhaseStrip({ on, pk, end }: { on: number; pk: number; end: number }) {
 			</div>
 			<div className="mt-3 grid grid-cols-3 gap-4">
 				{marks.map((m) => (
-					<div key={m.label}>
+					<div key={m.label} className="rd-step" style={{ animationDelay: `${0.25 + (x(m.v) / 100) * 1.5}s` }}>
 						<div className="flex items-center gap-2">
 							<span className="rd-dot" style={{ width: 9, height: 9, background: m.color }} />
 							<span className="rd-label" style={{ color: C.soft }}>{m.label}</span>
@@ -3718,6 +3730,17 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 	const routes = [...new Set([...ours.filter((t) => S(t.route) !== '*').map((t) => S(t.route)), ...pw.map((r) => normRoute(S(r.route)))])];
 	const [route, setRoute] = useState<string | null>(null);
 	const sel = route && routes.includes(route) ? route : routes[0] ?? '*';
+	// Plays through once it scrolls into view; switching route replays it (the cards remount).
+	const box = useRef<HTMLDivElement | null>(null);
+	const [go, setGo] = useState(false);
+	useEffect(() => {
+		const el = box.current;
+		if (!el || go) return;
+		if (typeof IntersectionObserver === 'undefined') return setGo(true);
+		const io = new IntersectionObserver(([e]) => e.isIntersecting && (setGo(true), io.disconnect()), { threshold: 0.25 });
+		io.observe(el);
+		return () => io.disconnect();
+	});
 	const p = pw.find((r) => normRoute(S(r.route)) === sel);
 	const t = ours.find((x) => S(x.route) === sel) ?? ours.find((x) => S(x.route) === '*');
 	const tOwn = ours.find((x) => S(x.route) === sel);
@@ -3738,9 +3761,9 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 				['Peak', pwDur(p.duration_peak, false)],
 				['Offset', pwDur(p.duration_offset, false)],
 				['After effects', pwDur(p.duration_aftereffects, false)],
-				['Total', pwDur(p.duration_total, false)],
 			] as [string, string][]).filter(([, v]) => v)
 		: [];
+	const total = p && pwDur(p.duration_total, false) ? pwDur(p.duration_total, false) : t ? `~${fmtDur(N(t.end_m))}` : '';
 	const row = 'flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm';
 	const mono = { fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: 12.5 };
 	return (
@@ -3755,7 +3778,7 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 					))}
 				</div>
 			)}
-			<div className="mt-4 grid gap-4 lg:grid-cols-2">
+			<div ref={box} key={sel} className={`rd-steps ${go ? 'go' : ''} mt-4 grid gap-4 lg:grid-cols-2`}>
 				<div className="rd-card p-5">
 					<div className="flex items-center gap-2 font-semibold">
 						<BarChart3 size={17} color={ACCENT} /> Dosage
@@ -3766,12 +3789,16 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 								<AlertTriangle size={13} /> Doses are population estimates that vary widely between people.
 							</p>
 							<div className="mt-3 grid gap-1.5">
-								{DOSE_ROWS.map((d, i) => ({ ...d, i })).filter((d) => dose(d.key)).map((d) => (
-									<div key={d.key} className={row} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${C.line}` }}>
+								{DOSE_ROWS.map((d, i) => ({ ...d, i })).filter((d) => dose(d.key)).map((d, k) => (
+									<div key={d.key} className={`${row} rd-step`} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${C.line}`, animationDelay: `${k * 0.14}s` }}>
 										<span className="flex items-center gap-3">
 											<span className="flex gap-1" aria-hidden>
 												{[0, 1, 2, 3, 4].map((j) => (
-													<span key={j} className="rounded-full" style={{ width: 6, height: 6, background: j <= d.i ? (d.i >= 4 ? C.coral : d.i >= 3 ? C.amber : C.lav) : 'rgba(255,255,255,.15)' }} />
+													<span
+														key={j}
+														className={`rounded-full ${j <= d.i ? 'rd-fill-dot' : ''}`}
+														style={{ width: 6, height: 6, background: j <= d.i ? (d.i >= 4 ? C.coral : d.i >= 3 ? C.amber : C.lav) : 'rgba(255,255,255,.15)', animationDelay: `${k * 0.14 + 0.15 + j * 0.07}s` }}
+													/>
 												))}
 											</span>
 											{d.label}
@@ -3793,8 +3820,15 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 					)}
 				</div>
 				<div className="rd-card p-5">
-					<div className="flex items-center gap-2 font-semibold">
-						<Clock size={17} color={ACCENT} /> Duration
+					<div className="flex items-center justify-between gap-3">
+						<span className="flex items-center gap-2 font-semibold">
+							<Clock size={17} color={ACCENT} /> Duration
+						</span>
+						{total && (
+							<span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'rgba(255,255,255,.08)', border: `1px solid ${C.line}` }} title="Total duration">
+								Total <span style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontWeight: 500 }}>{total}</span>
+							</span>
+						)}
 					</div>
 					{t && (
 						<div className="mt-3">
@@ -3807,8 +3841,8 @@ function DosageDuration({ name, timing }: { name: string; timing: Record<string,
 						<div className={t ? 'mt-5' : 'mt-3'}>
 							<div className="rd-label mb-2">PsychonautWiki</div>
 							<div className="grid gap-1.5">
-								{durRows.map(([k, v]) => (
-									<div key={k} className={row} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${C.line}` }}>
+								{durRows.map(([k, v], i) => (
+									<div key={k} className={`${row} rd-step`} style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${C.line}`, animationDelay: `${0.4 + i * 0.12}s` }}>
 										<span>{k}</span>
 										<span style={mono}>{v}</span>
 									</div>
