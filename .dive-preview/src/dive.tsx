@@ -909,34 +909,18 @@ const CSS = `
 .rd-home.rd-fx-rainbow .rd-molecules { animation: rd-drift-home 70s ease-in-out infinite alternate, rd-mol-hue 16s linear infinite; }
 .rd-home.rd-fx-rainbow .rd-molecules.b { animation: rd-drift-home 95s ease-in-out infinite alternate-reverse, rd-mol-hue 22s linear infinite reverse; }
 @media (prefers-reduced-motion: reduce) { .rd-home.rd-fx-rainbow .rd-molecules { animation: none; } }
-/* Start screen: the wallpaper holds still, and each of Spunion's landings (every .62s, colours taking turns) sends a
-   ring out through it: a coloured copy of the molecules, seen only through an expanding ring from his floor. */
+/* Start screen: the wallpaper holds still. Each landing adds a circle of the next background colour that grows from
+   his feet (newest on top), and a ring that grows the same way, seen only through the molecules' shapes. */
 .rd-start .rd-molecules { animation: rd-mol-hue-soft 60s linear infinite; }
-.rd-wave { position: fixed; inset: -280px; z-index: -1; pointer-events: none; opacity: 0; filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 2px currentColor);
-  -webkit-mask-repeat: repeat, no-repeat; mask-repeat: repeat, no-repeat;
-  -webkit-mask-position: 0 0, 50% calc(50% + 74px); mask-position: 0 0, 50% calc(50% + 74px);
-  -webkit-mask-size: 1100px, 0 0; mask-size: 1100px, 0 0;
-  -webkit-mask-composite: source-in; mask-composite: intersect;
-  animation: rd-wave 1.86s cubic-bezier(.2,.6,.35,1) infinite; }
-@keyframes rd-wave {
-  0% { -webkit-mask-size: 1100px, 40px 40px; mask-size: 1100px, 40px 40px; opacity: 1; }
-  70% { opacity: .9; }
-  100% { -webkit-mask-size: 1100px, 210vmax 210vmax; mask-size: 1100px, 210vmax 210vmax; opacity: 0; }
-}
-/* The background washes: a growing circle of the next colour; the newest always sits on top of the last. */
-.rd-bgwave { position: fixed; inset: -280px; pointer-events: none;
-  -webkit-mask-image: radial-gradient(closest-side, #000 97%, transparent 100%); mask-image: radial-gradient(closest-side, #000 97%, transparent 100%);
-  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-  -webkit-mask-position: 50% calc(50% + 74px); mask-position: 50% calc(50% + 74px);
-  animation: rd-bgwave 1.86s infinite; }
-@keyframes rd-bgwave {
-  0% { -webkit-mask-size: 0 0; mask-size: 0 0; z-index: -4; animation-timing-function: cubic-bezier(.15,.7,.3,1); }
-  27% { -webkit-mask-size: 300vmax 300vmax; mask-size: 300vmax 300vmax; }
-  33.333% { z-index: -5; }
-  66.667% { z-index: -6; }
-  100% { -webkit-mask-size: 300vmax 300vmax; mask-size: 300vmax 300vmax; z-index: -6; }
-}
-@media (prefers-reduced-motion: reduce) { .rd-wave, .rd-bgwave { display: none; } }
+.rd-wash { position: fixed; left: 50%; top: calc(50% + 74px); width: 300vmax; height: 300vmax; margin: -150vmax 0 0 -150vmax; border-radius: 50%;
+  z-index: -2; pointer-events: none; animation: rd-wash .6s cubic-bezier(.15,.7,.3,1) both; }
+@keyframes rd-wash { from { transform: scale(0); } to { transform: scale(1); } }
+.rd-ripples { position: fixed; inset: -280px; z-index: -1; pointer-events: none; -webkit-mask-size: 1100px; mask-size: 1100px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
+.rd-ripple { position: absolute; left: 50%; top: calc(50% + 74px); width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax; border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 50%, currentColor 72%, currentColor 86%, transparent 100%);
+  animation: rd-ripple 1.7s cubic-bezier(.2,.6,.35,1) both; }
+@keyframes rd-ripple { from { transform: scale(.03); opacity: 1; } 65% { opacity: .95; } to { transform: scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .rd-wash, .rd-ripple { animation: none; display: none; } }
 .rd-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .rd-board { grid-template-columns: 1fr; } }
 .rd-g-3 { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -7831,26 +7815,31 @@ const MOLECULES = `url("data:image/svg+xml,${encodeURIComponent(MOLECULE_SVG)}")
 
 type Q = ReturnType<typeof useSQLQuery>;
 
-// The preview's connecting screen: the site's background and drifting molecules behind the bouncing Spunion.
+// The preview's connecting screen. Every time Spunion lands (the bounce animation's own loop event, so it stays in
+// step), a new background colour washes out from his feet and a ring of colour rolls out through the molecules.
+const START_WASHES = ['#5b2c74', '#22497f', '#4a3d9c'];
+const START_RINGS = ['#fc6c84', '#5cdfe4', '#b3a8f0'];
 export function StartScreen() {
+	const [lands, setLands] = useState<number[]>([]);
+	const land = (e: React.AnimationEvent) => {
+		if (e.animationName === 'rd-bounce') setLands((l) => [...l.slice(-3), (l[l.length - 1] ?? -1) + 1]);
+	};
 	return (
 		<main className="rd rd-fx-rainbow rd-start" style={{ minHeight: '100vh', background: BG, position: 'relative', isolation: 'isolate', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
 			<style>{CSS}</style>
+			{lands.map((n) => (
+				<div key={`w${n}`} aria-hidden className="rd-wash" style={{ background: START_WASHES[n % 3] }} />
+			))}
 			<div aria-hidden className="rd-molecules" style={{ backgroundImage: MOLECULES }} />
 			<div aria-hidden className="rd-molecules b" style={{ backgroundImage: MOLECULES, backgroundPosition: '310px 470px' }} />
-			{/* Each landing washes a new background colour out from his feet... */}
-			{[
-				'linear-gradient(180deg, #4a2363 0%, #7e3f86 100%)',
-				'linear-gradient(180deg, #1d3a6e 0%, #2f6e9c 100%)',
-				BG,
-			].map((bg, i) => (
-				<div key={i} aria-hidden className="rd-bgwave" style={{ background: bg, animationDelay: `${i * 0.62}s` }} />
-			))}
-			{/* ...and sends a ring of colour out through the molecules. */}
-			{['#fc6c84', '#5cdfe4', '#b3a8f0'].map((c, i) => (
-				<div key={c} aria-hidden className="rd-wave" style={{ background: c, color: c, animationDelay: `${i * 0.62}s`, WebkitMaskImage: `${MOLECULES}, radial-gradient(closest-side, rgba(0,0,0,.45) 0%, rgba(0,0,0,.3) 40%, #000 65%, #000 88%, transparent 100%)`, maskImage: `${MOLECULES}, radial-gradient(closest-side, rgba(0,0,0,.45) 0%, rgba(0,0,0,.3) 40%, #000 65%, #000 88%, transparent 100%)` }} />
-			))}
-			<BouncingSpunion size={88} />
+			<div aria-hidden className="rd-ripples" style={{ WebkitMaskImage: MOLECULES, maskImage: MOLECULES }}>
+				{lands.map((n) => (
+					<div key={`r${n}`} className="rd-ripple" style={{ color: START_RINGS[n % 3] }} />
+				))}
+			</div>
+			<span onAnimationIteration={land} style={{ display: 'contents' }}>
+				<BouncingSpunion size={88} />
+			</span>
 		</main>
 	);
 }
