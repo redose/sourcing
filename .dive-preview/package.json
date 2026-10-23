@@ -2,9 +2,12 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "vite"
+		"dev": "vite",
+		"build:site": "VITE_STATIC=1 vite build --outDir ../site/dist --emptyOutDir && cp -R ../site/data ../site/dist/data && cp ../site/CNAME ../site/dist/CNAME",
+		"preview:site": "vite preview --outDir ../site/dist --port 5174"
 	},
 	"dependencies": {
+		"@duckdb/duckdb-wasm": "^1.32.0",
 		"@motherduck/wasm-client": "^0.8.0",
 		"apache-arrow": "^17.0.0",
 		"d3": "^7.9.0",
