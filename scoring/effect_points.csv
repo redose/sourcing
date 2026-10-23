@@ -1,0 +1,191 @@
+effect,points,seed,safety_flag,moments,felt_good_share,felt_bad_share
+Anxiety suppression,3,3,false,488,0.86,0.01
+Bodily control enhancement,3,3,false,32,0.97,0.0
+Cognitive euphoria,3,3,false,1245,0.94,0.0
+Creativity enhancement,3,3,false,99,0.89,0.0
+Depression reduction,3,3,false,78,0.94,0.0
+"Empathy, affection, and sociability enhancement",3,3,false,578,0.92,0.01
+Focus enhancement,3,3,false,261,0.89,0.02
+Increased music appreciation,3,3,false,422,0.89,0.01
+Increased sense of humor,3,3,false,113,0.94,0.0
+Memory enhancement,3,3,false,36,0.86,0.0
+Mindfulness,3,3,false,136,0.9,0.0
+Motivation enhancement,3,3,false,166,0.95,0.01
+Novelty enhancement,3,3,false,181,0.89,0.01
+Physical euphoria,3,3,false,1245,0.92,0.01
+Rejuvenation,3,3,false,304,0.94,0.0
+Stamina enhancement,3,3,false,41,0.95,0.0
+Thought organization,3,3,false,40,1.0,0.0
+Addiction suppression,2,2,false,63,0.79,0.03
+Analysis enhancement,2,2,false,115,0.84,0.02
+Auditory enhancement,2,2,false,138,0.75,0.07
+Breathing,2,2,false,134,0.67,0.07
+Brightness alteration,2,2,false,162,0.66,0.09
+Catharsis,2,2,false,174,0.65,0.04
+Colour enhancement,2,2,false,454,0.77,0.05
+Colour shifting,2,2,false,148,0.65,0.07
+Component controllability,2,2,false,35,0.77,0.0
+Conceptual thinking,2,2,false,144,0.74,0.03
+Ego inflation,2,2,false,73,0.75,0.12
+Environmental patterning,2,2,false,109,0.62,0.08
+Existential self-realization,2,2,false,200,0.68,0.07
+Flowing,2,2,false,55,0.75,0.13
+Gustatory enhancement,2,2,false,68,0.81,0.01
+Immersion enhancement,2,2,false,206,0.82,0.01
+Increased libido,2,2,false,121,0.76,0.07
+Laughter fits,2,2,false,155,0.81,0.03
+Muscle relaxation,2,2,false,312,0.79,0.02
+Nausea suppression,2,2,false,30,0.77,0.03
+Pain relief,2,2,false,158,0.76,0.07
+Perception of bodily lightness,2,2,false,149,0.68,0.05
+Personal bias suppression,2,2,false,55,0.76,0.04
+Personal meaning enhancement,2,2,false,265,0.83,0.01
+"Settings, sceneries, and landscapes",2,2,false,199,0.67,0.06
+Spirituality enhancement,2,2,false,255,0.83,0.02
+Structures,2,2,false,32,0.63,0.09
+Synaesthesia,2,2,false,99,0.73,0.1
+Tactile enhancement,2,2,false,187,0.86,0.04
+Texture liquidation,2,2,false,22,0.73,0.09
+Thought connectivity,2,2,false,60,0.68,0.05
+Unity and interconnectedness,2,2,false,243,0.86,0.03
+Visual acuity enhancement,2,2,false,98,0.8,0.02
+Visual auras,2,2,false,50,0.74,0.08
+Appetite enhancement,1,1,false,67,0.55,0.09
+Autonomous entity,1,1,false,231,0.46,0.22
+Autonomous voice communication,1,1,false,107,0.56,0.15
+Changes in felt bodily form,1,1,false,208,0.5,0.14
+Changes in felt gravity,1,1,false,104,0.49,0.13
+Colour replacement,1,1,false,24,0.38,0.21
+Depth perception distortions,1,1,false,93,0.42,0.19
+Disinhibition,1,1,false,279,0.61,0.2
+Dream potentiation,1,1,false,108,0.54,0.17
+Drifting,1,1,false,398,0.56,0.11
+Emotion intensification,1,1,false,237,0.51,0.2
+Geometry,1,1,false,512,0.6,0.12
+"Holes, spaces, and voids",1,1,false,51,0.43,0.18
+Increased pareidolia,1,1,false,59,0.56,0.14
+Internal hallucination,1,1,false,683,0.58,0.13
+Introspection,1,1,false,369,0.57,0.08
+Melting,1,1,false,55,0.51,0.15
+Memory replays,1,1,false,67,0.46,0.21
+Morphing,1,1,false,236,0.51,0.17
+Multiple thought streams,1,1,false,27,0.33,0.15
+Object activation,1,1,false,55,0.55,0.2
+Perception of eternalism,1,1,false,48,0.52,0.17
+Personality regression,1,1,false,21,0.52,0.24
+Sedation,1,1,false,1120,0.47,0.2
+Spontaneous tactile sensations,1,1,false,365,0.55,0.16
+Stimulation,1,1,false,1067,0.59,0.15
+Thought acceleration,1,1,false,150,0.49,0.23
+Time compression,1,1,false,60,0.38,0.12
+Tracers,1,1,false,143,0.54,0.08
+Transformations,1,1,false,168,0.55,0.17
+Atemporality,0,0,false,79,0.32,0.35
+Auditory distortion,0,0,false,158,0.25,0.28
+Cognitive disconnection,0,0,false,425,0.26,0.32
+Depersonalization,0,0,false,371,0.3,0.39
+Double vision,0,0,false,37,0.22,0.32
+Ego death,0,0,false,165,0.39,0.29
+Ego replacement,0,0,false,32,0.47,0.34
+Enhancement and suppression cycles,0,0,false,76,0.28,0.24
+Excessive yawning,0,0,false,23,0.35,0.22
+Focus suppression,0,0,false,117,0.28,0.38
+Frame rate suppression,0,0,false,30,0.17,0.23
+Gait alteration,0,0,false,117,0.24,0.33
+Gustatory hallucination,0,0,false,25,0.2,0.16
+Increased bodily temperature,0,0,false,224,0.4,0.37
+Internal auditory hallucination,0,0,false,52,0.4,0.42
+Magnification,0,0,false,29,0.31,0.17
+Mouth numbing,0,0,false,59,0.34,0.2
+Perception of bodily heaviness,0,0,false,159,0.35,0.23
+Peripheral information misinterpretation,0,0,false,37,0.27,0.27
+Perspective distortion,0,0,false,128,0.31,0.24
+Physical autonomy,0,0,false,20,0.25,0.4
+Physical disconnection,0,0,false,335,0.4,0.24
+Pupil dilation,0,0,false,130,0.36,0.27
+Scenarios and plots,0,0,false,130,0.38,0.28
+Sensed presence,0,0,false,121,0.4,0.25
+Sleepiness,0,0,false,174,0.34,0.19
+Spontaneous physical movements,0,0,false,89,0.39,0.31
+Tactile distortion,0,0,false,39,0.44,0.31
+Tactile suppression,0,0,false,27,0.26,0.37
+Teeth grinding,0,0,false,94,0.39,0.27
+Thought deceleration,0,0,false,69,0.39,0.26
+Time dilation,0,0,false,150,0.35,0.27
+Time distortion,0,0,false,108,0.3,0.34
+Vibrating vision,0,0,false,41,0.29,0.22
+Visual haze,0,0,false,51,0.29,0.25
+Visual strobing,0,0,false,41,0.2,0.27
+Wakefulness,0,0,false,413,0.33,0.4
+Analysis suppression,-1,-1,false,40,0.15,0.4
+Appetite suppression,-1,-1,false,120,0.18,0.51
+Auditory hallucination,-1,-1,false,148,0.23,0.4
+Auditory misinterpretation,-1,-1,false,20,0.25,0.6
+Auditory suppression,-1,-1,false,23,0.13,0.57
+Bodily pressures,-1,-1,false,152,0.1,0.55
+Compulsive redosing,-1,-1,false,217,0.15,0.58
+Dehydration,-1,-1,false,80,0.13,0.56
+Derealization,-1,-1,false,406,0.19,0.39
+Dizziness,-1,-1,false,254,0.13,0.54
+Dry mouth,-1,-1,false,80,0.26,0.44
+Emotion suppression,-1,-1,false,96,0.18,0.51
+External hallucination,-1,-1,false,368,0.25,0.43
+Glossolalia,-1,-1,false,23,0.22,0.39
+Gustatory suppression,-1,-1,false,20,0.1,0.45
+Increased heart rate,-1,-1,false,226,0.18,0.59
+Increased perspiration,-1,-1,false,169,0.17,0.62
+Itchiness,-1,-1,false,37,0.27,0.54
+Language suppression,-1,-1,false,186,0.16,0.44
+Memory suppression,-1,-1,false,82,0.17,0.49
+Mixed emotions,-1,-1,false,23,0.04,0.26
+Motor control loss,-1,-1,false,481,0.2,0.48
+Muscle tension,-1,-1,false,120,0.18,0.47
+Muscle twitching,-1,-1,false,78,0.15,0.6
+Photophobia,-1,-1,false,23,0.09,0.57
+Sensory overload,-1,-1,false,112,0.11,0.57
+Skin flushing,-1,-1,false,49,0.2,0.39
+Tactile hallucination,-1,-1,false,71,0.23,0.59
+Temperature regulation suppression,-1,-1,false,120,0.14,0.61
+Thought disorganization,-1,-1,false,150,0.18,0.43
+Tinnitus,-1,-1,false,47,0.19,0.43
+Vasoconstriction,-1,-1,false,61,0.11,0.61
+Visual acuity suppression,-1,-1,false,150,0.2,0.47
+Amnesia,-2,-2,false,350,0.07,0.68
+Anxiety,-2,-2,false,722,0.0,0.82
+Back pain,-2,-2,false,25,0.0,0.68
+Cognitive fatigue,-2,-2,false,328,0.05,0.7
+Confusion,-2,-2,false,267,0.07,0.65
+Delusion,-2,-2,false,231,0.09,0.73
+Difficulty urinating,-2,-2,false,25,0.08,0.68
+External auditory hallucination,-2,-2,false,50,0.08,0.64
+Frequent urination,-2,-2,false,45,0.02,0.64
+Headache,-2,-2,false,190,0.03,0.76
+Increased blood pressure,-2,-2,false,41,0.07,0.68
+Increased salivation,-2,-2,false,28,0.11,0.64
+Motivation suppression,-2,-2,false,92,0.09,0.76
+Muscle cramp,-2,-2,false,45,0.02,0.78
+Nausea,-2,-2,false,595,0.04,0.74
+Physical fatigue,-2,-2,false,427,0.07,0.67
+Restless legs,-2,-2,false,64,0.08,0.66
+Runny nose,-2,-2,false,25,0.08,0.76
+Shadow people,-2,-2,false,46,0.04,0.67
+Shakiness,-2,-2,false,142,0.11,0.65
+Spatial disorientation,-2,-2,false,156,0.1,0.62
+Stomach cramp,-2,-2,false,103,0.03,0.77
+Thought loops,-2,-2,false,106,0.09,0.67
+Visual disconnection,-2,-2,false,24,0.08,0.58
+Vomiting,-2,-2,false,261,0.02,0.79
+Abnormal heartbeat,-3,-3,true,51,0.02,0.86
+Cognitive dysphoria,-3,-3,false,234,0.0,0.95
+Delirium,-3,-2,true,194,0.04,0.78
+Depression,-3,-3,false,190,0.0,0.97
+Diarrhea,-3,-3,false,27,0.04,0.96
+Feelings of impending doom,-3,-3,false,300,0.0,0.93
+Irritability,-3,-3,false,111,0.01,0.87
+Panic attack,-3,-3,true,194,0.0,0.99
+Paranoia,-3,-3,false,252,0.0,0.89
+Psychosis,-3,-3,true,83,0.0,0.96
+Respiratory depression,-3,-2,true,72,0.06,0.81
+Seizure,-3,-3,true,28,0.0,1.0
+Suicidal ideation,-3,-3,true,49,0.0,1.0
+Unspeakable horrors,-3,-3,false,39,0.0,0.87

@@ -1,7 +1,7 @@
-import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDiveState, useSQLQuery } from "@motherduck/react-sql-query";
 import * as d3 from "d3";
-import { Activity, AlertTriangle, Cookie, LifeBuoy, EyeOff, Lock, UserX, BarChart3, BookOpen, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, FileText, FlaskConical, Link2, MessageCircle, MessageSquareQuote, Search, Sparkles, Pause, Play, Repeat, RotateCcw, Scale, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
+import { Activity, AlertTriangle, Cookie, LifeBuoy, EyeOff, Lock, UserX, BarChart3, BookOpen, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Clock, FileText, FlaskConical, Info, Link2, MessageCircle, MessageSquareQuote, Search, Sparkles, Pause, Play, Repeat, RotateCcw, Scale, Shuffle, SkipBack, SkipForward, User, X } from "lucide-react";
 
 export const REQUIRED_DATABASES = [{ type: "database", path: "md:sourcing", alias: "sourcing" }];
 
@@ -483,7 +483,7 @@ ORDER BY read_closely DESC, m.n_marks DESC, e.id
 LIMIT 40`;
 
 const reportSQL = (id: string) => `
-SELECT r.id, r.body, r.experience_year AS yr, r.gender, r.age,
+SELECT r.id, r.body, r.title, r.experience_year AS yr, r.gender, r.age,
   array_to_string(list_distinct(r.substances), ' · ') AS subs,
   x.overall_sentiment AS overall, x.would_repeat AS repeat
 FROM ${DB}."experience_reports" r
@@ -584,6 +584,45 @@ LEFT JOIN ${DB}."llm_observation_effects" e
 WHERE o.report_id = '${esc(id)}'
 GROUP BY ALL
 ORDER BY hrs NULLS LAST, o.obs_index`;
+
+// ── Session timeline: one story as took / felt lines ─────────────────────────────────────────────
+// Points per Effect Index effect, −3…+3 (scoring/effect_points.csv: seeded from how often each effect sat in a moment
+// that felt good vs bad across ~49k moments; friends can adjust the CSV, then regenerate this line).
+const EFFECT_POINTS: Record<string, number> = {"Anxiety suppression": 3, "Bodily control enhancement": 3, "Cognitive euphoria": 3, "Creativity enhancement": 3, "Depression reduction": 3, "Empathy, affection, and sociability enhancement": 3, "Focus enhancement": 3, "Increased music appreciation": 3, "Increased sense of humor": 3, "Memory enhancement": 3, "Mindfulness": 3, "Motivation enhancement": 3, "Novelty enhancement": 3, "Physical euphoria": 3, "Rejuvenation": 3, "Stamina enhancement": 3, "Thought organization": 3, "Addiction suppression": 2, "Analysis enhancement": 2, "Auditory enhancement": 2, "Breathing": 2, "Brightness alteration": 2, "Catharsis": 2, "Colour enhancement": 2, "Colour shifting": 2, "Component controllability": 2, "Conceptual thinking": 2, "Ego inflation": 2, "Environmental patterning": 2, "Existential self-realization": 2, "Flowing": 2, "Gustatory enhancement": 2, "Immersion enhancement": 2, "Increased libido": 2, "Laughter fits": 2, "Muscle relaxation": 2, "Nausea suppression": 2, "Pain relief": 2, "Perception of bodily lightness": 2, "Personal bias suppression": 2, "Personal meaning enhancement": 2, "Settings, sceneries, and landscapes": 2, "Spirituality enhancement": 2, "Structures": 2, "Synaesthesia": 2, "Tactile enhancement": 2, "Texture liquidation": 2, "Thought connectivity": 2, "Unity and interconnectedness": 2, "Visual acuity enhancement": 2, "Visual auras": 2, "Appetite enhancement": 1, "Autonomous entity": 1, "Autonomous voice communication": 1, "Changes in felt bodily form": 1, "Changes in felt gravity": 1, "Colour replacement": 1, "Depth perception distortions": 1, "Disinhibition": 1, "Dream potentiation": 1, "Drifting": 1, "Emotion intensification": 1, "Geometry": 1, "Holes, spaces, and voids": 1, "Increased pareidolia": 1, "Internal hallucination": 1, "Introspection": 1, "Melting": 1, "Memory replays": 1, "Morphing": 1, "Multiple thought streams": 1, "Object activation": 1, "Perception of eternalism": 1, "Personality regression": 1, "Sedation": 1, "Spontaneous tactile sensations": 1, "Stimulation": 1, "Thought acceleration": 1, "Time compression": 1, "Tracers": 1, "Transformations": 1, "Atemporality": 0, "Auditory distortion": 0, "Cognitive disconnection": 0, "Depersonalization": 0, "Double vision": 0, "Ego death": 0, "Ego replacement": 0, "Enhancement and suppression cycles": 0, "Excessive yawning": 0, "Focus suppression": 0, "Frame rate suppression": 0, "Gait alteration": 0, "Gustatory hallucination": 0, "Increased bodily temperature": 0, "Internal auditory hallucination": 0, "Magnification": 0, "Mouth numbing": 0, "Perception of bodily heaviness": 0, "Peripheral information misinterpretation": 0, "Perspective distortion": 0, "Physical autonomy": 0, "Physical disconnection": 0, "Pupil dilation": 0, "Scenarios and plots": 0, "Sensed presence": 0, "Sleepiness": 0, "Spontaneous physical movements": 0, "Tactile distortion": 0, "Tactile suppression": 0, "Teeth grinding": 0, "Thought deceleration": 0, "Time dilation": 0, "Time distortion": 0, "Vibrating vision": 0, "Visual haze": 0, "Visual strobing": 0, "Wakefulness": 0, "Analysis suppression": -1, "Appetite suppression": -1, "Auditory hallucination": -1, "Auditory misinterpretation": -1, "Auditory suppression": -1, "Bodily pressures": -1, "Compulsive redosing": -1, "Dehydration": -1, "Derealization": -1, "Dizziness": -1, "Dry mouth": -1, "Emotion suppression": -1, "External hallucination": -1, "Glossolalia": -1, "Gustatory suppression": -1, "Increased heart rate": -1, "Increased perspiration": -1, "Itchiness": -1, "Language suppression": -1, "Memory suppression": -1, "Mixed emotions": -1, "Motor control loss": -1, "Muscle tension": -1, "Muscle twitching": -1, "Photophobia": -1, "Sensory overload": -1, "Skin flushing": -1, "Tactile hallucination": -1, "Temperature regulation suppression": -1, "Thought disorganization": -1, "Tinnitus": -1, "Vasoconstriction": -1, "Visual acuity suppression": -1, "Amnesia": -2, "Anxiety": -2, "Back pain": -2, "Cognitive fatigue": -2, "Confusion": -2, "Delusion": -2, "Difficulty urinating": -2, "External auditory hallucination": -2, "Frequent urination": -2, "Headache": -2, "Increased blood pressure": -2, "Increased salivation": -2, "Motivation suppression": -2, "Muscle cramp": -2, "Nausea": -2, "Physical fatigue": -2, "Restless legs": -2, "Runny nose": -2, "Shadow people": -2, "Shakiness": -2, "Spatial disorientation": -2, "Stomach cramp": -2, "Thought loops": -2, "Visual disconnection": -2, "Vomiting": -2, "Abnormal heartbeat": -3, "Cognitive dysphoria": -3, "Delirium": -3, "Depression": -3, "Diarrhea": -3, "Feelings of impending doom": -3, "Irritability": -3, "Panic attack": -3, "Paranoia": -3, "Psychosis": -3, "Respiratory depression": -3, "Seizure": -3, "Suicidal ideation": -3, "Unspeakable horrors": -3};
+// Always −3 and always flagged: nothing nice cancels these out.
+const SAFETY_EFFECTS = new Set<string>(["Abnormal heartbeat", "Delirium", "Panic attack", "Psychosis", "Respiratory depression", "Seizure", "Suicidal ideation"]);
+const TONE_POINTS: Record<string, number> = { positive: 1, negative: -1 };
+
+// "T+1:30" / "T-0:15" → minutes from the first dose.
+const relMins = (col: string) => `CASE WHEN regexp_matches(${col}, '^T\\s*-') THEN -1 ELSE 1 END * (
+    TRY_CAST(regexp_extract(${col}, '^T\\s*[+-]\\s*~?(\\d+):(\\d{2})', 1) AS INTEGER) * 60
+    + TRY_CAST(regexp_extract(${col}, '^T\\s*[+-]\\s*~?(\\d+):(\\d{2})', 2) AS INTEGER))`;
+
+const sessionDosesSQL = (id: string) => `
+WITH story AS (
+  SELECT (d->>'$.order')::INT AS ord,
+    trim(regexp_replace(d->>'$.substance', '\\s*\\(.*\\)$', '')) AS raw,
+    d->>'$.amount' AS amount, d->>'$.route' AS route, d->>'$.context' AS quote,
+    ${relMins(`d->>'$.time_relative'`)} AS mins
+  FROM ${DB}."llm_extractions", unnest(from_json(extraction->'$.doses', '["json"]')) AS u(d)
+  WHERE report_id = '${esc(id)}'
+)
+SELECT ord, amount, route, quote, mins, coalesce(
+    (SELECT s.name FROM ${DB}."substances" s WHERE lower(s.name) = lower(raw) LIMIT 1),
+    (SELECT s.name FROM ${DB}."substances" s WHERE list_contains(list_transform(coalesce(s.common_names, []), x -> lower(x)), lower(raw)) LIMIT 1),
+    raw) AS sub
+FROM story ORDER BY mins NULLS FIRST, ord`;
+
+const sessionObsSQL = (id: string) => `
+SELECT o.obs_index, o.description AS quote, o.sentiment AS tone, o.sentiment_detail AS gist,
+  ${relMins('o.time_relative')} AS mins,
+  list(e.effect_name ORDER BY e.effect_name) FILTER (WHERE e.effect_name IS NOT NULL) AS effects
+FROM ${DB}."llm_observations" o
+LEFT JOIN ${DB}."llm_observation_effects" e
+  ON e.report_id = o.report_id AND e.obs_index = o.obs_index AND e.confidence <> 'low'
+WHERE o.report_id = '${esc(id)}'
+GROUP BY ALL
+ORDER BY mins NULLS LAST, o.obs_index`;
 
 // Effect prevalence over a substance-specific time window, in SLICES equal slices.
 const SLICES = 16;
@@ -6662,6 +6701,246 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 
 // ── Time-lapse ────────────────────────────────────────────────────
 
+// Substance colours within one story, in the order first taken; kept clear of the mood colours (cyan, lavender, coral).
+const DOSE_COLORS = ['#ffd59a', '#b9ec9a', '#f2b8ff', '#a9c1ff', '#e3cdb0', '#ffc49a', '#9fe6c8'];
+const DOSE_VERB: Record<string, string> = {
+	oral: 'swallowed', smoked: 'smoked', inhaled: 'inhaled', vaporized: 'vaped', vaped: 'vaped', insufflated: 'snorted', snorted: 'snorted',
+	injected: 'injected', iv: 'injected', im: 'injected', intravenous: 'injected', sublingual: 'held under the tongue', buccal: 'held in the cheek',
+	rectal: 'took rectally', transdermal: 'applied',
+};
+const hm = (m: number) => `${m < 0 ? '−' : '+'}${Math.floor(Math.abs(m) / 60)}:${String(Math.abs(m) % 60).padStart(2, '0')}`;
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+const unquote = (q: string) => q.trim().replace(/^["“'\s]+|["”'\s]+$/g, '');
+const EYEBALLED = 'Eyeballed, not weighed. For drugs active in tiny amounts, eyeballing is inaccurate and can be dangerous.';
+
+type Alert = { level: 'danger' | 'caution'; text: string };
+type SessionEv =
+	| { kind: 'took'; mins: number; sub: string; amount: string; route: string; quote: string; color: string; alert: Alert | null }
+	| { kind: 'felt'; mins: number; gist: string; quote: string; tone: string; effects: string[]; total: number };
+
+// One story read top to bottom: what they took and what they felt, a mood dot per moment, quotes on tap.
+function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ: Q; obsQ: Q; pairsQ: Q }) {
+	const { open: openPanel } = useContext(OpenCtx);
+	const [atH, setAt] = useDiveState<number | null>('at', null);
+	const [openKey, setOpenKey] = useState<string | null>(null);
+	const [tip, setTip] = useState<string | null>(null);
+	const boxRef = useRef<HTMLDivElement>(null);
+	const dotRefs = useRef(new Map<number, HTMLSpanElement>());
+	const [pts, setPts] = useState<{ x: number; y: number; mins: number }[]>([]);
+	const report = rows(reportQ)[0];
+
+	const { events, key } = useMemo(() => {
+		const color = new Map<string, string>();
+		const count = new Map<string, number>();
+		const ds = rows(dosesQ).map((d) => ({ sub: S(d.sub), amount: S(d.amount), route: S(d.route).toLowerCase(), quote: S(d.quote), mins: d.mins == null ? 0 : N(d.mins) }));
+		const pairs = rows(pairsQ);
+		const flagged = new Set<string>();
+		const evs: SessionEv[] = ds.map((d, i) => {
+			if (!color.has(d.sub)) color.set(d.sub, DOSE_COLORS[color.size % DOSE_COLORS.length]);
+			count.set(d.sub, (count.get(d.sub) ?? 0) + 1);
+			// A risky pairing is flagged on the first dose that brings the two together (within a day).
+			let alert: Alert | null = null, worst = 0;
+			for (const e of ds.slice(0, i)) {
+				if (e.sub === d.sub || d.mins - e.mins > 24 * 60) continue;
+				const pk = [d.sub, e.sub].sort().join('|');
+				const p = pairs.find((r) => [S(r.a), S(r.b)].sort().join('|') === pk);
+				const sev = N(p?.sev);
+				if (!p || sev < 1 || flagged.has(pk) || sev <= worst) continue;
+				flagged.add(pk);
+				worst = sev;
+				const label = S(p.status) || (sev >= 3 ? 'Dangerous' : sev === 2 ? 'Unsafe' : 'Take care');
+				alert = { level: sev >= 2 ? 'danger' : 'caution', text: `${label} with ${short(e.sub)}${p.note ? `: ${S(p.note)}` : '.'}` };
+			}
+			if (!alert && /eyeball/i.test(d.quote)) alert = { level: 'caution', text: EYEBALLED };
+			return { kind: 'took', mins: d.mins, sub: d.sub, amount: d.amount, route: d.route, quote: unquote(d.quote), color: color.get(d.sub)!, alert };
+		});
+		for (const o of rows(obsQ)) {
+			if (o.mins == null) continue;
+			const effects = L(o.effects);
+			const tone = S(o.tone);
+			const total = effects.reduce((s, e) => s + (EFFECT_POINTS[e] ?? 0), 0) + (TONE_POINTS[tone] ?? 0);
+			const gist = S(o.gist) || effects.slice(0, 2).join(', ').toLowerCase() || 'a moment';
+			evs.push({ kind: 'felt', mins: N(o.mins), gist, quote: unquote(S(o.quote)), tone, effects, total });
+		}
+		// In time order; at the same minute what they took comes before what they felt.
+		evs.sort((a, b) => a.mins - b.mins || (a.kind === b.kind ? 0 : a.kind === 'took' ? -1 : 1));
+		return { events: evs, key: [...color].map(([sub, c]) => ({ sub, c, n: count.get(sub) ?? 1 })) };
+	}, [dosesQ.data, obsQ.data, pairsQ.data]);
+
+	const now = atH == null ? null : Math.round(atH * 60);
+	const CX = 48, R = 40, CAP = 6;
+	const groupTotal = new Map<number, number>();
+	for (const e of events) if (e.kind === 'felt') groupTotal.set(e.mins, (groupTotal.get(e.mins) ?? 0) + e.total);
+	const segStyle = (mins: number, first: boolean) => (first ? 'none' : mins <= 0 ? 'before' : now == null || mins <= now ? 'past' : 'future');
+	const SEG: Record<string, React.CSSProperties> = {
+		none: {},
+		before: { backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,.5) 0 2px, transparent 2px 7px)' },
+		past: { background: 'rgba(255,255,255,.55)' },
+		future: { backgroundImage: 'repeating-linear-gradient(to bottom, rgba(255,255,255,.25) 0 5px, transparent 5px 10px)' },
+	};
+
+	// Measure where the mood dots landed, to draw the faint line that joins them.
+	useLayoutEffect(() => {
+		const box = boxRef.current;
+		if (!box) return;
+		const measure = () => {
+			const b = box.getBoundingClientRect();
+			setPts([...dotRefs.current].filter(([, el]) => el.isConnected).map(([mins, el]) => {
+				const r = el.getBoundingClientRect();
+				return { mins, x: r.left - b.left + r.width / 2, y: r.top - b.top + r.height / 2 };
+			}).sort((a, b) => a.y - b.y));
+		};
+		measure();
+		const ro = new ResizeObserver(measure);
+		ro.observe(box);
+		return () => ro.disconnect();
+	}, [events, openKey, now]);
+
+	if (reportQ.isLoading || dosesQ.isLoading || obsQ.isLoading) return <Loading height={420} />;
+	if (!report) return <p style={{ color: C.soft }}>Story not found.</p>;
+
+	const path = (ps: { x: number; y: number }[]) => ps.map((p, i) => {
+		if (!i) return `M${p.x} ${p.y}`;
+		const q = ps[i - 1], my = (q.y + p.y) / 2;
+		return ` C${q.x} ${my} ${p.x} ${my} ${p.x} ${p.y}`;
+	}).join('');
+	const pastPts = now == null ? pts : pts.filter((p) => p.mins <= now);
+	const futPts = now == null ? [] : pts.filter((p) => p.mins > now);
+	if (pastPts.length && futPts.length) futPts.unshift(pastPts[pastPts.length - 1]);
+	const title = S(report.title) || key.map((k) => short(k.sub)).join(' · ') || 'A story';
+	const repeat = report.repeat == null ? null : report.repeat ? 'would do again' : 'wouldn’t do again';
+	const dotDone = new Set<number>();
+	const erowidId = /^erowid-(\d+)$/.exec(S(report.id))?.[1];
+
+	return (
+		<div className="mx-auto" style={{ maxWidth: 760, display: 'flex', flexDirection: 'column', gap: 26 }}>
+			<header style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+				<p style={{ margin: 0, fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', color: C.faint }}>{['Erowid', report.yr ? String(report.yr) : null, repeat].filter(Boolean).join(' · ')}</p>
+				<h2 style={{ margin: 0, fontSize: 30, lineHeight: 1.2 }}>{title}</h2>
+				{erowidId && (
+					<a href={`https://erowid.org/experiences/exp.php?ID=${erowidId}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: C.soft, textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,.35)', textUnderlineOffset: 3 }}>
+						Read the full story on Erowid ↗
+					</a>
+				)}
+			</header>
+
+			{key.length > 0 && (
+				<div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '6px 16px', padding: '10px 16px', borderRadius: 14, background: 'rgba(42,32,89,.45)', fontSize: 13 }}>
+					<span style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: C.faint }}>In the mix</span>
+					{key.map((k) => (
+						<button key={k.sub} onClick={() => openPanel({ kind: 'substance', name: k.sub })} title="About this substance" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+							<span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: k.c }} />
+							<span style={{ color: k.c, fontWeight: 600 }}>{short(k.sub)}</span>
+							{k.n > 1 && <span style={{ color: C.faint }}>×{k.n}</span>}
+						</button>
+					))}
+				</div>
+			)}
+
+			<div ref={boxRef} style={{ position: 'relative' }}>
+				<svg aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+					<path d={path(pastPts)} fill="none" stroke="rgba(255,255,255,.28)" strokeWidth={1.5} />
+					<path d={path(futPts)} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth={1.5} strokeDasharray="3 5" />
+				</svg>
+				{events.map((e, i) => {
+					const prev = events[i - 1], next = events[i + 1];
+					const same = !!prev && prev.mins === e.mins;
+					const lastOfGroup = !next || next.mins !== e.mins;
+					const mins = prev ? e.mins - prev.mins : 0;
+					const big = mins > 240;
+					const gap = !prev ? 0 : same ? 4 : big ? 40 : Math.round(clamp(Math.sqrt(mins) * 3, 10, 24));
+					const future = now != null && e.mins > now;
+					const isNow = now != null && e.mins === now && !same;
+					const k = `${e.kind}${i}`;
+					const isOpen = openKey === k;
+					const showDot = e.kind === 'felt' && !dotDone.has(e.mins);
+					if (showDot) dotDone.add(e.mins);
+					const gt = groupTotal.get(e.mins) ?? 0;
+					const moodOf = (n: number) => (n >= 2 ? C.cyan : n <= -2 ? C.coral : C.lav);
+					const dotX = CX + (clamp(gt, -CAP, CAP) / CAP) * R;
+					return (
+						<div key={k} style={{ display: 'grid', gridTemplateColumns: '58px 96px minmax(0, 1fr)', opacity: future ? 0.45 : 1 }}>
+							<div style={{ position: 'relative', paddingTop: gap, display: 'flex', justifyContent: 'flex-end' }}>
+								{big && <span style={{ position: 'absolute', right: 8, top: gap / 2 - 7, fontSize: 11, lineHeight: '14px', color: C.faint, whiteSpace: 'nowrap' }}>{Math.round(mins / 60)}h later</span>}
+								{!same && (
+									<button onClick={() => setAt(isNow ? (undefined as unknown as null) : e.mins / 60)} title="Set now to this moment" style={{ fontSize: 13, lineHeight: '24px', fontWeight: 600, padding: '0 8px', borderRadius: 999, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', userSelect: 'none', color: isNow ? C.deep : C.soft, background: isNow ? '#fff' : 'transparent' }}>
+										{hm(e.mins)}
+									</button>
+								)}
+								{(same || !lastOfGroup) && <span aria-hidden style={{ position: 'absolute', right: 4, top: same ? 0 : gap + 28, bottom: lastOfGroup ? 'auto' : 0, height: lastOfGroup ? gap + 12 : undefined, width: 2, borderRadius: 2, background: 'rgba(255,255,255,.28)' }} />}
+							</div>
+							<div style={{ position: 'relative', paddingTop: gap, minHeight: 24 }}>
+								<span aria-hidden style={{ position: 'absolute', left: CX - 1, top: 0, height: gap + 12, width: 2, ...SEG[segStyle(e.mins, !prev)] }} />
+								{next && <span aria-hidden style={{ position: 'absolute', left: CX - 1, top: gap + 12, bottom: 0, width: 2, ...SEG[segStyle(next.mins, false)] }} />}
+								{e.kind === 'took' && <span aria-hidden style={{ position: 'absolute', left: CX - 5, top: gap + 7, width: 10, height: 10, borderRadius: 3, background: e.color }} />}
+								{showDot && (
+									<>
+										<span aria-hidden style={{ position: 'absolute', top: gap + 11, height: 2, left: Math.min(CX, dotX), width: Math.abs(dotX - CX), background: moodOf(gt), opacity: 0.7 }} />
+										<span ref={(el) => { if (el) dotRefs.current.set(e.mins, el); else dotRefs.current.delete(e.mins); }} aria-hidden style={{ position: 'absolute', left: dotX - 7, top: gap + 5, width: 14, height: 14, boxSizing: 'border-box', borderRadius: 999, background: future ? C.deep : moodOf(gt), border: `2px solid ${moodOf(gt)}`, boxShadow: isNow ? '0 0 0 5px rgba(255,255,255,.22)' : 'none' }} />
+									</>
+								)}
+							</div>
+							<div style={{ paddingTop: gap, paddingLeft: 10, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 15, lineHeight: '24px' }}>
+								{e.kind === 'took' ? (
+									<>
+										<div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0 6px' }}>
+											<button onClick={() => setOpenKey(isOpen ? null : k)} aria-expanded={isOpen} title="Their words" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: C.soft, whiteSpace: 'nowrap' }}>
+												{e.route && <RouteIcon route={e.route} size={16} color={C.soft} />}
+												{DOSE_VERB[e.route] ?? 'took'}
+											</button>
+											{e.amount && <><b style={{ fontWeight: 600 }}>{e.amount}</b><span style={{ color: C.soft }}>of</span></>}
+											<button onClick={() => openPanel({ kind: 'substance', name: e.sub })} title="About this substance" style={{ color: e.color, fontWeight: 600, textDecoration: 'underline', textDecorationColor: `${e.color}66`, textUnderlineOffset: 3, whiteSpace: 'nowrap' }}>{short(e.sub)}</button>
+											{e.alert && (
+												<span style={{ position: 'relative', display: 'inline-flex' }} onMouseEnter={() => setTip(k)} onMouseLeave={() => setTip(null)}>
+													<button onClick={() => setTip(tip === k ? null : k)} onFocus={() => setTip(k)} onBlur={() => setTip(null)} aria-label={`${e.alert.level === 'danger' ? 'Warning' : 'Heads up'}: ${e.alert.text}`} style={{ display: 'inline-flex', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', color: e.alert.level === 'danger' ? C.coral : C.soft }}>
+														{e.alert.level === 'danger' ? <AlertTriangle size={15} /> : <Info size={15} />}
+													</button>
+													{tip === k && (
+														<span role="tooltip" style={{ position: 'absolute', left: '50%', top: 28, transform: 'translateX(-50%)', zIndex: 5, width: 'max-content', maxWidth: 280, padding: '8px 12px', borderRadius: 10, background: C.deep, boxShadow: '0 6px 20px rgba(20,12,60,.35)', fontSize: 13, lineHeight: '18px', color: e.alert.level === 'danger' ? C.coral : C.soft }}>{e.alert.text}</span>
+													)}
+												</span>
+											)}
+										</div>
+										{isOpen && e.quote && <div style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 14, lineHeight: '21px', color: C.faint }}>“{e.quote}”</div>}
+									</>
+								) : (
+									<>
+										<button onClick={() => setOpenKey(isOpen ? null : k)} aria-expanded={isOpen} style={{ display: 'flex', alignItems: 'baseline', gap: 10, textAlign: 'left', color: moodOf(e.total) }}>
+											<span aria-label={e.total >= 2 ? 'better' : e.total <= -2 ? 'rougher' : 'mixed'} style={{ width: 16, flexShrink: 0, textAlign: 'center', fontSize: 18, fontWeight: 700 }}>{e.total >= 2 ? '+' : e.total <= -2 ? '−' : '~'}</span>
+											<span style={{ fontWeight: 500 }}>{e.gist}</span>
+											{e.effects.some((x) => SAFETY_EFFECTS.has(x)) && <AlertTriangle size={14} color={C.coral} style={{ flexShrink: 0, alignSelf: 'center' }} />}
+										</button>
+										{isOpen && (
+											<div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 26, paddingBottom: 4 }}>
+												<div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontSize: 13, lineHeight: '20px', color: C.soft }}>
+													{e.effects.map((x) => {
+														const p = EFFECT_POINTS[x] ?? 0;
+														return (
+															<button key={x} onClick={() => openPanel({ kind: 'effect', name: x })} style={{ whiteSpace: 'nowrap', color: C.soft }}>
+																{x} <b style={{ color: p > 0 ? C.cyan : p < 0 ? C.coral : C.faint }}>{signed(p)}</b>
+															</button>
+														);
+													})}
+													<span style={{ whiteSpace: 'nowrap', color: C.faint }}>their tone <b style={{ color: (TONE_POINTS[e.tone] ?? 0) > 0 ? C.cyan : (TONE_POINTS[e.tone] ?? 0) < 0 ? C.coral : C.faint }}>{signed(TONE_POINTS[e.tone] ?? 0)}</b></span>
+												</div>
+												{e.quote && <div style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 14, lineHeight: '21px', color: C.faint }}>“{e.quote}”</div>}
+											</div>
+										)}
+									</>
+								)}
+							</div>
+						</div>
+					);
+				})}
+			</div>
+
+			<p style={{ margin: 0, textAlign: 'center', fontSize: 12, lineHeight: 1.7, color: C.faint }}>
+				+ better · − rougher · ~ mixed. Dots sit right when it felt better, left when rougher. Tap a line for its points and their words; tap a time to set now.
+			</p>
+		</div>
+	);
+}
+
 function TimelapseStep({ id, reportQ, marksQ, dosesQ, obsQ, timingQ, pairsQ, frozen }: { id: string; reportQ: Q; marksQ: Q; dosesQ: Q; obsQ: Q; timingQ: Q; pairsQ: Q; frozen: boolean }) {
 	const report = rows(reportQ)[0];
 	const body = S(report?.body)
@@ -8017,6 +8296,8 @@ export default function ReportTimelapse() {
 	const marksQ = useSQLQuery(reportMarksSQL(reportId ?? ''), { enabled: onReport });
 	const dosesQ = useSQLQuery(reportDosesSQL(reportId ?? ''), { enabled: onReport });
 	const obsQ = useSQLQuery(reportObsSQL(reportId ?? ''), { enabled: onReport });
+	const sDosesQ = useSQLQuery(sessionDosesSQL(reportId ?? ''), { enabled: onReport });
+	const sObsQ = useSQLQuery(sessionObsSQL(reportId ?? ''), { enabled: onReport });
 	const doseSubs = useMemo(() => [...new Set(rows(dosesQ).map((d) => S(d.sub)).filter(Boolean))].sort(), [dosesQ.data]);
 	const timingQ = useSQLQuery(timingSQL(doseSubs), { enabled: onReport && doseSubs.length > 0 });
 	const pairsQ = useSQLQuery(reportPairsSQL(doseSubs), { enabled: onReport && doseSubs.length > 1 });
@@ -8211,7 +8492,9 @@ export default function ReportTimelapse() {
 
 					{view === 'reports' && !sub && !reportId && <StoriesBrowse onOpen={goReport} />}
 					{onSub && <ReportsStep sub={sub!} withSub={withSub} only={only} setOnly={(v: boolean) => setOnly(v || (undefined as unknown as boolean))} onCombo={goCombo} pairQ={comboPairQ} pairTimingQ={pairTimingQ} pairMoodQ={pairMoodQ} pairSummaryQ={pairSummaryQ} pairEffectsQ={pairEffectsQ} pairSeqQ={pairSeqQ} q={listQ} kq={kpiQ} curveQ={curveQ} effectsRoute={effectsRoute} denQ={denQ} horizon={horizon} onOpen={(rid) => (setAtLink(undefined as unknown as null), setReportId(rid))} />}
-					{onReport && <TimelapseStep id={reportId!} reportQ={reportQ} marksQ={marksQ} dosesQ={dosesQ} obsQ={obsQ} timingQ={timingQ} pairsQ={pairsQ} frozen={!!openItem} />}
+					{onReport && (sObsQ.isLoading || rows(sObsQ).length > 0
+						? <SessionTimeline reportQ={reportQ} dosesQ={sDosesQ} obsQ={sObsQ} pairsQ={pairsQ} />
+						: <TimelapseStep id={reportId!} reportQ={reportQ} marksQ={marksQ} dosesQ={dosesQ} obsQ={obsQ} timingQ={timingQ} pairsQ={pairsQ} frozen={!!openItem} />)}
 					{view === 'home' && <HomePage q={pickQ} onSubstance={goSubstance} onEffect={goEffect} onReport={goReport} onCombo={goCombo} onView={goView} />}
 					{view === 'substances' && <SubstancesBrowse q={pickQ} onPick={goSubstance} onCombo={goCombo} />}
 					{view === 'effects' && effect && (
