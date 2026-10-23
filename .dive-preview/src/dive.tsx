@@ -2100,7 +2100,11 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 
 	return (
 		<section className="rd-in" onClick={() => setFocus(null)} style={{ minHeight: '60vh' }}>
-			<h1 className="text-4xl font-semibold">Substances</h1>
+			{/* Title with the sources off to the right, then search, then the kinds to jump to. */}
+			<div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+				<h1 className="text-4xl font-semibold">Substances</h1>
+				<Sources className="pb-1" list={['erowid', 'pw', 'tripsit']} />
+			</div>
 			<p className="mt-2" style={{ color: C.soft }}>
 				{focus ? (
 					<>
@@ -2112,7 +2116,15 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 					</>
 				)}
 			</p>
-			<Sources className="mt-3" list={['erowid', 'pw', 'tripsit']} />
+			<input
+				ref={searchRef}
+				value={filter}
+				onClick={(e) => e.stopPropagation()}
+				onChange={(e) => setFilter(e.target.value)}
+				placeholder="Search substances or street names"
+				className="rd-card mt-5 w-full px-5 py-3 text-base"
+				style={{ borderRadius: 999, color: C.text, outline: 'none' }}
+			/>
 			{!focus && !needle && grouped.length > 1 && (
 				<nav className="mt-4 flex flex-wrap gap-2" aria-label="Kinds of substance">
 					{grouped.map(([label, , items]) => (
@@ -2122,15 +2134,6 @@ function SubstancesBrowse({ q, onPick, onCombo }: { q: Q; onPick: (s: string) =>
 					))}
 				</nav>
 			)}
-			<input
-				ref={searchRef}
-				value={filter}
-				onClick={(e) => e.stopPropagation()}
-				onChange={(e) => setFilter(e.target.value)}
-				placeholder="Search substances or street names"
-				className="rd-card mt-6 w-full px-5 py-3 text-base"
-				style={{ borderRadius: 999, color: C.text, outline: 'none' }}
-			/>
 			{focus && <FocusPanel name={focus} onPick={onPick} onCombo={onCombo} onClose={() => setFocus(null)} />}
 			{q.isLoading ? (
 				<Loading height={240} className="mt-6" />

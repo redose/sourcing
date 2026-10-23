@@ -264,17 +264,28 @@ const parseAt = (s: string) => {
 	return Number.isFinite(h) ? h + (Number.isFinite(mm) ? mm / 60 : 0) : undefined;
 };
 
+// Every page has a link: #/ (substances, home) · #/stories · #/effects · #/effects/Anxiety · #/about ·
+// #/Cocaine (a substance) · #/Cocaine+Alcohol (a pair, ?only=1 for "only these two") · #/Cocaine/85370 (a story,
+// ?at=1:30 for a moment) · and ?effect=… / ?substance=… for an open side panel.
 function readRoute(): [string, unknown][] {
 	const hash = window.location.hash.replace(/^#\/?/, '');
 	if (!hash) return [];
 	const [path, query = ''] = hash.split('?');
 	const parts = path.split('/').filter(Boolean);
 	const out: [string, unknown][] = [];
-	if (parts[0] === 'substances' || parts[0] === 'effects' || parts[0] === 'about') out.push(['view', parts[0]]);
-	if (parts[0] === 'effects' && parts[1]) out.push(['effect', dec(parts[1])]);
-	else if (parts[0] === 'stories') out.push(['view', 'reports']);
-	else if (parts[0]) {
-		const [s1, s2] = parts[0].split('+').map(dec);
+	const head = parts[0];
+	if (head === 'substances' || head === 'about') out.push(['view', head]);
+	else if (head === 'effects') {
+		out.push(['view', 'effects']);
+		if (parts[1]) out.push(['effect', dec(parts[1])]);
+	} else if (head === 'stories') out.push(['view', 'reports']);
+	else if (head === 'story' && parts[1]) {
+		out.push(['view', 'reports']);
+		out.push(['report', `erowid-${parts[1]}`]);
+	}
+	else if (head) {
+		out.push(['view', 'reports']);
+		const [s1, s2] = head.split('+').map(dec);
 		out.push(['substance', s1]);
 		if (s2) out.push(['with', s2]);
 		if (parts[1]) out.push(['report', `erowid-${parts[1]}`]);
@@ -282,6 +293,7 @@ function readRoute(): [string, unknown][] {
 	const q = new URLSearchParams(query);
 	const at = q.get('at');
 	if (at && parseAt(at) != null) out.push(['at', parseAt(at)]);
+	if (q.get('only') === '1') out.push(['only', true]);
 	for (const kind of ['effect', 'substance'] as const) {
 		const v = q.get(kind);
 		if (v) out.push(['open', { kind, name: dec(v) }]);
@@ -289,30 +301,49 @@ function readRoute(): [string, unknown][] {
 	return out;
 }
 
-function writeRoute(state: Map<string, unknown>) {
+function routeOf(state: Map<string, unknown>) {
 	const view = state.get('view') as string | undefined;
 	const sub = state.get('substance') as string | undefined;
 	const withSub = state.get('with') as string | undefined;
 	const report = state.get('report') as string | undefined;
+	const effect = state.get('effect') as string | undefined;
 	const at = state.get('at') as number | undefined;
 	const open = state.get('open') as { kind: string; name: string } | undefined;
 	let path = '';
-	const effect = state.get('effect') as string | undefined;
-	if (view === 'effects' && effect) path = `effects/${enc(effect)}`;
-	else if (view && view !== 'reports') path = view;
-	else if (view === 'reports' && !sub && !report) path = 'stories';
-	else if (sub) path = enc(sub) + (withSub ? '+' + enc(withSub) : '') + (report ? '/' + report.replace(/^erowid-/, '') : '');
+	if (view === 'effects') path = effect ? `effects/${enc(effect)}` : 'effects';
+	else if (view === 'about') path = 'about';
+	else if (view === 'reports' && sub) path = enc(sub) + (withSub ? '+' + enc(withSub) : '') + (report ? '/' + report.replace(/^erowid-/, '') : '');
+	else if (view === 'reports' && report) path = `story/${report.replace(/^erowid-/, '')}`;
+	else if (view === 'reports') path = 'stories';
 	const q: string[] = [];
 	if (report && at) q.push('at=' + fmtAt(at));
+	if (view === 'reports' && sub && !report && state.get('only')) q.push('only=1');
 	if (open?.name) q.push(`${open.kind}=${enc(open.name)}`);
-	const hash = path || q.length ? `#/${path}${q.length ? '?' + q.join('&') : ''}` : '';
-	history.replaceState(null, '', hash || window.location.pathname);
+	return { path, hash: path || q.length ? `#/${path}${q.length ? '?' + q.join('&') : ''}` : '' };
+}
+
+// A new page gets its own history entry (so Back works); moving within a page (the replay's moment, a panel)
+// just updates the link.
+function writeRoute(state: Map<string, unknown>) {
+	const { path, hash } = routeOf(state);
+	const current = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+	const url = hash || window.location.pathname;
+	if (path !== current) history.pushState(null, '', url);
+	else history.replaceState(null, '', url);
 }
 
 const diveState = new Map<string, unknown>(readRoute());
 const writeHash = () => writeRoute(diveState);
 const diveListeners = new Set<() => void>();
 let diveVersion = 0;
+function syncFromUrl() {
+	diveState.clear();
+	for (const [k, v] of readRoute()) diveState.set(k, v);
+	diveVersion++;
+	diveListeners.forEach((l) => l());
+}
+window.addEventListener('popstate', syncFromUrl);
+window.addEventListener('hashchange', syncFromUrl);
 
 export function useDiveState<T>(key: string, initial: T): [T, (value: T) => void] {
 	useSyncExternalStore(
