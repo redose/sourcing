@@ -5162,7 +5162,7 @@ function ReportsStep({ sub, withSub, only, setOnly, onCombo, pairQ, pairTimingQ,
 				)}
 				{!enoughToChart ? (
 					<div className="mt-6 flex flex-col items-center py-6 text-center">
-						<SpunionPuzzle size={96} />
+						<SpunionPuzzle size={110} />
 						<div className="mt-5 text-xs font-bold" style={{ letterSpacing: '.16em', color: 'rgba(255,255,255,.9)' }}>NOT ENOUGH DATA YET</div>
 						<p className="mt-1.5 max-w-md text-sm" style={{ color: C.soft, lineHeight: 1.6 }}>
 							Only {closeReads} closely read {closeReads === 1 ? 'report' : 'reports'} so far, too few to chart how it unfolds over time. Here’s what {closeReads === 1 ? 'it mentions' : 'they mention'} most:
@@ -6195,13 +6195,13 @@ const BOUNCE_CSS = `
   88% { transform: translateY(-6%) scale(.92, 1.1); animation-timing-function: ease-out; }
   100% { transform: translateY(0) scale(1.22, .76); }
 }
-/* Each landing flips his colour: logo coral, then logo cyan (two bounces per cycle, switching on the squash). */
-@keyframes rd-hue { 0% { color: #fc6c84; } 50% { color: #5ae0e4; } }
-.rd-bounce { display: block; opacity: .85; color: #5ae0e4; animation: rd-bounce .62s infinite, rd-hue 1.24s steps(1, end) infinite; transform-origin: 50% 100%; pointer-events: none; margin-top: 60px; }
+/* Each landing changes his colour: logo coral, logo cyan, white (three bounces per cycle, switching on the squash). */
+@keyframes rd-hue { 0% { color: #fc6c84; } 33.333% { color: #5ae0e4; } 66.667% { color: #fff; } }
+.rd-bounce { display: block; opacity: .85; color: #5ae0e4; animation: rd-bounce .62s infinite, rd-hue 1.86s steps(1, end) infinite; transform-origin: 50% 100%; pointer-events: none; margin-top: 60px; }
 @media (prefers-reduced-motion: reduce) { .rd-bounce { animation: none; } }
 `;
 
-// The loader: Spunion bouncing, switching between the logo's coral and cyan each time he lands. Exported for the
+// The loader: Spunion bouncing, going coral, cyan, then white each time he lands. Exported for the
 // preview's startup screen.
 export function BouncingSpunion({ size = 96 }: { size?: number }) {
 	return (
@@ -6286,28 +6286,28 @@ function SpunionLost({ size = 44, marks = true }: { size?: number; marks?: boole
 const PUZZLE_PIECE =
 	'M0 0 L35 0 C38 0 40 -2 38 -6 C34 -14 37 -27 50 -27 C63 -27 66 -14 62 -6 C60 -2 62 0 65 0 L100 0 L100 35 C100 38 102 40 106 38 C114 34 127 37 127 50 C127 63 114 66 106 62 C102 60 100 62 100 65 L100 100 L65 100 C62 100 60 98 62 94 C66 86 63 73 50 73 C37 73 34 86 38 94 C40 98 38 100 35 100 L0 100 L0 65 C0 62 2 60 6 62 C14 66 27 63 27 50 C27 37 14 34 6 38 C2 40 0 38 0 35 Z';
 function SpunionPuzzle({ size = 72 }: { size?: number }) {
-	// Mirrored, so the tabs point into him and the flat side runs along his edge.
-	const hole = 'translate(498 228) rotate(10) scale(-1.45 1.45)';
+	// Low on his right, clear of his eyes; mirrored so the tabs point into him and the flat side runs along his edge.
+	const hole = 'translate(462 318) rotate(8) scale(-1.15 1.15)';
 	return (
-		<svg viewBox="-20 -20 800 540" width={(size * 800) / 540} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
+		<svg viewBox="20 10 680 480" width={(size * 680) / 480} height={size} aria-hidden style={{ display: 'block', overflow: 'visible', flexShrink: 0 }}>
 			<defs>
-				<mask id="sp-bite" maskUnits="userSpaceOnUse" x="-20" y="-20" width="800" height="540">
-					<rect x="-20" y="-20" width="800" height="540" fill="#fff" />
+				<mask id="sp-bite" maskUnits="userSpaceOnUse" x="20" y="10" width="680" height="480">
+					<rect x="20" y="10" width="680" height="480" fill="#fff" />
 					<path d={PUZZLE_PIECE} transform={hole} fill="#000" />
 				</mask>
 			</defs>
 			<path
 				d="M70 190 C110 112 196 62 288 32 C316 23 330 46 302 57 C284 64 268 70 271 78 C275 87 302 82 332 96 C424 138 472 222 466 312 C460 412 380 472 263 471 C138 470 38 400 38 300 C38 256 50 222 70 190 Z"
 				fill="#fff"
-				fillOpacity="0.92"
+				fillOpacity="0.94"
 				mask="url(#sp-bite)"
 			/>
-			<circle cx="152" cy="270" r="52" fill={C.deep} />
-			<circle cx="170" cy="288" r="15" fill="#fff" />
-			<circle cx="258" cy="236" r="39" fill={C.deep} />
-			<circle cx="272" cy="250" r="11" fill="#fff" />
+			<circle cx="160" cy="262" r="54" fill={C.deep} />
+			<circle cx="178" cy="280" r="16" fill="#fff" />
+			<circle cx="282" cy="230" r="41" fill={C.deep} />
+			<circle cx="296" cy="244" r="12" fill="#fff" />
 			<g className="rd-piece">
-				<path d={PUZZLE_PIECE} transform="translate(735 170) rotate(22) scale(-1.45 1.45)" fill="#fff" fillOpacity="0.95" />
+				<path d={PUZZLE_PIECE} transform="translate(650 262) rotate(20) scale(-1.15 1.15)" fill="#fff" fillOpacity="0.94" />
 			</g>
 		</svg>
 	);
