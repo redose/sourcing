@@ -276,6 +276,7 @@ function readRoute(): [string, unknown][] {
 	const head = parts[0];
 	if (head === 'substances' || head === 'about') out.push(['view', 'substances']); // #/about: that page is gone
 	else if (head === 'resources') out.push(['view', 'resources']);
+	else if (head === 'privacy') out.push(['view', 'privacy']);
 	else if (head === 'effects') {
 		out.push(['view', 'effects']);
 		if (parts[1]) out.push(['effect', dec(parts[1])]);
@@ -313,6 +314,7 @@ function routeOf(state: Map<string, unknown>) {
 	let path = '';
 	if (view === 'effects') path = effect ? `effects/${enc(effect)}` : 'effects';
 	else if (view === 'resources') path = 'resources';
+	else if (view === 'privacy') path = 'privacy';
 	else if (view === 'reports' && sub) path = enc(sub) + (withSub ? '+' + enc(withSub) : '') + (report ? '/' + report.replace(/^erowid-/, '') : '');
 	else if (view === 'reports' && report) path = `story/${report.replace(/^erowid-/, '')}`;
 	else if (view === 'reports') path = 'stories';
