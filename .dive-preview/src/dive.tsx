@@ -6860,7 +6860,7 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 					const dotX = CX + (clamp(gt, -CAP, CAP) / CAP) * R;
 					return (
 						<div key={k} style={{ display: 'grid', gridTemplateColumns: '58px 96px minmax(0, 1fr)', opacity: future ? 0.45 : 1 }}>
-							<div style={{ position: 'relative', paddingTop: gap, display: 'flex', justifyContent: 'flex-end' }}>
+							<div style={{ position: 'relative', paddingTop: gap, display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
 								{big && <span style={{ position: 'absolute', right: 8, top: gap / 2 - 7, fontSize: 11, lineHeight: '14px', color: C.faint, whiteSpace: 'nowrap' }}>{Math.round(mins / 60)}h later</span>}
 								{!same && (
 									<button onClick={() => setAt(isNow ? (undefined as unknown as null) : e.mins / 60)} title="Set now to this moment" style={{ fontSize: 13, lineHeight: '24px', fontWeight: 600, padding: '0 8px', borderRadius: 999, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', userSelect: 'none', color: isNow ? C.deep : C.soft, background: isNow ? '#fff' : 'transparent' }}>
@@ -6884,7 +6884,7 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 								{e.kind === 'took' ? (
 									<>
 										<div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0 6px' }}>
-											<button onClick={() => setOpenKey(isOpen ? null : k)} aria-expanded={isOpen} title="Their words" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: C.soft, whiteSpace: 'nowrap' }}>
+											<button onClick={() => (setOpenKey(isOpen ? null : k), setAt(e.mins / 60))} aria-expanded={isOpen} title="Their words" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: C.soft, whiteSpace: 'nowrap' }}>
 												{e.route && <RouteIcon route={e.route} size={16} color={C.soft} />}
 												{DOSE_VERB[e.route] ?? 'took'}
 											</button>
@@ -6905,7 +6905,7 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 									</>
 								) : (
 									<>
-										<button onClick={() => setOpenKey(isOpen ? null : k)} aria-expanded={isOpen} style={{ display: 'flex', alignItems: 'baseline', gap: 10, textAlign: 'left', color: moodOf(e.total) }}>
+										<button onClick={() => (setOpenKey(isOpen ? null : k), setAt(e.mins / 60))} aria-expanded={isOpen} style={{ display: 'flex', alignItems: 'baseline', gap: 10, textAlign: 'left', color: moodOf(e.total) }}>
 											<span aria-label={e.total >= 2 ? 'better' : e.total <= -2 ? 'rougher' : 'mixed'} style={{ width: 16, flexShrink: 0, textAlign: 'center', fontSize: 18, fontWeight: 700 }}>{e.total >= 2 ? '+' : e.total <= -2 ? '−' : '~'}</span>
 											<span style={{ fontWeight: 500 }}>{e.gist}</span>
 											{e.effects.some((x) => SAFETY_EFFECTS.has(x)) && <AlertTriangle size={14} color={C.coral} style={{ flexShrink: 0, alignSelf: 'center' }} />}
@@ -6935,7 +6935,7 @@ function SessionTimeline({ reportQ, dosesQ, obsQ, pairsQ }: { reportQ: Q; dosesQ
 			</div>
 
 			<p style={{ margin: 0, textAlign: 'center', fontSize: 12, lineHeight: 1.7, color: C.faint }}>
-				+ better · − rougher · ~ mixed. Dots sit right when it felt better, left when rougher. Tap a line for its points and their words; tap a time to set now.
+				+ better · − rougher · ~ mixed. Dots sit right when it felt better, left when rougher. Tap a line to jump there and see its points and their words.
 			</p>
 		</div>
 	);
